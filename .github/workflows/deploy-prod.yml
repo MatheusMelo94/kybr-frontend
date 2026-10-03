@@ -65,6 +65,8 @@ jobs:
       PRODUCTION_ENABLED: ${{ vars.PRODUCTION_ENABLED }}
       PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
       ACTOR: ${{ github.actor }}
+      # On a re-run, github.actor stays the original initiator (Security DV-05).
+      TRIGGERING_ACTOR: ${{ github.triggering_actor }}
       OWNER: ${{ github.repository_owner }}
       REF: ${{ github.ref }}
       SHA: ${{ github.sha }}
@@ -78,7 +80,8 @@ jobs:
             fail "Production deploys are off (repository variable PRODUCTION_ENABLED). Production needs the real API first."
           [ -n "$PRODUCTION_URL" ] || fail "The repository variable PRODUCTION_URL is not set."
           [ "$REF" = "refs/heads/main" ] || fail "Production deploys run from main only."
-          [ "$ACTOR" = "$OWNER" ] || fail "Only the repository owner can deploy to production."
+          [ "$ACTOR" = "$OWNER" ] && [ "$TRIGGERING_ACTOR" = "$OWNER" ] ||
+            fail "Only the repository owner can deploy to production, or re-run a production deploy."
           printf '%s' "$RELEASE_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' ||
             fail "release_tag must look like v1.2.3."
           [ "$CONFIRM" = "$RELEASE_TAG" ] || fail "confirm must repeat the release tag exactly."
