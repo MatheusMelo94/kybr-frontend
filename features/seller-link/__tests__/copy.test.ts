@@ -25,7 +25,7 @@ const MODULES = {
 
 // Spec v3 § Content & Copy, verbatim, grouped by the per-screen module that holds
 // each key. Item rows are keyed pending.item.<CODE>.title/.description, and
-// document labels pending.document.<TIPO>. Spec notes (e.g. "shown for … when a
+// document labels documento.<TIPO> (spec v3). Spec notes (e.g. "shown for … when a
 // URL exists") are not copy and are left out.
 const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
   form: {
@@ -109,6 +109,7 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "pending.h1": "Quase lá",
     "pending.body":
       "Encontramos a empresa {razao_social}. Falta pouco para liberar seu cadastro:",
+    "pending.body.nodata": "Falta pouco para liberar seu cadastro:",
     "pending.deadline":
       "Prazo da análise: até {data_hora}. Avisamos por e-mail.",
     "pending.allreceived":
@@ -142,11 +143,11 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "pending.item.MEI.description":
       "O MEI tem limite de faturamento por ano. Vamos conferir antes de liberar. Você não precisa fazer nada agora.",
     "pending.item.regularize": "Como regularizar",
-    "pending.document.CONTRATO_SOCIAL_OU_CCMEI": "Contrato social ou CCMEI",
-    "pending.document.PROCURACAO": "Procuração do responsável",
-    "pending.document.COMPROVANTE_ENDERECO":
-      "Comprovante de endereço da empresa",
-    "pending.document.CARTAO_CNPJ": "Cartão CNPJ atualizado",
+    "documento.CONTRATO_SOCIAL_OU_CCMEI": "Contrato social ou CCMEI",
+    "documento.PROCURACAO": "Procuração do responsável",
+    "documento.COMPROVANTE_ENDERECO": "Comprovante de endereço da empresa",
+    "documento.CARTAO_CNPJ": "Cartão CNPJ atualizado",
+    "documento.RESPONSAVEL": "Contrato social ou procuração",
   },
   upload: {
     "upload.cta": "Enviar documento",

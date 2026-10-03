@@ -1,12 +1,13 @@
-// Spec v2 § Content & Copy, verbatim. *Quase lá*: the screen, one
+// Spec v3 § Content & Copy, verbatim. *Quase lá*: the screen, one
 // title/description per item code (EMPRESA_RECENTE has one/many title keys) and
-// the document labels for {documento}. Fill placeholders with fill() from
+// the document labels for {documento}, keyed documento.<documento_tipo>. Fill placeholders with fill() from
 // features/seller-link/format.ts. Never edit a string here without the spec
 // changing first (the UX Strategist owns the copy).
 export const pendingCopy = {
   "pending.h1": "Quase lá",
   "pending.body":
     "Encontramos a empresa {razao_social}. Falta pouco para liberar seu cadastro:",
+  "pending.body.nodata": "Falta pouco para liberar seu cadastro:",
   "pending.deadline": "Prazo da análise: até {data_hora}. Avisamos por e-mail.",
   "pending.allreceived":
     "Recebemos tudo. Agora é com a gente: avisamos por e-mail até {data_hora}.",
@@ -39,8 +40,9 @@ export const pendingCopy = {
   "pending.item.MEI.description":
     "O MEI tem limite de faturamento por ano. Vamos conferir antes de liberar. Você não precisa fazer nada agora.",
   "pending.item.regularize": "Como regularizar",
-  "pending.document.CONTRATO_SOCIAL_OU_CCMEI": "Contrato social ou CCMEI",
-  "pending.document.PROCURACAO": "Procuração do responsável",
-  "pending.document.COMPROVANTE_ENDERECO": "Comprovante de endereço da empresa",
-  "pending.document.CARTAO_CNPJ": "Cartão CNPJ atualizado",
+  "documento.CONTRATO_SOCIAL_OU_CCMEI": "Contrato social ou CCMEI",
+  "documento.PROCURACAO": "Procuração do responsável",
+  "documento.COMPROVANTE_ENDERECO": "Comprovante de endereço da empresa",
+  "documento.CARTAO_CNPJ": "Cartão CNPJ atualizado",
+  "documento.RESPONSAVEL": "Contrato social ou procuração",
 } as const;

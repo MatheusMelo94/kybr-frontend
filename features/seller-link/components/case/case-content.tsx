@@ -2,8 +2,8 @@ import type { JSX } from "react";
 
 import { ApprovedView } from "@/features/seller-link/components/case/approved-view";
 import { BlockedView } from "@/features/seller-link/components/case/blocked-view";
+import { PendingView } from "@/features/seller-link/components/case/pending-view";
 import { caseCopy } from "@/features/seller-link/copy/case";
-import { pendingCopy } from "@/features/seller-link/copy/pending";
 import type { CaseViewKey } from "@/features/seller-link/types";
 import type {
   CaseResult,
@@ -48,9 +48,7 @@ export function CaseContent({ viewKey, publicCase, link }: Props): JSX.Element {
         />
       );
     case "pending":
-      return (
-        <h1 className="text-title font-title">{pendingCopy["pending.h1"]}</h1>
-      );
+      return <PendingView resultado={resultOf(publicCase)} />;
     case "blocked":
       return (
         <BlockedView

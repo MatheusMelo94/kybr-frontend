@@ -151,7 +151,13 @@ const pendingItemSchema = z.discriminatedUnion("codigo", [
   z.object({ codigo: z.enum(["ATIVIDADE_FORA_DA_CATEGORIA", "MEI"]) }),
 ]);
 
-export type PendingItem = z.output<typeof pendingItemSchema>;
+export type CaseItem = z.output<typeof pendingItemSchema>;
+
+/** An item that asks for a document (the upload's slot). */
+export type DocumentItem = Extract<
+  CaseItem,
+  { codigo: "DOCUMENTO_RESPONSAVEL" | "DOCUMENTO_SOLICITADO" }
+>;
 
 /** An *tudo certo* confirmation row. The IE row needs its {uf}. */
 const confirmationSchema = z.discriminatedUnion("codigo", [
