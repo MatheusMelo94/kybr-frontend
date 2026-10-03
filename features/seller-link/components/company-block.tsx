@@ -21,8 +21,14 @@ export type CompanyBlockState =
   | { status: "not_found" }
   | { status: "failed" };
 
-// One minimum height for every state, so a result never shifts the form.
-const BOX = "min-h-28 rounded-lg bg-surface-raised p-4";
+// One minimum height for every state, so a result never shifts the form
+// (design-conventions.md § Screen States Matrix; review M1 v1 finding 0001).
+// Sized to the filled block of the common case, without truncating anything:
+// a two-line razão social, the activity and the city.
+// - Phone (328 px column): the activity wraps to three lines → 164 px.
+// - sm and up (the 480 px column): the activity fits two lines → 144 px.
+// Guarded by geometry in tests/e2e/seller-link/company-block-layout.spec.ts.
+const BOX = "min-h-41 sm:min-h-36 rounded-lg bg-surface-raised p-4";
 
 /** The grey autofill block under the CNPJ field (spec AC 7–9). */
 export function CompanyBlock({

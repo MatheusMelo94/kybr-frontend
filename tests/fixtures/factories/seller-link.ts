@@ -205,6 +205,16 @@ function fakerFor(key: string): Faker {
   return faker;
 }
 
+// A long razão social: two lines at 360 px and in the 480 px column. Sizes the
+// company block's reserved height (review M1 v1 finding 0001).
+const LONG_NAME_ROOT = "582936140001";
+
+/** The CNPJ whose D2 razão social is LONG_RAZAO_SOCIAL. */
+export const LONG_NAME_CNPJ = `${LONG_NAME_ROOT}${cnpjCheckDigits(LONG_NAME_ROOT)}`;
+
+export const LONG_RAZAO_SOCIAL =
+  "Comercial Exemplo de Peças Automotivas do Interior Ltda.";
+
 /** D2 projection (U-E, contract D2): name, activity, city and state. No street address. */
 export type Company = {
   razao_social: string;
@@ -216,14 +226,16 @@ export type Company = {
 /** D2 body for a CNPJ. The same CNPJ always gives the same company. */
 export function buildCompany(cnpj: string): Company {
   const faker = fakerFor(`company:${cnpj}`);
-  const meiName =
+  const fixedName =
     cnpj === MEI_CNPJS.masked
       ? MEI_NAMES.masked
       : cnpj === MEI_CNPJS.unmasked
         ? MEI_NAMES.unmasked
-        : undefined;
+        : cnpj === LONG_NAME_CNPJ
+          ? LONG_RAZAO_SOCIAL
+          : undefined;
   return {
-    razao_social: meiName ?? `${faker.company.name()} Ltda.`,
+    razao_social: fixedName ?? `${faker.company.name()} Ltda.`,
     municipio: faker.location.city(),
     uf: faker.location.state({ abbreviated: true }),
     cnae: {

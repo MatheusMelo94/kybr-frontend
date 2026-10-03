@@ -51,19 +51,6 @@ describe("CompanyBlock", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("keeps one minimum height in every state, so the result causes no shift", () => {
-    const heights = (["loading", "not_found", "failed"] as const).map(
-      (status) =>
-        render(<CompanyBlock state={{ status }} />).container.firstElementChild
-          ?.className,
-    );
-    const found = render(<CompanyBlock state={{ status: "found", company }} />)
-      .container.firstElementChild?.className;
-
-    for (const className of [...heights, found])
-      expect(className).toContain("min-h-28");
-  });
-
   it("renders nothing while idle", () => {
     const { container } = render(<CompanyBlock state={{ status: "idle" }} />);
 
