@@ -25,6 +25,9 @@ const serverEnvSchema = z
     API_BASE_URL: httpUrl,
     // Kybr API base URL the browser uploads documents to (ADR-0004b). Not secret.
     API_PUBLIC_BASE_URL: httpUrl,
+    // Local and E2E production builds only: lets API_BASE_URL be http: on a
+    // loopback host (the mock API). Never set in a deployed environment (F08).
+    API_ALLOW_LOOPBACK_HTTP: z.enum(["true", "false"]).optional(),
     // Server-to-server secret sent as X-Kybr-BFF-Key (contract X2).
     API_BFF_KEY: z.string().min(32).optional(),
     // Header the hosting platform fills with the real client IP (contract X2).
@@ -65,6 +68,18 @@ const serverEnvSchema = z
         code: "custom",
         path: ["API_BFF_KEY"],
         message: "Required in production",
+      });
+    }
+    // The BFF key and the seller's data travel on API_BASE_URL (F08).
+    const apiUrl = new URL(env.API_BASE_URL);
+    const loopbackAllowed =
+      env.API_ALLOW_LOOPBACK_HTTP === "true" &&
+      isLoopbackHostname(apiUrl.hostname);
+    if (apiUrl.protocol !== "https:" && !loopbackAllowed) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["API_BASE_URL"],
+        message: "Must be an https: URL in production",
       });
     }
     const publicUrl = new URL(env.API_PUBLIC_BASE_URL);

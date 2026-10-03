@@ -233,8 +233,10 @@ export const sellerLinkHandlers: RequestHandler[] = [
 
   // D2: company lookup
   http.get("*/public/v/:slug/lookup", ({ params, request }) => {
-    if (!linkFor(String(params.slug)))
-      return apiError(404, "LINK_NAO_ENCONTRADO");
+    const slug = String(params.slug);
+    if (!linkFor(slug)) return apiError(404, "LINK_NAO_ENCONTRADO");
+    // S19: the autofill kill switch (contract X6).
+    if (slug === SLUGS.noAutofill) return apiError(503, "AUTOFILL_DESATIVADO");
     const cnpj = new URL(request.url).searchParams.get("cnpj") ?? "";
     if (!isValidCnpj(cnpj))
       return apiError(400, "CNPJ_INVALIDO", { field: "cnpj" });

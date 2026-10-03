@@ -9,6 +9,7 @@ import {
   cnpjCheckDigits,
   cnpjFor,
   isValidCnpj,
+  MEI_CNPJS,
   type CnpjScenario,
 } from "@/tests/fixtures/factories/seller-link";
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
@@ -212,7 +213,7 @@ describe("D1 link info", () => {
 });
 
 describe("D2 company lookup", () => {
-  it("S4: answers the company", async () => {
+  it("S4: answers the U-E projection: name, activity, city and state, no street address", async () => {
     const { response, body } = await call(
       `/public/v/${SLUGS.ok}/lookup?cnpj=${cnpjFor("aprovado")}`,
     );
@@ -220,9 +221,34 @@ describe("D2 company lookup", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       razao_social: expect.any(String),
-      endereco: expect.any(String),
-      cnae: { codigo: expect.any(String), descricao: expect.any(String) },
+      municipio: expect.any(String),
+      uf: expect.stringMatching(/^[A-Z]{2}$/),
+      cnae: { descricao: expect.any(String) },
     });
+  });
+
+  it("S18: an MEI name with the CPF masked by the backend", async () => {
+    const { body } = await call(
+      `/public/v/${SLUGS.ok}/lookup?cnpj=${MEI_CNPJS.masked}`,
+    );
+
+    expect(body.razao_social).toBe("JOAO CARLOS SILVA ***.***.***-**");
+  });
+
+  it("S18: a contract-violating MEI name with the CPF unmasked (tests the frontend backstop)", async () => {
+    const { body } = await call(
+      `/public/v/${SLUGS.ok}/lookup?cnpj=${MEI_CNPJS.unmasked}`,
+    );
+
+    expect(body.razao_social).toBe("JOAO CARLOS SILVA 12345678909");
+  });
+
+  it("S19: the autofill kill switch answers 503 AUTOFILL_DESATIVADO", async () => {
+    const { response, body } = await call(
+      `/public/v/${SLUGS.noAutofill}/lookup?cnpj=${cnpjFor("aprovado")}`,
+    );
+
+    expectErrorEnvelope(response, body, 503, "AUTOFILL_DESATIVADO");
   });
 
   it("answers the same synthetic company every time", async () => {

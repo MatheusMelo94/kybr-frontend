@@ -33,6 +33,21 @@ export type ApiResult<T> =
 
 const NOT_JSON = Symbol("not JSON");
 
+/**
+ * Resolves `path` against API_BASE_URL and refuses anything that would leave
+ * the API's origin or its /public/ tree (threat model F01). It catches absolute
+ * and protocol-relative URLs, userinfo host swaps, and traversal, including
+ * encoded (WHATWG URL resolves "..", "%2e%2e").
+ */
+function publicApiUrl(path: string): URL {
+  const base = new URL(env.API_BASE_URL);
+  const url = new URL(path, base);
+  if (url.origin !== base.origin || !url.pathname.startsWith("/public/")) {
+    throw new Error("Refused API path: outside the API's /public/ tree");
+  }
+  return url;
+}
+
 /** A failure before a full response arrived: the timeout's abort, or the network. */
 function transportError(error: unknown): AppError {
   const aborted =
@@ -44,11 +59,13 @@ function transportError(error: unknown): AppError {
 /**
  * Calls the Kybr API from the Next server. It never throws for an HTTP,
  * network or schema failure: those come back as `{ ok: false, error }`, and the
- * data function decides what is expected.
+ * data function decides what is expected. It does throw for a path outside the
+ * API's /public/ tree: that's a bug or an attack, never a runtime condition.
  */
 export async function apiRequest<T>(
   request: ApiRequest<T>,
 ): Promise<ApiResult<T>> {
+  const url = publicApiUrl(request.path);
   const headers = new Headers(request.headers);
   headers.set("accept", "application/json");
   if (env.API_BFF_KEY !== undefined)
@@ -62,19 +79,16 @@ export async function apiRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(
-      `${env.API_BASE_URL.replace(/\/$/, "")}${request.path}`,
-      {
-        method: request.method ?? "GET",
-        headers,
-        signal: AbortSignal.timeout(request.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-        ...(request.body !== undefined && {
-          body: JSON.stringify(request.body),
-        }),
-        ...(request.cache !== undefined && { cache: request.cache }),
-        ...(request.next !== undefined && { next: request.next }),
-      },
-    );
+    response = await fetch(url, {
+      method: request.method ?? "GET",
+      headers,
+      // Never follow a 3xx: a redirect would carry the BFF key to its target (F01).
+      redirect: "error",
+      signal: AbortSignal.timeout(request.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+      ...(request.body !== undefined && { body: JSON.stringify(request.body) }),
+      ...(request.cache !== undefined && { cache: request.cache }),
+      ...(request.next !== undefined && { next: request.next }),
+    });
   } catch (error) {
     return { ok: false, error: transportError(error) };
   }

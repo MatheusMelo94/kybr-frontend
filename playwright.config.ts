@@ -41,6 +41,8 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: {
         API_BASE_URL: MOCK_API_URL,
+        // The mock API is http: on loopback; production refuses http: otherwise (F08).
+        API_ALLOW_LOOPBACK_HTTP: "true",
         API_PUBLIC_BASE_URL: MOCK_API_URL,
         // Not a secret: it only ever reaches the local mock API.
         API_BFF_KEY: "e2e-only-bff-key-for-the-local-mock-api",

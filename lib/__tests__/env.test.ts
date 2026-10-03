@@ -134,6 +134,35 @@ describe("parseServerEnv", () => {
     ).toContain("API_PUBLIC_BASE_URL");
   });
 
+  it("requires an https: API_BASE_URL in production: the BFF key and PII travel on it (F08)", () => {
+    expect(
+      parseError({ ...production, API_BASE_URL: "http://api.kybr.test" }),
+    ).toContain("API_BASE_URL");
+  });
+
+  it("refuses a loopback http: API_BASE_URL in production unless explicitly allowed", () => {
+    expect(
+      parseError({ ...production, API_BASE_URL: "http://localhost:4010" }),
+    ).toContain("API_BASE_URL");
+    expect(
+      parseServerEnv({
+        ...production,
+        API_BASE_URL: "http://localhost:4010",
+        API_ALLOW_LOOPBACK_HTTP: "true",
+      }).API_BASE_URL,
+    ).toBe("http://localhost:4010");
+  });
+
+  it("never lets the loopback flag allow a non-loopback http: API_BASE_URL", () => {
+    expect(
+      parseError({
+        ...production,
+        API_BASE_URL: "http://api.kybr.test",
+        API_ALLOW_LOOPBACK_HTTP: "true",
+      }),
+    ).toContain("API_BASE_URL");
+  });
+
   it("allows a loopback http: API_PUBLIC_BASE_URL in production, for local production builds", () => {
     expect(
       parseServerEnv({

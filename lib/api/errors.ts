@@ -14,6 +14,7 @@ export const API_ERROR_CODES = [
   "ARQUIVO_GRANDE",
   "FORMATO_INVALIDO",
   "CASO_DECIDIDO",
+  "AUTOFILL_DESATIVADO", // D2 kill switch (contract X6)
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

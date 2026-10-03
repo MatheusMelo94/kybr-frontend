@@ -28,6 +28,7 @@ export const SLUGS = {
   other: "outra-loja", // a second live link (URL contact); S11 slug mismatch
   unknown: "loja-inexistente", // S2
   unstable: "loja-instavel", // S3: 500 until recovered (POST /__mock/links/:slug/recover)
+  noAutofill: "loja-sem-autofill", // S19: D2 kill switch, 503 AUTOFILL_DESATIVADO
 } as const;
 
 /** Fixed case tokens (X3 pattern). Their cases exist as soon as the mock starts. */
@@ -89,6 +90,13 @@ export const PUBLIC_LINKS: Readonly<Record<string, PublicLink>> = {
   [SLUGS.other]: {
     nome: "Outra Loja",
     contato_vendedor: { tipo: "url", valor: "https://outra-loja.test/ajuda" },
+  },
+  [SLUGS.noAutofill]: {
+    nome: "Loja Sem Autofill",
+    contato_vendedor: {
+      tipo: "email",
+      valor: "contato@loja-sem-autofill.test",
+    },
   },
   [SLUGS.unstable]: {
     nome: "Loja Instável",
@@ -157,6 +165,22 @@ export function scenarioForCnpj(cnpj: string): CnpjScenario | undefined {
   );
 }
 
+// S18: MEI names carry the owner's CPF (synthetic). The mock masks it as the
+// backend must (contract X7), except for one contract-violating variant that
+// exercises the frontend backstop.
+const MEI_ROOTS = { masked: "369258140001", unmasked: "471582630001" } as const;
+
+/** S18 CNPJs, by how the mock returns the MEI name's CPF. */
+export const MEI_CNPJS = {
+  masked: `${MEI_ROOTS.masked}${cnpjCheckDigits(MEI_ROOTS.masked)}`,
+  unmasked: `${MEI_ROOTS.unmasked}${cnpjCheckDigits(MEI_ROOTS.unmasked)}`,
+} as const;
+
+export const MEI_NAMES = {
+  masked: "JOAO CARLOS SILVA ***.***.***-**",
+  unmasked: "JOAO CARLOS SILVA 12345678909",
+} as const;
+
 // --- Seeded synthetic data ----------------------------------------------------
 
 function fakerFor(key: string): Faker {
@@ -167,20 +191,28 @@ function fakerFor(key: string): Faker {
   return faker;
 }
 
+/** D2 projection (U-E, contract D2): name, activity, city and state. No street address. */
 export type Company = {
   razao_social: string;
-  endereco: string;
-  cnae: { codigo: string; descricao: string };
+  municipio: string;
+  uf: string;
+  cnae: { descricao: string };
 };
 
 /** D2 body for a CNPJ. The same CNPJ always gives the same company. */
 export function buildCompany(cnpj: string): Company {
   const faker = fakerFor(`company:${cnpj}`);
+  const meiName =
+    cnpj === MEI_CNPJS.masked
+      ? MEI_NAMES.masked
+      : cnpj === MEI_CNPJS.unmasked
+        ? MEI_NAMES.unmasked
+        : undefined;
   return {
-    razao_social: `${faker.company.name()} Ltda.`,
-    endereco: `${faker.location.street()}, ${faker.number.int({ min: 10, max: 1999 })}, ${faker.location.city()} - ${faker.location.state({ abbreviated: true })}`,
+    razao_social: meiName ?? `${faker.company.name()} Ltda.`,
+    municipio: faker.location.city(),
+    uf: faker.location.state({ abbreviated: true }),
     cnae: {
-      codigo: "4530-7/03",
       descricao:
         "Comércio a varejo de peças e acessórios novos para veículos automotores",
     },
