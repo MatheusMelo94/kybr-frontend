@@ -101,24 +101,33 @@ test.describe("live status @feature-seller-link", () => {
     page,
     request,
   }) => {
+    // Held case: the server keeps answering "verifying". The browser clock is
+    // paused and advanced one 2 s step at a time, so the cadence is counted,
+    // not timed (QA plan § Making timing deterministic; review 0012).
     const token = await createCase(request, { responsavel: "Maria Exemplo" });
     const checks = recordChecks(page);
+    await page.clock.install();
 
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
     await expect(h1(page, VERIFYING)).toBeVisible();
-    await expect.poll(() => checks.length, { timeout: 8_000 }).toBe(3);
-    const gaps = checks
-      .slice(1)
-      .map((sentAt, index) => sentAt - (checks[index] ?? 0));
-    for (const gap of gaps) {
-      expect(gap).toBeGreaterThan(1_500);
-      expect(gap).toBeLessThan(3_500);
+    // Slightly ahead: pauseAt refuses a time that has already passed.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+    // A check already in flight must come back first: its next one is
+    // scheduled from the clock at that moment.
+    await expect.poll(() => checks.settled.length).toBe(checks.sent.length);
+    const before = checks.sent.length;
+
+    for (let step = 1; step <= 3; step += 1) {
+      await page.clock.runFor(2_000);
+      await expect.poll(() => checks.sent.length).toBe(before + step);
+      await expect.poll(() => checks.settled.length).toBe(before + step);
     }
 
     await setCaseState(request, token, { kind: "aprovado" });
+    await page.clock.resume();
 
     const result = h1(page, "Tudo certo, Maria.");
-    await expect(result).toBeVisible({ timeout: 4_000 });
+    await expect(result).toBeVisible({ timeout: 5_000 });
     await expect(result).toBeFocused();
     await expect(page.getByRole("status")).toHaveText("Tudo certo, Maria.");
     await expect(page.getByText("Passo 3 de 3")).toBeAttached();

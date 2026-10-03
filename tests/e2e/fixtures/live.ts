@@ -1,13 +1,28 @@
-import type { Page } from "@playwright/test";
+import type { Page, Request } from "@playwright/test";
 
-/** Records when each status check (a Server Action POST) leaves the page. */
-export function recordChecks(page: Page): number[] {
-  const sent: number[] = [];
+function isCheck(request: Request): boolean {
+  return request.method() === "POST" && !!request.headers()["next-action"];
+}
+
+export type CheckLog = {
+  /** When each status check (a Server Action POST) left the page. */
+  sent: number[];
+  /** When each one's response came back (or the request failed). */
+  settled: number[];
+};
+
+/** Records the page's status checks as they're sent and as they settle. */
+export function recordChecks(page: Page): CheckLog {
+  const log: CheckLog = { sent: [], settled: [] };
   page.on("request", (request) => {
-    if (request.method() === "POST" && request.headers()["next-action"])
-      sent.push(Date.now());
+    if (isCheck(request)) log.sent.push(Date.now());
   });
-  return sent;
+  const settle = (request: Request): void => {
+    if (isCheck(request)) log.settled.push(Date.now());
+  };
+  page.on("requestfinished", settle);
+  page.on("requestfailed", settle);
+  return log;
 }
 
 /** Resolves when the page sends its next status check. */
