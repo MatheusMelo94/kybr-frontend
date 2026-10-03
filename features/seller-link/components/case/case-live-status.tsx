@@ -11,13 +11,30 @@ import {
 import { useAnnounceViewChange } from "@/features/seller-link/components/case/case-view-transition";
 import type { CaseViewKey } from "@/features/seller-link/types";
 
-// Check cadence (plan § 1.3; contract D4 polling load).
-const CHECK_WHILE_VERIFYING_MS = 2_000;
-const CHECK_WHILE_ANALYSIS_MS = 10_000;
-/** After a non-network failure, retry quietly (tech-design § 3 rule 7). */
-const RETRY_AFTER_FAILURE_MS = 5_000;
-/** While a refresh is outstanding, re-render this often (see refreshing below). */
-const REFRESH_NUDGE_MS = 250;
+const SECOND = 1_000;
+const MINUTE = 60 * SECOND;
+
+/**
+ * Every timing number of the live status, in one place (plan § 1.3,
+ * tech-design § 3, Architect's schedule for security finding M2-02/M2-04).
+ */
+export const LIVE_STATUS_SCHEDULE = {
+  /** *Verificando*: one check every 2 s (the switch itself is at 10 s, server-computed). */
+  verifyingEveryMs: 2 * SECOND,
+  /**
+   * *Em análise*: the cadence by visible time since it appeared on this page.
+   * Past the last rung's `untilMs` (2 h), checks stop.
+   */
+  analysisLadder: [
+    { untilMs: 5 * MINUTE, everyMs: 10 * SECOND },
+    { untilMs: 30 * MINUTE, everyMs: 30 * SECOND },
+    { untilMs: 120 * MINUTE, everyMs: 60 * SECOND },
+  ],
+  /** Non-network failures: max(cadence, baseMs × 2^(n−1)), at most maxMs. */
+  failureBackoff: { baseMs: 5 * SECOND, maxMs: 60 * SECOND },
+  /** After router.refresh(): re-render this often, at most this many times (rule 11). */
+  nudge: { everyMs: 250, maxTicks: 40 },
+} as const;
 
 // One literal class string or none, so no cn(): it would pull tailwind-merge
 // (~9 kB gzip) into this route's client chunk (ADR-0003 budget).
@@ -48,12 +65,36 @@ type SwitchProps = CaseRef & {
 };
 
 type WatchProps = CaseRef & {
-  /** *Em análise* rendered by the server: check every 10 s; only the banner renders. */
+  /** *Em análise* rendered by the server: check on the ladder; only the banner renders. */
   mode: "watch";
   viewKey: "analysis-timeout" | "analysis-notfound";
 };
 
 type Props = SwitchProps | WatchProps;
+
+/** Visible time on *em análise*, paused while the tab is hidden. */
+type AnalysisClock = {
+  /** Visible ms already counted. */
+  counted: number;
+  /** When the current visible stretch began, or null (not started, or hidden). */
+  since: number | null;
+  started: boolean;
+};
+
+function visibleMs(clock: AnalysisClock): number {
+  return clock.counted + (clock.since === null ? 0 : Date.now() - clock.since);
+}
+
+function startClock(clock: AnalysisClock): void {
+  clock.started = true;
+  clock.counted = 0;
+  clock.since = document.hidden ? null : Date.now();
+}
+
+/** A failed fetch: the browser couldn't reach the server (Q2). */
+function isNetworkError(error: unknown): boolean {
+  return error instanceof TypeError;
+}
 
 /**
  * The case page's live status (tech-design § 3; ADR-0004a).
@@ -61,18 +102,18 @@ type Props = SwitchProps | WatchProps;
  * - Switch mode swaps the verifying node for the analysis node at
  *   msUntilTimeout, on the client and with no server round trip, so it also
  *   happens offline, and reports it to CaseViewTransition (rule 3).
- * - Both modes check the case through pollCaseViewAction: every 2 s while
- *   verifying, every 10 s on *em análise*, one at a time (rules 1, 8), paused
- *   while the tab is hidden and run at once when it's visible again (rule 6).
- * - router.refresh() runs only after a successful check returns a different
- *   view, or not-found (rules 2, 7), and checking stops there: the server's
- *   render takes over. A failed check is retried quietly after 5 s (rule 7).
- * - Offline (rule 5): navigator.onLine false, an `offline` event, or a check
- *   that rejects at the network level shows offline.banner (role=status) and
- *   pauses the checks; router.refresh() never runs then, so a failed RSC fetch
- *   can't turn into a hard navigation. On `online` the banner goes and a check
- *   runs at once. A rejection while the browser still says online is retried
- *   at the current cadence, and the first successful check hides the banner.
+ * - Checks go through pollCaseViewAction, one at a time (rules 1, 8): every
+ *   2 s while verifying; on *em análise*, on LIVE_STATUS_SCHEDULE's ladder of
+ *   visible time, stopping at 2 h (M2-02). Hidden: paused; visible again:
+ *   check at once (rule 6). After the stop, visible or `online` restarts the
+ *   ladder.
+ * - router.refresh() only after a successful check returns another view, or
+ *   not-found (rules 2, 7); a "verifying" after the switch is no change (Q4).
+ * - Failures: a network TypeError is the offline state (banner, retry at the
+ *   cadence, Q2); anything else, a WAF 429 included, is silent with a capped
+ *   exponential backoff (rule 7, M2-04). navigator.onLine false or `offline`
+ *   shows the banner and pauses; `online` hides it and checks at once
+ *   (rule 5). router.refresh() never runs offline.
  */
 export function CaseLiveStatus(props: Props): JSX.Element {
   const { slug, token, mode } = props;
@@ -85,22 +126,54 @@ export function CaseLiveStatus(props: Props): JSX.Element {
   const watchedKey = mode === "watch" ? props.viewKey : undefined;
 
   const [timedOut, setTimedOut] = useState(msUntilTimeout <= 0);
-  // True from router.refresh() until the server's new tree replaces this
-  // component (a result view unmounts it; *em análise* remounts it).
-  const [refreshing, setRefreshing] = useState(false);
-  const [, setNudges] = useState(0);
   const [offline, setOffline] = useState(false);
-  // The view on screen, for comparing check results. A ref: changing it must
-  // not restart the check loop.
+  // From router.refresh() until the server's new tree remounts this island
+  // (the keyed wrapper in CaseViewTransition), or the nudge cap.
+  const [refreshing, setRefreshing] = useState(false);
+  // Bumped when a refresh gives up waiting, to restart the check loop.
+  const [resumes, setResumes] = useState(0);
+  const [, setNudges] = useState(0);
+
+  // The view the server (or the client switch) put on screen, for comparing
+  // check results. Refs: changing them must not restart the loop.
   const onScreen = useRef<CaseViewKey>(
     watchedKey ?? (msUntilTimeout > 0 ? "verifying" : "analysis-timeout"),
   );
+  const clock = useRef<AnalysisClock>({
+    counted: 0,
+    since: null,
+    started: false,
+  });
+
+  // *Em análise* on mount (watch mode, or no time left): the ladder starts now.
+  useEffect(() => {
+    if (onScreen.current !== "verifying" && !clock.current.started)
+      startClock(clock.current);
+  }, []);
+
+  // The visible-time clock pauses while hidden.
+  useEffect(() => {
+    function onVisibilityChange(): void {
+      const current = clock.current;
+      if (!current.started) return;
+      if (document.hidden && current.since !== null) {
+        current.counted += Date.now() - current.since;
+        current.since = null;
+      } else if (!document.hidden && current.since === null) {
+        current.since = Date.now();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
 
   // The 10 s switch (rule 3). It fires even while hidden or offline.
   useEffect(() => {
     if (mode !== "switch" || timedOut) return;
     const timer = setTimeout(() => {
       onScreen.current = "analysis-timeout";
+      startClock(clock.current);
       setTimedOut(true);
       announceViewChange("analysis-timeout", analysisAnnouncement);
     }, msUntilTimeout);
@@ -113,22 +186,43 @@ export function CaseLiveStatus(props: Props): JSX.Element {
     analysisAnnouncement,
   ]);
 
-  // The check loop, with the offline state.
+  // The check loop. Stopped while a refresh is pending.
   useEffect(() => {
-    if (watchedKey !== undefined) onScreen.current = watchedKey;
+    if (refreshing) return;
     let active = true;
     let inFlight = false;
+    let failures = 0;
     let isOffline = false;
+    let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const cadence = (): number =>
-      onScreen.current === "verifying"
-        ? CHECK_WHILE_VERIFYING_MS
-        : CHECK_WHILE_ANALYSIS_MS;
+    /** The cadence now, or null once *em análise* has run its 2 h. */
+    function cadence(): number | null {
+      if (onScreen.current === "verifying")
+        return LIVE_STATUS_SCHEDULE.verifyingEveryMs;
+      const { analysisLadder } = LIVE_STATUS_SCHEDULE;
+      const elapsed = visibleMs(clock.current);
+      const rung = analysisLadder.find(({ untilMs }) => elapsed < untilMs);
+      const stopAt = analysisLadder[analysisLadder.length - 1]?.untilMs ?? 0;
+      // The last check comes before the stop, never at or after it.
+      if (rung === undefined || elapsed + rung.everyMs >= stopAt) return null;
+      return rung.everyMs;
+    }
 
-    function schedule(ms: number): void {
+    function schedule(ms: number | null): void {
       clearTimeout(timer);
+      if (ms === null) {
+        stopped = true; // no timer, no banner change
+        return;
+      }
       timer = setTimeout(() => void check(), ms);
+    }
+
+    function backoff(): number | null {
+      const base = cadence();
+      if (base === null) return null;
+      const { baseMs, maxMs } = LIVE_STATUS_SCHEDULE.failureBackoff;
+      return Math.min(maxMs, Math.max(base, baseMs * 2 ** (failures - 1)));
     }
 
     function goOffline(next: boolean): void {
@@ -136,9 +230,9 @@ export function CaseLiveStatus(props: Props): JSX.Element {
       setOffline(next);
     }
 
-    function refreshTo(viewKey: CaseViewKey | undefined): void {
+    function refreshTo(): void {
       active = false;
-      if (viewKey !== undefined) onScreen.current = viewKey;
+      clearTimeout(timer);
       router.refresh();
       setRefreshing(true);
     }
@@ -155,14 +249,21 @@ export function CaseLiveStatus(props: Props): JSX.Element {
       let result: PollCaseViewResult;
       try {
         result = await pollCaseViewAction(slug, token);
-      } catch {
-        // The action couldn't be reached: the offline state. The browser may
-        // still say online (no `online` event will come), so keep checking at
-        // the current cadence (QA plan Q2, Architect-pending).
+      } catch (error) {
         inFlight = false;
         if (!active) return;
-        goOffline(true);
-        if (navigator.onLine) schedule(cadence());
+        if (isNetworkError(error)) {
+          // The offline state (Q2). The browser may still say online, and no
+          // `online` event will come, so keep checking at the cadence.
+          goOffline(true);
+          if (navigator.onLine) schedule(cadence());
+          return;
+        }
+        // The server answered with something else (a WAF 429, a 5xx page):
+        // reachable, so no banner; slow down (M2-04).
+        if (isOffline) goOffline(false);
+        failures += 1;
+        schedule(backoff());
         return;
       }
       inFlight = false;
@@ -170,17 +271,27 @@ export function CaseLiveStatus(props: Props): JSX.Element {
       if (isOffline) goOffline(false);
 
       if (!result.ok) {
-        if (result.reason === "not_found") refreshTo(undefined);
-        else schedule(RETRY_AFTER_FAILURE_MS);
+        if (result.reason === "not_found") {
+          refreshTo();
+          return;
+        }
+        failures += 1;
+        schedule(backoff());
         return;
       }
+      failures = 0;
       // Once the switch shows *em análise*, a late "verifying" isn't a change.
       if (result.viewKey !== onScreen.current && result.viewKey !== "verifying")
-        refreshTo(result.viewKey);
+        refreshTo();
       else schedule(cadence());
     }
 
     function checkNow(): void {
+      if (stopped) {
+        // After the 2 h stop, a return restarts the ladder from 0.
+        stopped = false;
+        if (onScreen.current !== "verifying") startClock(clock.current);
+      }
       clearTimeout(timer);
       void check();
     }
@@ -202,8 +313,9 @@ export function CaseLiveStatus(props: Props): JSX.Element {
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("offline", onOffline);
     window.addEventListener("online", onOnline);
-    if (navigator.onLine) schedule(cadence());
-    else goOffline(true);
+    if (!navigator.onLine) goOffline(true);
+    else if (resumes > 0) checkNow();
+    else schedule(cadence());
     return () => {
       active = false;
       clearTimeout(timer);
@@ -211,19 +323,29 @@ export function CaseLiveStatus(props: Props): JSX.Element {
       window.removeEventListener("offline", onOffline);
       window.removeEventListener("online", onOnline);
     };
-  }, [slug, token, watchedKey, router]);
+  }, [slug, token, router, refreshing, resumes]);
 
   // Next 15.5 / React 19.2: a refresh dispatched right after a Server Action
   // sometimes stays uncommitted until some other React update happens (seen
-  // in E2E under load: the result appeared only when the 10 s switch fired, or
-  // never). An urgent no-op re-render releases it, so one runs every 250 ms
-  // until this component is replaced. Remove when the framework fixes it.
+  // in E2E under load). An urgent no-op re-render releases it, so one runs
+  // every 250 ms from router.refresh() until the new view remounts this
+  // island, never while hidden, and at most 40 times (10 s): then checks
+  // resume, and the next one refreshes again if the view still differs
+  // (tech-design § 3 rule 11). Remove when the framework fixes it.
   useEffect(() => {
     if (!refreshing) return;
-    const nudge = setInterval(
-      () => setNudges((count) => count + 1),
-      REFRESH_NUDGE_MS,
-    );
+    let ticks = 0;
+    const nudge = setInterval(() => {
+      if (document.hidden) return;
+      ticks += 1;
+      if (ticks > LIVE_STATUS_SCHEDULE.nudge.maxTicks) {
+        clearInterval(nudge);
+        setRefreshing(false);
+        setResumes((count) => count + 1);
+        return;
+      }
+      setNudges((count) => count + 1);
+    }, LIVE_STATUS_SCHEDULE.nudge.everyMs);
     return () => clearInterval(nudge);
   }, [refreshing]);
 
