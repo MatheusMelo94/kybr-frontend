@@ -62,7 +62,9 @@ export function PendingView({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <h1 className="text-title font-title">{pendingCopy["pending.h1"]}</h1>
+        <h1 tabIndex={-1} className="text-title font-title">
+          {pendingCopy["pending.h1"]}
+        </h1>
         <p className="text-body break-words text-ink-muted">
           {razao_social === undefined
             ? pendingCopy["pending.body.nodata"]

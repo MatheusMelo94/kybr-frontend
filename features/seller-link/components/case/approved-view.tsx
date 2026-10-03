@@ -60,7 +60,7 @@ export function ApprovedView({ resultado, marketplace }: Props): JSX.Element {
     <div className="flex flex-col gap-6">
       <Seal />
       <div className="flex flex-col gap-3">
-        <h1 className="text-title font-title break-words">
+        <h1 tabIndex={-1} className="text-title font-title break-words">
           {fill(resultsCopy["approved.h1"], {
             primeiro_nome: primeiroNome(responsavel),
           })}

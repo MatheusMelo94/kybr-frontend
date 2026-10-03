@@ -22,7 +22,9 @@ export function AnalysisView({ variant, emailBlock }: Props): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <h1 className="text-title font-title">{caseCopy["analysis.h1"]}</h1>
+        <h1 tabIndex={-1} className="text-title font-title">
+          {caseCopy["analysis.h1"]}
+        </h1>
         <p className="text-body text-ink-muted">{BODY[variant]}</p>
       </div>
       {emailBlock}

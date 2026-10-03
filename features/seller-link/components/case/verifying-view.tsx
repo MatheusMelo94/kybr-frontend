@@ -10,7 +10,9 @@ import { caseCopy } from "@/features/seller-link/copy/case";
 export function VerifyingView(): JSX.Element {
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-title font-title">{caseCopy["verifying.h1"]}</h1>
+      <h1 tabIndex={-1} className="text-title font-title">
+        {caseCopy["verifying.h1"]}
+      </h1>
       <p className="text-body text-ink-muted">{caseCopy["verifying.status"]}</p>
     </div>
   );

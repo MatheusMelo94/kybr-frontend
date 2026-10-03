@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { JSX } from "react";
 
+import { caseAnnouncement } from "@/features/seller-link/case-announcement";
 import { CaseContent } from "@/features/seller-link/components/case/case-content";
+import { CaseViewTransition } from "@/features/seller-link/components/case/case-view-transition";
 import { StepIndicator } from "@/features/seller-link/components/step-indicator";
 import { deriveCaseView } from "@/features/seller-link/case-view";
 import { formCopy } from "@/features/seller-link/copy/form";
@@ -33,11 +35,16 @@ export default async function CasePage({
   return (
     <div className="flex flex-col gap-6">
       <StepIndicator step={view.step} />
-      <CaseContent
-        view={view}
-        publicCase={caseResult.publicCase}
-        link={link.link}
-      />
+      <CaseViewTransition
+        viewKey={view.viewKey}
+        announcement={caseAnnouncement(view.viewKey, caseResult.publicCase)}
+      >
+        <CaseContent
+          view={view}
+          publicCase={caseResult.publicCase}
+          link={link.link}
+        />
+      </CaseViewTransition>
     </div>
   );
 }

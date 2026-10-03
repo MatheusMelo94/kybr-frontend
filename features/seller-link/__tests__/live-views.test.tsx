@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AnalysisView } from "@/features/seller-link/components/case/analysis-view";
 import { CaseLiveStatus } from "@/features/seller-link/components/case/case-live-status";
+import { CaseViewTransition } from "@/features/seller-link/components/case/case-view-transition";
 import { VerifyingView } from "@/features/seller-link/components/case/verifying-view";
 
 describe("VerifyingView", () => {
@@ -94,6 +95,7 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
         msUntilTimeout={msUntilTimeout}
         verifying={<h1>verificando</h1>}
         analysis={<h1>em análise</h1>}
+        analysisAnnouncement="em análise"
       />,
     );
   }
@@ -126,6 +128,36 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
     expect(
       screen.getByRole("heading", { name: "em análise" }),
     ).toBeInTheDocument();
+  });
+
+  it("AC 17: reports the switch, so the em análise h1 gets focus and the change is announced", () => {
+    render(
+      <CaseViewTransition viewKey="verifying" announcement="Consultando…">
+        <CaseLiveStatus
+          msUntilTimeout={3_000}
+          verifying={<VerifyingView />}
+          analysis={<AnalysisView variant="timeout" />}
+          analysisAnnouncement="Sua empresa está em análise"
+        />
+      </CaseViewTransition>,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(20); // the region fills one frame later
+    });
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Sua empresa está em análise",
+      }),
+    ).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Sua empresa está em análise",
+    );
   });
 
   it("stops its timer on unmount", () => {

@@ -40,10 +40,11 @@ test.describe("live status @feature-seller-link", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
     ).toBeVisible();
+    // The view's status line (the polite region says it too, T25).
     await expect(
-      page.getByText(
-        "Consultando Receita Federal, Simples Nacional e SINTEGRA…",
-      ),
+      page.locator("p", {
+        hasText: "Consultando Receita Federal, Simples Nacional e SINTEGRA…",
+      }),
     ).toBeVisible();
 
     await expect(
@@ -55,6 +56,16 @@ test.describe("live status @feature-seller-link", () => {
     await expect(page.getByText(/^A consulta está demorando/)).toBeVisible();
     await expect(page.getByText(/^Este endereço também mostra/)).toBeVisible();
     await expect(page.getByText("Passo 2 de 3")).toBeAttached();
+    // T25: the switch moves focus to the new h1 and announces it.
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Sua empresa está em análise",
+      }),
+    ).toBeFocused();
+    await expect(page.getByRole("status")).toHaveText(
+      "Sua empresa está em análise",
+    );
     expect(
       await page.evaluate(
         () =>

@@ -108,7 +108,9 @@ export function BlockedView({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <h1 className="text-title font-title">{blockedCopy["blocked.h1"]}</h1>
+        <h1 tabIndex={-1} className="text-title font-title">
+          {blockedCopy["blocked.h1"]}
+        </h1>
         <p className="text-body break-words text-ink-muted">
           {reasonFor(motivo, razao_social, responsavel, marketplace)}
         </p>

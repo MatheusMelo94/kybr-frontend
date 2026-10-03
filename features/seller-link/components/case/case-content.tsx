@@ -6,6 +6,7 @@ import { BlockedView } from "@/features/seller-link/components/case/blocked-view
 import { CaseLiveStatus } from "@/features/seller-link/components/case/case-live-status";
 import { PendingView } from "@/features/seller-link/components/case/pending-view";
 import { VerifyingView } from "@/features/seller-link/components/case/verifying-view";
+import { caseAnnouncement } from "@/features/seller-link/case-announcement";
 import type { CaseView } from "@/features/seller-link/types";
 import type {
   CaseResult,
@@ -40,6 +41,10 @@ export function CaseContent({ view, publicCase, link }: Props): JSX.Element {
           msUntilTimeout={view.msUntilTimeout}
           verifying={<VerifyingView />}
           analysis={<AnalysisView variant="timeout" />}
+          analysisAnnouncement={caseAnnouncement(
+            "analysis-timeout",
+            publicCase,
+          )}
         />
       );
     case "analysis-timeout":
