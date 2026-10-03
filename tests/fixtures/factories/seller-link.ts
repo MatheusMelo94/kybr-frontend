@@ -17,7 +17,8 @@ export type CnpjScenario =
   | "limite-consulta" // S8
   | "limite-cnpj" // S9
   | "limite-geral" // S9
-  | "lento"; // S10
+  | "lento" // S10
+  | "aprovado-alfanumerico"; // S16
 
 /** Every mocked error carries this `message`. It must never reach the screen (AC 36). */
 export const ERROR_SENTINEL = "MSG-BACKEND-NAO-EXIBIR";
@@ -96,11 +97,14 @@ export const PUBLIC_LINKS: Readonly<Record<string, PublicLink>> = {
 };
 
 // --- CNPJ -------------------------------------------------------------------
+// Wire format (contract X5): 14 uppercase alphanumerics, ^[0-9A-Z]{12}[0-9]{2}$.
+// Spec v2 samples for S4–S6 and S16; made-up roots for the rest.
 
 const CNPJ_ROOTS: Record<CnpjScenario, string> = {
-  aprovado: "481537290001",
-  pendente: "572648130001",
-  bloqueado: "639271540001",
+  aprovado: "123456780001", // 12.345.678/0001-95
+  pendente: "987654320001", // 98.765.432/0001-98
+  bloqueado: "112223330001", // 11.222.333/0001-81
+  "aprovado-alfanumerico": "12ABC34501DE", // 12.ABC.345/01DE-35 (Receita's example)
   "sem-dados": "714385620001",
   "limite-consulta": "825496730001",
   "limite-cnpj": "936517840001",
@@ -108,34 +112,39 @@ const CNPJ_ROOTS: Record<CnpjScenario, string> = {
   lento: "258739160001",
 };
 
+// A separate implementation from lib/cnpj.ts (pnpm mock:api runs under plain
+// Node, without the @/ alias); a parity test keeps the two in agreement.
 const FIRST_WEIGHTS = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 const SECOND_WEIGHTS = [6, ...FIRST_WEIGHTS];
 
-function checkDigit(digits: string, weights: number[]): number {
+function checkDigit(characters: string, weights: number[]): number {
+  // Each character is worth its ASCII code minus 48 (0–9 → 0–9, A → 17 … Z → 42).
   const sum = weights.reduce(
-    (total, weight, index) => total + Number(digits[index]) * weight,
+    (total, weight, index) =>
+      total + (characters.charCodeAt(index) - 48) * weight,
     0,
   );
   const remainder = sum % 11;
   return remainder < 2 ? 0 : 11 - remainder;
 }
 
-/** The two CNPJ check digits for the first 12 digits (Receita Federal algorithm). */
+/** The two check digits for the first 12 characters (Receita, IN RFB 2.229/2024). */
 export function cnpjCheckDigits(first12: string): string {
   const first = checkDigit(first12, FIRST_WEIGHTS);
   const second = checkDigit(`${first12}${first}`, SECOND_WEIGHTS);
   return `${first}${second}`;
 }
 
+/** Strict wire-format check: what the mock accepts on D2 and D3. */
 export function isValidCnpj(cnpj: string): boolean {
   return (
-    /^\d{14}$/.test(cnpj) &&
-    !/^(\d)\1{13}$/.test(cnpj) &&
+    /^[0-9A-Z]{12}[0-9]{2}$/.test(cnpj) &&
+    !/^(.)\1{13}$/.test(cnpj) &&
     cnpjCheckDigits(cnpj.slice(0, 12)) === cnpj.slice(12)
   );
 }
 
-/** A synthetic, check-digit-valid CNPJ (14 digits, unmasked) for a scenario. */
+/** A check-digit-valid CNPJ in wire format (14 uppercase characters, unmasked). */
 export function cnpjFor(scenario: CnpjScenario): string {
   const root = CNPJ_ROOTS[scenario];
   return `${root}${cnpjCheckDigits(root)}`;
