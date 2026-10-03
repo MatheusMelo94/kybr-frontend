@@ -18,6 +18,10 @@ type Props = {
   type?: "text" | "email";
   inputMode?: "text" | "numeric" | "email";
   autoComplete?: string;
+  autoCapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";
+  /** Safari's non-standard autocorrect switch. */
+  autoCorrect?: "on" | "off";
+  spellCheck?: boolean;
   placeholder?: string;
   maxLength?: number;
   value?: string;
@@ -36,6 +40,9 @@ export function TextField({
   type = "text",
   inputMode,
   autoComplete,
+  autoCapitalize,
+  autoCorrect,
+  spellCheck,
   placeholder,
   maxLength,
   value,
@@ -64,6 +71,9 @@ export function TextField({
         type={type}
         inputMode={inputMode}
         autoComplete={autoComplete}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+        spellCheck={spellCheck}
         placeholder={placeholder}
         maxLength={maxLength}
         value={value}
