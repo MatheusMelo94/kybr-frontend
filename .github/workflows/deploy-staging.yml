@@ -95,6 +95,7 @@ jobs:
 
       - name: Smoke the preview (health, security headers)
         env:
+          EXPECT_PROTECTED: "true"
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
         run: sh scripts/check-deploy-headers.sh "$DEPLOY_URL"

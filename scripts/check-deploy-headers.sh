@@ -10,6 +10,11 @@
 # VERCEL_AUTOMATION_BYPASS_SECRET; it's sent as x-vercel-protection-bypass.
 # The slug page needn't exist: the headers come from next.config.ts and
 # middleware.ts on every page response.
+#
+# EXPECT_PROTECTED=true: also check that a request *without* the bypass is
+# refused (401/403). For generated *.vercel.app URLs, which run with real env
+# and must stay behind Deployment Protection (Security DV-06). Not for the
+# public production domain.
 set -eu
 
 base="${1:?Usage: check-deploy-headers.sh <base-url>}"
@@ -37,6 +42,15 @@ fail() {
 echo "Smoke: ${base}/api/health"
 health_status=$(fetch "--output /dev/null --write-out %{http_code}" /api/health)
 [ "$health_status" = "200" ] || fail "/api/health answered ${health_status}, not 200"
+
+if [ "${EXPECT_PROTECTED:-}" = "true" ]; then
+  echo "Smoke: ${base} refuses a request without the bypass"
+  anon_status=$(curl --silent --max-time 30 --output /dev/null --write-out '%{http_code}' "${base}/api/health")
+  case "$anon_status" in
+    401 | 403) ;;
+    *) fail "an unauthenticated request got ${anon_status}, not 401/403: Deployment Protection is off" ;;
+  esac
+fi
 
 echo "Smoke: security headers on ${base}${page_path}"
 headers=$(fetch "--dump-header - --output /dev/null" "$page_path" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
