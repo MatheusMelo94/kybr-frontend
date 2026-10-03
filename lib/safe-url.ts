@@ -20,3 +20,10 @@ export function toSafeHttpsUrl(value: string): SafeHttpsUrl | undefined {
   }
   return url.href as SafeHttpsUrl;
 }
+
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** True for localhost, 127.0.0.1 and [::1], as URL.hostname spells them. */
+export function isLoopbackHostname(hostname: string): boolean {
+  return LOOPBACK_HOSTNAMES.has(hostname);
+}

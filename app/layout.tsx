@@ -1,5 +1,6 @@
 import type { Viewport } from "next";
 import { Inter } from "next/font/google";
+import { connection } from "next/server";
 import type { JSX, ReactNode } from "react";
 
 import "./globals.css";
@@ -27,7 +28,15 @@ type Props = {
   children: ReactNode;
 };
 
-export default function RootLayout({ children }: Props): JSX.Element {
+export default async function RootLayout({
+  children,
+}: Props): Promise<JSX.Element> {
+  // middleware.ts sets a fresh CSP nonce on every request, and Next stamps it on
+  // the page's scripts. A prerendered page would carry scripts without this
+  // request's nonce, and the CSP would block them. So every page renders per
+  // request (ADR-0001: a nonce CSP makes every page dynamic).
+  await connection();
+
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body>{children}</body>

@@ -1,9 +1,9 @@
 import { z } from "zod";
 
+import { isLoopbackHostname } from "./safe-url";
+
 // Pure schema, with no `server-only` and no process.env read: lib/env.ts uses it
 // at runtime, and next.config.ts uses it to fail the build on a bad environment.
-
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 const httpUrl = z.url({ protocol: /^https?$/ });
 
@@ -38,7 +38,7 @@ const serverEnvSchema = z
     // Loopback stays allowed so a production build can run against the local mock API (E2E).
     if (
       publicUrl.protocol !== "https:" &&
-      !LOOPBACK_HOSTS.has(publicUrl.hostname)
+      !isLoopbackHostname(publicUrl.hostname)
     ) {
       ctx.addIssue({
         code: "custom",

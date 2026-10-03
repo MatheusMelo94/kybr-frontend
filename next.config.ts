@@ -6,9 +6,34 @@ import { parseServerEnv } from "./lib/env-schema";
 // environment fails the deploy, not the user (§ Configuration & Environment).
 parseServerEnv(process.env);
 
+// frontend-security-conventions.md § Default Headers. The CSP is per request,
+// with a nonce, so it's set in middleware.ts.
+const securityHeaders = [
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=31536000; includeSubDomains; preload",
+  },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  // The case URL holds the token: never send it to another origin in a Referer.
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // camera=() may hide the file picker's camera option (tech-design R4, checked in T34).
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), payment=()",
+  },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // Legacy twin of CSP frame-ancestors 'none'.
+  { key: "X-Frame-Options", value: "DENY" },
+];
+
 const nextConfig: NextConfig = {
   // Portable deploy artifact (§ Stack Baseline › Containerization).
   output: "standalone",
+  poweredByHeader: false,
+  productionBrowserSourceMaps: false,
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
 };
 
 export default nextConfig;

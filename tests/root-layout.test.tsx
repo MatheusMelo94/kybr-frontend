@@ -10,6 +10,10 @@ import RootLayout, { viewport } from "@/app/layout";
 // next/font is a build-time transform; record how the layout configures it.
 const fontCalls = vi.hoisted((): unknown[] => []);
 
+// The nonce CSP (middleware.ts) needs every page rendered per request.
+const connection = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("next/server", () => ({ connection }));
+
 vi.mock("next/font/google", () => ({
   Inter: (options: unknown) => {
     fontCalls.push(options);
@@ -37,11 +41,9 @@ describe("RootLayout", () => {
     ]);
   });
 
-  it("renders <html lang=pt-BR> carrying the Inter variable class", () => {
+  it("renders <html lang=pt-BR> carrying the Inter variable class", async () => {
     const markup = renderToStaticMarkup(
-      <RootLayout>
-        <p>conteúdo</p>
-      </RootLayout>,
+      await RootLayout({ children: <p>conteúdo</p> }),
     );
     const html = new DOMParser().parseFromString(
       markup,
@@ -51,6 +53,12 @@ describe("RootLayout", () => {
     expect(html.getAttribute("lang")).toBe("pt-BR");
     expect(html.classList.contains("inter-variable-class")).toBe(true);
     expect(html.querySelector("body p")?.textContent).toBe("conteúdo");
+  });
+
+  it("renders per request, so each response's scripts get that request's CSP nonce", async () => {
+    await RootLayout({ children: null });
+
+    expect(connection).toHaveBeenCalledTimes(1);
   });
 
   it("declares both color schemes", () => {
