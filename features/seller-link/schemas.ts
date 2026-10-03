@@ -53,9 +53,20 @@ export function fieldIssues(
 export const RESPONSAVEL_MAX_LENGTH = 120;
 const PASSTHROUGH_MAX_LENGTH = 256;
 
-// Unicode letters (with combining marks), space, apostrophe, hyphen, period (F07).
-const RESPONSAVEL_PATTERN = /^[\p{L}\p{M} '.-]+$/u;
-const NOT_A_NAME_CHARACTER = /[^\p{L}\p{M} '.-]/gu;
+// F07 + security finding 0001: Unicode letters, each with at most two
+// combining marks (after NFC, Portuguese needs none), plus space, apostrophe,
+// hyphen and period. The Hangul fillers are letters (Lo) that render blank,
+// so they're excluded.
+const BLANK_LETTERS = "\\u115F\\u1160\\u3164\\uFFA0";
+const BLANK_LETTER = new RegExp(`[${BLANK_LETTERS}]`, "u");
+const MAX_MARKS_PER_LETTER = 2;
+const RESPONSAVEL_PATTERN = new RegExp(
+  `^(?:(?![${BLANK_LETTERS}])\\p{L}\\p{M}{0,${MAX_MARKS_PER_LETTER}}|[ '.-])+$`,
+  "u",
+);
+const LETTER = /\p{L}/u;
+const MARK = /\p{M}/u;
+const NAME_PUNCTUATION = /[ '.-]/;
 // Printable ASCII only: no control characters and nothing non-ASCII (F07).
 const PASSTHROUGH_PATTERN = /^[\x20-\x7E]+$/;
 
@@ -75,9 +86,24 @@ function canonicalName(raw: string): string {
  * (F07); the schema below still rejects tampered requests.
  */
 export function filterResponsavel(raw: string): string {
-  return canonicalName(raw)
-    .replace(NOT_A_NAME_CHARACTER, "")
-    .slice(0, RESPONSAVEL_MAX_LENGTH);
+  let kept = "";
+  // Marks kept on the current letter; null when no letter precedes them.
+  let marks: number | null = null;
+  for (const character of canonicalName(raw)) {
+    if (LETTER.test(character) && !BLANK_LETTER.test(character)) {
+      kept += character;
+      marks = 0;
+    } else if (MARK.test(character)) {
+      if (marks !== null && marks < MAX_MARKS_PER_LETTER) {
+        kept += character;
+        marks += 1;
+      }
+    } else if (NAME_PUNCTUATION.test(character)) {
+      kept += character;
+      marks = null;
+    }
+  }
+  return kept.slice(0, RESPONSAVEL_MAX_LENGTH);
 }
 
 /** A missing value reads as "" so it gets the field's own `empty` reason. */

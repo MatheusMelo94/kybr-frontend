@@ -4,11 +4,17 @@
 
 export const CPF_MASK = "***.***.***-**";
 
-// A word-bounded 11-digit run, with or without the usual . and - punctuation.
-// Word boundaries keep longer digit runs (a CNPJ's 14 digits) untouched.
-const CPF_RUN = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g;
+// An 11-digit run in the 3-3-3-2 shape, bare or separated by ., - or spaces,
+// with no digit on either side (security finding 0002). A non-digit (or the
+// start) is captured in front instead of a word boundary, so a CPF glued to
+// letters or _ is caught, and longer digit runs (a CNPJ's 14) stay untouched.
+// No lookbehind: this ships to the browser, and Safari < 16.4 can't parse it.
+const CPF_RUN = /(^|\D)\d{3}[.\s]?\d{3}[.\s]?\d{3}[-.\s]?\d{2}(?!\d)/g;
 
 /** Replaces every CPF-shaped run in `text` with CPF_MASK. */
 export function maskCpf(text: string): string {
-  return text.replace(CPF_RUN, CPF_MASK);
+  return text.replace(
+    CPF_RUN,
+    (_run, before: string) => `${before}${CPF_MASK}`,
+  );
 }

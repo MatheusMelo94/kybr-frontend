@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   contactEmailSchema,
+  filterResponsavel,
   verifySchema,
 } from "@/features/seller-link/schemas";
 
@@ -109,6 +110,21 @@ describe("verifySchema: F07 bounds (threat model)", () => {
     ).toBe("José Silva");
   });
 
+  it("accepts up to two combining marks on a letter (after NFC)", () => {
+    expect(
+      verifySchema.safeParse({
+        ...valid,
+        responsavel: "Nguye\u0302\u0303n Van",
+      }).data?.responsavel,
+    ).toBe("Nguyễn Van");
+    expect(
+      verifySchema.safeParse({
+        ...valid,
+        responsavel: "Maria Silva\u0301\u0331",
+      }).success,
+    ).toBe(true);
+  });
+
   it("accepts letters, spaces, apostrophes, hyphens and periods", () => {
     expect(
       verifySchema.safeParse({ ...valid, responsavel: "Ana-Maria D'Ávila Jr." })
@@ -135,6 +151,16 @@ describe("verifySchema: F07 bounds (threat model)", () => {
     ["a control character", "Maria\u0000 Silva"],
     ["an emoji", "Maria Silva 😀"],
     ["more than 120 characters", `Maria ${"a".repeat(120)}`],
+    // Security finding 0001 (F07 residual): blank-rendering letters and
+    // combining-mark stacks.
+    ["a Hangul filler (U+3164)", "Maria \u3164 Silva"],
+    ["a halfwidth Hangul filler (U+FFA0)", "Maria \uFFA0 Silva"],
+    ["a Hangul choseong filler (U+115F)", "Maria \u115F Silva"],
+    ["a Hangul jungseong filler (U+1160)", "Maria \u1160 Silva"],
+    ["only Hangul fillers", "\u3164 \u3164"],
+    ["three combining marks on one letter", "Maria Silvq\u0301\u0300\u0302"],
+    ["100 combining marks (Zalgo)", `A${"\u0301".repeat(100)} Silva`],
+    ["a combining mark with no letter", "Maria \u0301 Silva"],
   ])(
     "rejects a tampered name with %s (the field never sends one)",
     (_case, responsavel) => {
@@ -211,5 +237,26 @@ describe("schemas.ts", () => {
 
     expect(source).toMatch(/from "zod\/mini"/);
     expect(source).not.toMatch(/from "zod"/);
+  });
+});
+
+describe("filterResponsavel: security finding 0001 as typed", () => {
+  it("drops Hangul fillers", () => {
+    expect(filterResponsavel("Ana\u3164 \uFFA0Lima\u115F\u1160")).toBe(
+      "Ana Lima",
+    );
+  });
+
+  it("keeps at most two combining marks per letter and drops orphan marks", () => {
+    expect(filterResponsavel(`A${"\u0301".repeat(100)} Lima`)).toBe(
+      "\u00C1\u0301\u0301 Lima",
+    );
+    expect(filterResponsavel("Ana \u0301Lima")).toBe("Ana Lima");
+  });
+
+  it("keeps José, João and Conceição intact", () => {
+    expect(filterResponsavel("José João Conceição")).toBe(
+      "José João Conceição",
+    );
   });
 });
