@@ -1,0 +1,5 @@
+# A separate pnpm root for the deploy workflows' CLIs (.github/actions/deploy-tools).
+# Dependency build scripts stay blocked, as in the app (CLAUDE.md › Toolchain).
+allowBuilds:
+  # Bundled by the Vercel CLI for local builds; the deploy workflows build on Vercel.
+  esbuild: false

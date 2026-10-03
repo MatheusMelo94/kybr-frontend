@@ -1,0 +1,9 @@
+{
+  "name": "kybr-deploy-tools",
+  "private": true,
+  "description": "CLIs the deploy workflows run, pinned by this lockfile. Not part of the app.",
+  "devDependencies": {
+    "@lhci/cli": "0.15.1",
+    "vercel": "62.2.0"
+  }
+}
