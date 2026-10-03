@@ -59,9 +59,14 @@ const NOT_A_NAME_CHARACTER = /[^\p{L}\p{M} '.-]/gu;
 // Printable ASCII only: no control characters and nothing non-ASCII (F07).
 const PASSTHROUGH_PATTERN = /^[\x20-\x7E]+$/;
 
-/** NFC, with typographic apostrophes (iOS smart punctuation) read as '. */
+// Apostrophe look-alikes (spec § Name field behavior): ’ (iOS smart
+// punctuation), ‘, ʼ, and the ´ and ` that Brazilian keyboards type. Only
+// completed characters reach here: the field doesn't filter mid-composition.
+const APOSTROPHE_LOOK_ALIKES = /[\u2018\u2019\u02BC\u00B4\u0060]/g;
+
+/** NFC, with every apostrophe look-alike read as '. */
 function canonicalName(raw: string): string {
-  return raw.normalize("NFC").replace(/[‘’]/g, "'");
+  return raw.normalize("NFC").replace(APOSTROPHE_LOOK_ALIKES, "'");
 }
 
 /**

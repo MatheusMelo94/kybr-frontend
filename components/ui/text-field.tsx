@@ -1,6 +1,7 @@
 import {
   useId,
   type ChangeEvent,
+  type CompositionEvent,
   type FocusEvent,
   type JSX,
   type Ref,
@@ -28,6 +29,9 @@ type Props = {
   defaultValue?: string;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
   onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
+  /** IME / dead-key composition: lets a filtering field leave the value alone while composing. */
+  onCompositionStart?: (event: CompositionEvent<HTMLInputElement>) => void;
+  onCompositionEnd?: (event: CompositionEvent<HTMLInputElement>) => void;
   className?: string;
   ref?: Ref<HTMLInputElement>;
 };
@@ -49,6 +53,8 @@ export function TextField({
   defaultValue,
   onChange,
   onBlur,
+  onCompositionStart,
+  onCompositionEnd,
   className,
   ref,
 }: Props): JSX.Element {
@@ -80,6 +86,8 @@ export function TextField({
         defaultValue={defaultValue}
         onChange={onChange}
         onBlur={onBlur}
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         className={cn(

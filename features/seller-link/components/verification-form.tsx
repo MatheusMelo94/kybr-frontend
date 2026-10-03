@@ -94,6 +94,16 @@ export function VerificationForm({ slug, passthrough }: Props): JSX.Element {
   const idempotencyKey = useRef<string | null>(null);
   // Set synchronously, so a double tap can't dispatch twice before re-render.
   const inFlight = useRef(false);
+  // True between compositionstart and compositionend: a dead key (ABNT2 ´ ~ ^)
+  // or an IME (Gboard) is still building a character, so the value is left
+  // alone until it's complete (spec § Name field behavior).
+  const composingName = useRef(false);
+
+  function changeName(value: string): void {
+    setResponsavel(composingName.current ? value : filterResponsavel(value));
+    inputChanged();
+    clearError("responsavel");
+  }
 
   function showFieldErrors(next: FieldIssues): void {
     setErrors(next);
@@ -251,10 +261,13 @@ export function VerificationForm({ slug, passthrough }: Props): JSX.Element {
         autoComplete="name"
         maxLength={RESPONSAVEL_MAX_LENGTH}
         value={responsavel}
-        onChange={(event) => {
-          setResponsavel(filterResponsavel(event.target.value));
-          inputChanged();
-          clearError("responsavel");
+        onChange={(event) => changeName(event.target.value)}
+        onCompositionStart={() => {
+          composingName.current = true;
+        }}
+        onCompositionEnd={(event) => {
+          composingName.current = false;
+          changeName(event.currentTarget.value);
         }}
         {...(errors.responsavel !== undefined && {
           error: NAME_ERROR_COPY[errors.responsavel],

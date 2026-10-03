@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -193,6 +193,78 @@ describe("VerificationForm: name field and submit validation", () => {
     await user.type(nameInput(), "Ana<3 D’Ávila-Silva.");
 
     expect(nameInput()).toHaveValue("Ana D'Ávila-Silva.");
+  });
+
+  it.each(["’", "‘", "ʼ", "´", "`"])(
+    "spec § Name field behavior: a typed %s becomes '",
+    async (mark) => {
+      const user = userEvent.setup();
+      render(<VerificationForm slug="loja-exemplo" />);
+
+      await user.type(nameInput(), `Ana D${mark}Ávila`);
+
+      expect(nameInput()).toHaveValue("Ana D'Ávila");
+    },
+  );
+
+  describe("dead keys and IME composition (ABNT2 ´ ~ ^, Gboard)", () => {
+    /** One composition: the in-progress values, then the committed value. */
+    function compose(
+      input: HTMLInputElement,
+      composing: readonly string[],
+      committed: string,
+    ): void {
+      fireEvent.compositionStart(input);
+      for (const value of composing)
+        fireEvent.change(input, { target: { value } });
+      fireEvent.change(input, { target: { value: committed } });
+      fireEvent.compositionEnd(input);
+    }
+
+    it.each([
+      ["José", "Jos", "´", "é", ""],
+      ["João", "Jo", "~", "ã", "o"],
+      ["Conceição", "Conceiç", "~", "ã", "o"],
+      ["Ângela", "", "^", "Â", "ngela"],
+    ])(
+      "%s: the dead key stays in the field while composing, and the accented letter lands",
+      (expected, before, deadKey, accented, after) => {
+        render(<VerificationForm slug="loja-exemplo" />);
+        const input = nameInput();
+        fireEvent.change(input, { target: { value: before } });
+
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: `${before}${deadKey}` } });
+        expect(input).toHaveValue(`${before}${deadKey}`);
+        fireEvent.change(input, { target: { value: `${before}${accented}` } });
+        fireEvent.compositionEnd(input);
+        fireEvent.change(input, {
+          target: { value: `${before}${accented}${after}` },
+        });
+
+        expect(input).toHaveValue(expected);
+      },
+    );
+
+    it("a dead ´ completed on its own (´ then space) becomes ' once composition ends", () => {
+      render(<VerificationForm slug="loja-exemplo" />);
+      const input = nameInput();
+      fireEvent.change(input, { target: { value: "Ana D" } });
+
+      compose(input, ["Ana D´"], "Ana D´");
+
+      expect(input).toHaveValue("Ana D'");
+    });
+
+    it("a dead ~ or ^ completed on its own is dropped once composition ends", () => {
+      render(<VerificationForm slug="loja-exemplo" />);
+      const input = nameInput();
+      fireEvent.change(input, { target: { value: "Ana" } });
+
+      compose(input, ["Ana~"], "Ana~");
+
+      expect(input).toHaveValue("Ana");
+    });
   });
 
   it.each([

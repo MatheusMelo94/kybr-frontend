@@ -116,11 +116,17 @@ describe("verifySchema: F07 bounds (threat model)", () => {
     ).toBe("Ana-Maria D'Ávila Jr.");
   });
 
-  it("reads a typographic apostrophe (iOS smart punctuation) as '", () => {
+  it.each([
+    ["’ (iOS smart punctuation)", "’"],
+    ["‘", "‘"],
+    ["ʼ", "ʼ"],
+    ["´ (ABNT2 acute, completed)", "´"],
+    ["` (backtick)", "`"],
+  ])("reads the apostrophe look-alike %s as '", (_case, mark) => {
     expect(
-      verifySchema.safeParse({ ...valid, responsavel: "Maria O’Neil" }).data
-        ?.responsavel,
-    ).toBe("Maria O'Neil");
+      verifySchema.safeParse({ ...valid, responsavel: `Maria D${mark}Ávila` })
+        .data?.responsavel,
+    ).toBe("Maria D'Ávila");
   });
 
   it.each([
