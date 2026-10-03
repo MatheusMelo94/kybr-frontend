@@ -1,0 +1,7 @@
+{
+  "$comment": "First Load JS budgets in gzip kB (1000 bytes), checked by scripts/check-bundle-budget.mjs. Owned by the Frontend Architect: default from frontend-architecture-conventions.md § Performance Budgets, /v/* from ADR-0003. Change only through the plan or an ADR.",
+  "default": 180,
+  "routes": {
+    "/v/*": 130
+  }
+}
