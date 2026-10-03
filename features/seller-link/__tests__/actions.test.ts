@@ -329,7 +329,7 @@ describe("pollCaseViewAction (read-only, ADR-0004a)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("Q3: a link disabled while the case is open is not_found, and its cached info is dropped so the page shows Link not found", async () => {
+  it("Q3 / M2-07: a link disabled while the case is open is not_found, with no cache purge (the page decides Link not found from D4)", async () => {
     vi.mocked(revalidateTag).mockClear();
     disableLink(SLUGS.ok);
 
@@ -337,7 +337,15 @@ describe("pollCaseViewAction (read-only, ADR-0004a)", () => {
       ok: false,
       reason: "not_found",
     });
-    expect(revalidateTag).toHaveBeenCalledWith("public-link:loja-exemplo");
+    expect(revalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("M2-07: an unknown slug never reaches revalidateTag (no purge, no re-render of the posting route)", async () => {
+    vi.mocked(revalidateTag).mockClear();
+
+    await pollCaseViewAction("loja-aleatoria-x9", CASE_TOKENS.aprovado);
+
+    expect(revalidateTag).not.toHaveBeenCalled();
   });
 
   it("an unknown token leaves the link's cached info alone", async () => {
