@@ -72,7 +72,7 @@ type Props = SwitchProps | WatchProps;
  *   pauses the checks; router.refresh() never runs then, so a failed RSC fetch
  *   can't turn into a hard navigation. On `online` the banner goes and a check
  *   runs at once. A rejection while the browser still says online is retried
- *   every 5 s, and the first successful check hides the banner.
+ *   at the current cadence, and the first successful check hides the banner.
  */
 export function CaseLiveStatus(props: Props): JSX.Element {
   const { slug, token, mode } = props;
@@ -157,11 +157,12 @@ export function CaseLiveStatus(props: Props): JSX.Element {
         result = await pollCaseViewAction(slug, token);
       } catch {
         // The action couldn't be reached: the offline state. The browser may
-        // still say online (no `online` event will come), so keep trying.
+        // still say online (no `online` event will come), so keep checking at
+        // the current cadence (QA plan Q2, Architect-pending).
         inFlight = false;
         if (!active) return;
         goOffline(true);
-        if (navigator.onLine) schedule(RETRY_AFTER_FAILURE_MS);
+        if (navigator.onLine) schedule(cadence());
         return;
       }
       inFlight = false;

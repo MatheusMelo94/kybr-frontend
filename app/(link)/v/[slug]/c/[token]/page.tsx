@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { caseAnnouncement } from "@/features/seller-link/case-announcement";
 import { CaseContent } from "@/features/seller-link/components/case/case-content";
 import { CaseViewTransition } from "@/features/seller-link/components/case/case-view-transition";
+import { LinkNotFound } from "@/features/seller-link/components/link-not-found";
 import { StepIndicator } from "@/features/seller-link/components/step-indicator";
 import { deriveCaseView } from "@/features/seller-link/case-view";
 import { formCopy } from "@/features/seller-link/copy/form";
@@ -29,7 +30,12 @@ export default async function CasePage({
     getPublicLink(slug),
     getPublicCase(slug, token),
   ]);
-  if (!link.ok || !caseResult.ok) notFound();
+  // The link is unknown or was disabled (D1, or D4 while D1 is still cached):
+  // Link not found, as on the form (QA plan Q3). Otherwise a missing case is
+  // Case not found.
+  if (!link.ok || (!caseResult.ok && caseResult.reason === "link_not_found"))
+    return <LinkNotFound />;
+  if (!caseResult.ok) notFound();
 
   const view = deriveCaseView(caseResult.publicCase, Date.now());
   return (

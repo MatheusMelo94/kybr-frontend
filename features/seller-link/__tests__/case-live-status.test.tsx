@@ -271,7 +271,7 @@ describe("CaseLiveStatus: offline (T27; tech-design § 3 rule 5)", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("while the browser still says online, retries every 5 s and hides the banner on the next successful check", async () => {
+  it("Q2 (Architect-pending): while the browser still says online, retries at the current cadence and hides the banner on the next successful check", async () => {
     poll
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
       .mockResolvedValue({ ok: true, viewKey: "verifying" });
@@ -280,7 +280,9 @@ describe("CaseLiveStatus: offline (T27; tech-design § 3 rule 5)", () => {
     await elapse(2_000);
     expect(screen.getByRole("status")).toHaveTextContent(BANNER);
 
-    await elapse(5_000);
+    await elapse(1_999);
+    expect(poll).toHaveBeenCalledTimes(1);
+    await elapse(1);
     expect(poll).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(BANNER)).toBeNull();
   });

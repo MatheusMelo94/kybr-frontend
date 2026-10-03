@@ -167,7 +167,13 @@ export async function pollCaseViewAction(
     const result = await getPublicCase(args.data.slug, args.data.token, {
       timeoutMs: STATUS_CHECK_TIMEOUT_MS,
     });
-    if (!result.ok) return { ok: false, reason: "not_found" };
+    if (!result.ok) {
+      // The link was disabled while the case was open. Drop its cached info
+      // (60 s), so the refresh renders Link not found (QA plan Q3).
+      if (result.reason === "link_not_found")
+        revalidateTag(`public-link:${args.data.slug}`);
+      return { ok: false, reason: "not_found" };
+    }
     return {
       ok: true,
       viewKey: deriveCaseView(result.publicCase, Date.now()).viewKey,

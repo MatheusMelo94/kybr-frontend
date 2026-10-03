@@ -161,13 +161,14 @@ export async function createVerification(
 }
 
 export type PublicCaseResult =
-  { ok: true; publicCase: PublicCase } | { ok: false; reason: "not_found" };
+  | { ok: true; publicCase: PublicCase }
+  | { ok: false; reason: "not_found" | "link_not_found" };
 
 /**
  * D4. Personal and live: no-store, with the client IP. An unknown token, a
- * token from another slug, an unknown slug and a malformed slug or token are
- * all the same not-found, so nothing leaks whether a case exists (SEC § Error
- * Responses). A 5xx or a response that breaks the schema throws, for the case
+ * token from another slug and a malformed slug or token are all the same
+ * not-found, so nothing leaks whether a case exists (SEC § Error Responses).
+ * An unknown or disabled link is link_not_found (QA plan Q3). A 5xx or a response that breaks the schema throws, for the case
  * route's error boundary. Status checks pass a shorter `timeoutMs`.
  */
 export async function getPublicCase(
@@ -186,11 +187,11 @@ export async function getPublicCase(
     ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
   });
   if (result.ok) return { ok: true, publicCase: result.data };
-  if (
-    result.error.code === "CASO_NAO_ENCONTRADO" ||
-    result.error.code === "LINK_NAO_ENCONTRADO"
-  )
+  if (result.error.code === "CASO_NAO_ENCONTRADO")
     return { ok: false, reason: "not_found" };
+  // The link itself is unknown or was disabled: Link not found (Q3).
+  if (result.error.code === "LINK_NAO_ENCONTRADO")
+    return { ok: false, reason: "link_not_found" };
   logUnexpected("getPublicCase", result.error);
   throw result.error;
 }

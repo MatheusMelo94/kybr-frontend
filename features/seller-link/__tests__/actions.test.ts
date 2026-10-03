@@ -9,6 +9,7 @@ import {
   pollCaseViewAction,
   startVerification,
 } from "@/features/seller-link/actions";
+import { disableLink } from "@/tests/fixtures/msw/handlers/seller-link";
 import { server } from "@/tests/fixtures/msw/server";
 import {
   CASE_TOKENS,
@@ -326,6 +327,25 @@ describe("pollCaseViewAction (read-only, ADR-0004a)", () => {
       reason: "not_found",
     });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("Q3: a link disabled while the case is open is not_found, and its cached info is dropped so the page shows Link not found", async () => {
+    vi.mocked(revalidateTag).mockClear();
+    disableLink(SLUGS.ok);
+
+    expect(await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.aprovado)).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+    expect(revalidateTag).toHaveBeenCalledWith("public-link:loja-exemplo");
+  });
+
+  it("an unknown token leaves the link's cached info alone", async () => {
+    vi.mocked(revalidateTag).mockClear();
+
+    await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.unknown);
+
+    expect(revalidateTag).not.toHaveBeenCalled();
   });
 
   it("S12: a 5xx is a failed check, never a throw", async () => {

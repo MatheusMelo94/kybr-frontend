@@ -80,11 +80,17 @@ describe("getPublicCase (D4)", () => {
   it.each([
     ["an unknown token (S11)", SLUGS.ok, CASE_TOKENS.unknown],
     ["a token from another slug (S11)", SLUGS.other, CASE_TOKENS.aprovado],
-    ["an unknown slug", SLUGS.unknown, CASE_TOKENS.aprovado],
   ])("%s is not-found", async (_name, slug, token) => {
     expect(await getPublicCase(slug, token)).toEqual({
       ok: false,
       reason: "not_found",
+    });
+  });
+
+  it("Q3: an unknown or disabled link (LINK_NAO_ENCONTRADO) is link_not_found", async () => {
+    expect(await getPublicCase(SLUGS.unknown, CASE_TOKENS.aprovado)).toEqual({
+      ok: false,
+      reason: "link_not_found",
     });
   });
 
