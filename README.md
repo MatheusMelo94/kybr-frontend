@@ -51,9 +51,10 @@ Copy `.env.example` to `.env.local` (gitignored). `lib/env.ts` validates every v
 
 The seller link routes come with tasks T13, T20 and T32. Every page renders per request, because the CSP carries a fresh nonce (`middleware.ts`).
 
-| Path                     | Auth   | Description                                          |
-| ------------------------ | ------ | ---------------------------------------------------- |
-| `/` and any unknown path | Public | "Link não encontrado" (404). The root has no screen. |
+| Path                     | Auth                            | Description                                                                                                       |
+| ------------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `/` and any unknown path | Public                          | "Link não encontrado" (404). The root has no screen.                                                              |
+| `/v/{slug}`              | Public (the slug is the access) | Seller sign-up form. A malformed slug is a 404; an unknown or disabled one shows "Link não encontrado" (noindex). |
 
 ## Commands
 

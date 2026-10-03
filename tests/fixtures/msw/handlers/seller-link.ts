@@ -1,4 +1,5 @@
 import {
+  delay,
   http,
   HttpResponse,
   type JsonBodyType,
@@ -12,17 +13,20 @@ import {
   MAX_UPLOAD_BYTES,
   PUBLIC_LINKS,
   RETRY_AFTER_SECONDS,
+  SLOW_LINK_DELAY_MS,
   SLUGS,
   UPLOAD_MARKERS,
   buildCompany,
   buildFixedCases,
   buildPublicCase,
   caseKindFor,
+  isSlugVariant,
   isValidCnpj,
   maskEmail,
   scenarioForCnpj,
   type CaseRecord,
   type DocumentType,
+  type PublicLink,
 } from "../../factories/seller-link.ts";
 
 // Pre-Contract handlers for D1–D6 (contract-request.md). One set serves Vitest
@@ -169,8 +173,11 @@ function isDocumentType(value: unknown): value is DocumentType {
 
 // --- Handlers -----------------------------------------------------------------
 
-const linkFor = (slug: string): (typeof PUBLIC_LINKS)[string] | undefined =>
-  PUBLIC_LINKS[slug];
+function linkFor(slug: string): PublicLink | undefined {
+  if (isSlugVariant(slug, SLUGS.unstable)) return PUBLIC_LINKS[SLUGS.unstable];
+  if (isSlugVariant(slug, SLUGS.slow)) return PUBLIC_LINKS[SLUGS.ok];
+  return PUBLIC_LINKS[slug];
+}
 
 function caseFor(slug: string, token: string): CaseRecord | undefined {
   const record = store.cases.get(token);
@@ -222,9 +229,13 @@ function startVerification(
 
 export const sellerLinkHandlers: RequestHandler[] = [
   // D1: link info
-  http.get("*/public/v/:slug", ({ params }) => {
+  http.get("*/public/v/:slug", async ({ params }) => {
     const slug = String(params.slug);
-    if (slug === SLUGS.unstable && !store.recoveredLinks.has(slug)) {
+    if (isSlugVariant(slug, SLUGS.slow)) await delay(SLOW_LINK_DELAY_MS);
+    if (
+      isSlugVariant(slug, SLUGS.unstable) &&
+      !store.recoveredLinks.has(slug)
+    ) {
       return apiError(500, "ERRO_INTERNO");
     }
     const link = linkFor(slug);

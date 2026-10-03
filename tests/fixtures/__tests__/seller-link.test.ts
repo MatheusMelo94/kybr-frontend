@@ -10,6 +10,7 @@ import {
   cnpjFor,
   isValidCnpj,
   MEI_CNPJS,
+  SLOW_LINK_DELAY_MS,
   type CnpjScenario,
 } from "@/tests/fixtures/factories/seller-link";
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
@@ -209,6 +210,33 @@ describe("D1 link info", () => {
 
     expect(recovered.response.status).toBe(200);
     expect(recovered.body.nome).toEqual(expect.any(String));
+  });
+});
+
+describe("D1 per-test link variants (parallel-safe E2E keys)", () => {
+  it("S3: any loja-instavel-<suffix> fails on its own until that slug is recovered", async () => {
+    const first = await call(`/public/v/${SLUGS.unstable}-a1`);
+    expectErrorEnvelope(first.response, first.body, 500, "ERRO_INTERNO");
+
+    recoverLink(`${SLUGS.unstable}-a1`);
+
+    expect((await call(`/public/v/${SLUGS.unstable}-a1`)).response.status).toBe(
+      200,
+    );
+    expect((await call(`/public/v/${SLUGS.unstable}-b2`)).response.status).toBe(
+      500,
+    );
+  });
+
+  it("any loja-lenta-<suffix> answers like S1, after a delay (skeleton tests)", async () => {
+    const started = Date.now();
+    const { response, body } = await call(`/public/v/${SLUGS.slow}-a1`);
+
+    expect(response.status).toBe(200);
+    expect(body.nome).toEqual(expect.any(String));
+    expect(Date.now() - started).toBeGreaterThanOrEqual(
+      SLOW_LINK_DELAY_MS - 50,
+    );
   });
 });
 

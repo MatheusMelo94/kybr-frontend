@@ -29,7 +29,20 @@ export const SLUGS = {
   unknown: "loja-inexistente", // S2
   unstable: "loja-instavel", // S3: 500 until recovered (POST /__mock/links/:slug/recover)
   noAutofill: "loja-sem-autofill", // S19: D2 kill switch, 503 AUTOFILL_DESATIVADO
+  slow: "loja-lenta", // D1 answers like S1 after SLOW_LINK_DELAY_MS (skeleton tests)
 } as const;
+
+/**
+ * D1 delay for loja-lenta and loja-lenta-<suffix>. A per-test suffix lets each
+ * parallel E2E project miss the Next server's 60 s D1 cache, and own its own
+ * S3 toggle as loja-instavel-<suffix>.
+ */
+export const SLOW_LINK_DELAY_MS = 1_500;
+
+/** True for `base` itself and for `base-<suffix>`. */
+export function isSlugVariant(slug: string, base: string): boolean {
+  return slug === base || slug.startsWith(`${base}-`);
+}
 
 /** Fixed case tokens (X3 pattern). Their cases exist as soon as the mock starts. */
 export const CASE_TOKENS = {
