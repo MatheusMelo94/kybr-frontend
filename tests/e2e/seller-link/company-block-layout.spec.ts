@@ -59,6 +59,8 @@ test.describe("company block layout @feature-seller-link", () => {
 
       expect(filled?.height).toBe(reserved?.height);
       expect(fieldAfter?.y).toBe(fieldBefore?.y);
+      // The razão social is the block's bold line (font-weight-strong).
+      await expect(block.locator("p").first()).toHaveCSS("font-weight", "600");
     });
   }
 });

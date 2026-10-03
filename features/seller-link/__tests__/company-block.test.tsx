@@ -11,14 +11,15 @@ const company = {
 };
 
 describe("CompanyBlock", () => {
-  it("found: the name in bold, the activity and the city, and no street address", () => {
+  it("found: the name, the activity and the city, and no street address", () => {
     const { container } = render(
       <CompanyBlock state={{ status: "found", company }} />,
     );
 
+    // The bold weight is checked in company-block-layout.spec.ts.
     expect(
-      screen.getByText("JOAO CARLOS SILVA", { exact: false }).closest("p"),
-    ).toHaveClass("font-strong");
+      screen.getByText("JOAO CARLOS SILVA", { exact: false }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Atividade principal: Comércio a varejo de peças"),
     ).toBeInTheDocument();

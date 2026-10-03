@@ -52,6 +52,6 @@ describe("PrivacyFooter", () => {
     const link = screen.getByRole("link", { name: "Como tratamos seus dados" });
     expect(link).toHaveAttribute("href", "/v/loja-exemplo/privacidade");
     expect(link).not.toHaveAttribute("target");
-    expect(link).toHaveClass("min-h-11");
+    // The 44 px target is measured in tests/e2e/seller-link/form.spec.ts.
   });
 });

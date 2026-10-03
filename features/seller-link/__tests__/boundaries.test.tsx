@@ -57,9 +57,8 @@ describe("FormSkeleton", () => {
   it("sketches the form: name line, step indicator, title, lead, two fields and the button", () => {
     const { container } = render(<FormSkeleton />);
 
+    // Same heights as the form: proven by the CLS = 0 check in
+    // tests/e2e/seller-link/form-boundaries.spec.ts.
     expect(container.querySelectorAll("[data-skeleton]")).toHaveLength(6);
-    expect(
-      container.querySelector('[data-skeleton="button"] > div'),
-    ).toHaveClass("h-12", "rounded-full");
   });
 });

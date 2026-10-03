@@ -26,6 +26,25 @@ test.describe("form screen @feature-seller-link", () => {
     await expect(page).toHaveTitle("Cadastro de vendedor");
   });
 
+  test("spec § Responsive (360): fields and the button are 48 px high, and every target is at least 44 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto("/v/loja-exemplo");
+
+    for (const control of [
+      page.getByRole("textbox", { name: "CNPJ da empresa" }),
+      page.getByRole("textbox", { name: "Nome completo do responsável" }),
+      page.getByRole("button", { name: "Verificar empresa" }),
+    ])
+      expect((await control.boundingBox())?.height).toBe(48);
+    const privacy = await page
+      .getByRole("link", { name: "Como tratamos seus dados" })
+      .boundingBox();
+    expect(privacy?.height).toBeGreaterThanOrEqual(44);
+    expect(privacy?.width).toBeGreaterThanOrEqual(44);
+  });
+
   test("AC 1: no favicon and never indexed", async ({ page }) => {
     await page.goto("/v/loja-exemplo");
 

@@ -14,9 +14,15 @@ describe("RazaoSocial", () => {
       </p>,
     );
 
-    const mask = screen.getByText("***.***.***-**");
-    expect(mask).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByText("CPF oculto")).toHaveClass("sr-only");
+    // Inside a named role, the accessible name is what a screen reader says.
+    render(
+      <button type="button">
+        <RazaoSocial value="JOAO CARLOS SILVA ***.***.***-**" />
+      </button>,
+    );
+    expect(screen.getByRole("button")).toHaveAccessibleName(
+      "JOAO CARLOS SILVA CPF oculto",
+    );
     expect(container.textContent).toBe(
       "JOAO CARLOS SILVA ***.***.***-**CPF oculto",
     );
