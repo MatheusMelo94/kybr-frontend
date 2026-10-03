@@ -17,6 +17,7 @@ export default defineConfig({
       API_PUBLIC_BASE_URL: "https://api.kybr.test",
       API_BFF_KEY: "test-only-bff-key-0123456789abcdef",
       CLIENT_IP_HEADER: "x-forwarded-for",
+      CLIENT_IP_TRUSTED_HOPS: "1",
     },
     // Playwright owns tests/e2e.
     exclude: [...configDefaults.exclude, "tests/e2e/**"],

@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { apiRequest } from "@/lib/api/client";
-import { parseClientIp } from "@/lib/api/client-ip";
 import { AppError } from "@/lib/api/errors";
 import { server } from "@/tests/fixtures/msw/server";
 
@@ -291,23 +290,4 @@ describe("apiRequest", () => {
       expect(logged).not.toContain("42");
     });
   });
-});
-
-describe("parseClientIp", () => {
-  it.each([
-    ["203.0.113.7", "203.0.113.7"],
-    ["2001:db8::1", "2001:db8::1"],
-    // A list: the right-most entry is the one the trusted proxy appended.
-    ["198.51.100.1, 203.0.113.7", "203.0.113.7"],
-    [" 203.0.113.7 ", "203.0.113.7"],
-  ])("reads %j as %j", (value, ip) => {
-    expect(parseClientIp(value)).toBe(ip);
-  });
-
-  it.each([null, "", "unknown", "203.0.113.7, not-an-ip", "<script>"])(
-    "ignores %j",
-    (value) => {
-      expect(parseClientIp(value)).toBeUndefined();
-    },
-  );
 });

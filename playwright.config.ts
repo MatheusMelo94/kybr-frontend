@@ -45,6 +45,7 @@ export default defineConfig({
         // Not a secret: it only ever reaches the local mock API.
         API_BFF_KEY: "e2e-only-bff-key-for-the-local-mock-api",
         CLIENT_IP_HEADER: "x-forwarded-for",
+        CLIENT_IP_TRUSTED_HOPS: "1",
       },
     },
   ],

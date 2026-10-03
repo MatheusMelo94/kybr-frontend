@@ -42,6 +42,14 @@ test.describe("security headers @feature-seller-link", () => {
     expect(headers["x-powered-by"]).toBeUndefined();
   });
 
+  test("/v/* responses tell crawlers not to index or follow (F06d)", async ({
+    request,
+  }) => {
+    const headers = (await request.get("/v/loja-exemplo")).headers();
+
+    expect(headers["x-robots-tag"]).toBe("noindex, nofollow");
+  });
+
   test("the CSP is strict, nonce-based and new on every request", async ({
     request,
   }) => {
