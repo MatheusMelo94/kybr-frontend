@@ -1,3 +1,19 @@
 allowBuilds:
   msw: false
   unrs-resolver: false
+
+# Threat model F18 (frontend-security-conventions.md § Supply Chain).
+# next 15.5 pins postcss 8.4.31, which has GHSA-6g55-p6wh-862q and
+# GHSA-r28c-9q8g-f849 (high). It runs at build time only, on our own CSS.
+# Lift it to the patched version the rest of the tree already uses.
+# Remove when next ships postcss >= 8.5.18.
+overrides:
+  next>postcss: 8.5.28
+
+auditConfig:
+  ignoreGhsas:
+    # braces <= 3.0.3 has no patched version. Dev-time only: it is reached via
+    # eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch,
+    # on glob patterns we write, and is never in the build output or runtime.
+    # Revisit 2027-01-03, or earlier when a patched braces ships.
+    - GHSA-vfj7-8cjw-p6xm
