@@ -50,7 +50,9 @@ export const CASE_TOKENS = {
   aprovado: "tokaprovado0000000000000", // S4
   pendente: "tokpendente0000000000000", // S5
   bloqueado: "tokbloqueado000000000000", // S6
-  semDados: "toksemdados0000000000000", // S7
+  semDados: "toksemdados0000000000000", // S7: processing, no company data
+  semDadosDocumento: "toksemdadosdoc0000000000", // S7: a document requested by Renata
+  semDadosAprovado: "toksemdadosok00000000000", // S7: the same case approved
   allReceived: "tokrecebido0000000000000", // S14
   decided: "tokdecidido000000000000", // S15
   unknown: "tokdesconhecido00000000", // S11: never exists
@@ -264,6 +266,8 @@ export type CaseKind =
   | "pendente"
   | "bloqueado"
   | "sem-dados"
+  | "sem-dados-documento"
+  | "sem-dados-aprovado"
   | "lento"
   | "tudo-recebido"
   | "decidido";
@@ -304,7 +308,8 @@ function pendingItems(record: CaseRecord): Record<string, unknown>[] {
     },
     {
       codigo: "IE_NAO_ENCONTRADA",
-      url_regularizacao: "https://sefaz.uf.test/regularizar-ie",
+      url_regularizacao:
+        "https://portal.fazenda.sp.gov.br/exemplo-regularizar-ie",
     },
     { codigo: "ATIVIDADE_FORA_DA_CATEGORIA" },
     { codigo: "EMPRESA_RECENTE", dias: 3 },
@@ -322,14 +327,36 @@ export function buildPublicCase(record: CaseRecord, now: number): PublicCase {
     }),
   };
 
-  if (record.kind === "sem-dados") {
-    // Contract gap: ResultadoPublico requires razao_social, but this company
-    // has no data yet. The mock omits it until the backend decides.
-    return {
-      estado: "processing",
-      criado_em,
-      resultado: { ...shared, variante: "DADOS_NAO_ENCONTRADOS" },
-    };
+  // S7 (spec v3): no company data, so no razao_social and no consultado_em.
+  const noData = {
+    responsavel: record.responsavel,
+    variante: "DADOS_NAO_ENCONTRADOS",
+    ...(record.emailMasked !== undefined && {
+      email_contato_mascarado: record.emailMasked,
+    }),
+  };
+  switch (record.kind) {
+    case "sem-dados":
+      return { estado: "processing", criado_em, resultado: noData };
+    case "sem-dados-documento":
+      return {
+        estado: "pending",
+        criado_em,
+        resultado: {
+          ...noData,
+          prazo_revisao: new Date(record.createdAt + 2 * DAY_MS).toISOString(),
+          itens: [
+            {
+              codigo: "DOCUMENTO_SOLICITADO",
+              documento_tipo: "CONTRATO_SOCIAL_OU_CCMEI",
+              documentos_enviados:
+                record.uploads.get("CONTRATO_SOCIAL_OU_CCMEI")?.files ?? 0,
+            },
+          ],
+        },
+      };
+    case "sem-dados-aprovado":
+      return { estado: "approved", criado_em, resultado: noData };
   }
 
   const resultAfter =
@@ -377,7 +404,8 @@ export function buildPublicCase(record: CaseRecord, now: number): PublicCase {
           motivo: {
             codigo: "SITUACAO_IRREGULAR",
             situacao: "inapta",
-            url_regularizacao: "https://receita.test/regularizar-cnpj",
+            url_regularizacao:
+              "https://www.gov.br/receitafederal/exemplo-regularizar-cnpj",
           },
         },
       };
@@ -430,6 +458,8 @@ export function buildFixedCases(): Map<string, CaseRecord> {
     fixed("pendente", "pendente", CASE_TOKENS.pendente),
     fixed("bloqueado", "bloqueado", CASE_TOKENS.bloqueado),
     fixed("sem-dados", "sem-dados", CASE_TOKENS.semDados),
+    fixed("sem-dados-documento", "sem-dados", CASE_TOKENS.semDadosDocumento),
+    fixed("sem-dados-aprovado", "sem-dados", CASE_TOKENS.semDadosAprovado),
     fixed("tudo-recebido", "pendente", CASE_TOKENS.allReceived),
     fixed("decidido", "pendente", CASE_TOKENS.decided),
   ]);

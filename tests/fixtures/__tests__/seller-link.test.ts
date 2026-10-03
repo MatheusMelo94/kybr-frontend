@@ -485,6 +485,28 @@ describe("D4 case state", () => {
     });
   });
 
+  it("S5 / S6: regularization URLs are https: on gov.br (contract X4, F14)", async () => {
+    const pending = (await readCase(CASE_TOKENS.pendente)).body as {
+      resultado: { itens: { url_regularizacao?: string }[] };
+    };
+    const blocked = (await readCase(CASE_TOKENS.bloqueado)).body as {
+      resultado: { motivo: { url_regularizacao: string } };
+    };
+    const urls = [
+      ...pending.resultado.itens.flatMap((item) =>
+        item.url_regularizacao === undefined ? [] : [item.url_regularizacao],
+      ),
+      blocked.resultado.motivo.url_regularizacao,
+    ];
+
+    expect(urls.length).toBeGreaterThan(1);
+    for (const url of urls) {
+      const { protocol, hostname } = new URL(url);
+      expect(protocol).toBe("https:");
+      expect(hostname === "gov.br" || hostname.endsWith(".gov.br")).toBe(true);
+    }
+  });
+
   it("S6: blocked, inapta, with an https regularization URL", async () => {
     const { body } = await readCase(CASE_TOKENS.bloqueado);
 
@@ -500,7 +522,7 @@ describe("D4 case state", () => {
     });
   });
 
-  it("S7: verify accepted, processing with the DADOS_NAO_ENCONTRADOS variant right away", async () => {
+  it("S7: verify accepted, processing with the DADOS_NAO_ENCONTRADOS variant right away, with no company data", async () => {
     const token = await createCase("sem-dados");
 
     const { body } = await readCase(token);
@@ -509,6 +531,41 @@ describe("D4 case state", () => {
       estado: "processing",
       resultado: { variante: "DADOS_NAO_ENCONTRADOS" },
     });
+    expect(body.resultado).not.toHaveProperty("razao_social");
+    expect(body.resultado).not.toHaveProperty("consultado_em");
+  });
+
+  it("S7: a document requested by Renata → pending with the item and no company data", async () => {
+    const { body } = await readCase(CASE_TOKENS.semDadosDocumento);
+
+    expect(body).toMatchObject({
+      estado: "pending",
+      resultado: {
+        variante: "DADOS_NAO_ENCONTRADOS",
+        responsavel: expect.any(String),
+        prazo_revisao: expect.any(String),
+        itens: [
+          {
+            codigo: "DOCUMENTO_SOLICITADO",
+            documento_tipo: "CONTRATO_SOCIAL_OU_CCMEI",
+            documentos_enviados: 0,
+          },
+        ],
+      },
+    });
+    expect(body.resultado).not.toHaveProperty("razao_social");
+    expect(body.resultado).not.toHaveProperty("consultado_em");
+  });
+
+  it("S7: the same case approved → approved without razao_social or consultado_em", async () => {
+    const { body } = await readCase(CASE_TOKENS.semDadosAprovado);
+
+    expect(body).toMatchObject({
+      estado: "approved",
+      resultado: { variante: "DADOS_NAO_ENCONTRADOS" },
+    });
+    expect(body.resultado).not.toHaveProperty("razao_social");
+    expect(body.resultado).not.toHaveProperty("consultado_em");
   });
 
   it("S10: still processing past 10 s, approved at 14 s", async () => {
