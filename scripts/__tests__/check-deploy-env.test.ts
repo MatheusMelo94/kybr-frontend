@@ -5,11 +5,16 @@ import { checkDeployEnv, parseDotenv } from "../check-deploy-env.mjs";
 
 const PROD_ORIGIN = "https://api.kybr.com.br";
 
+// What vercel@60.1.3 `env pull` writes for a Sensitive variable
+// (SENSITIVE_ENV_VALUE_PLACEHOLDER in its dist).
+const SENSITIVE = "[SENSITIVE]";
+
 const production = {
   API_BASE_URL: "https://api.kybr.com.br",
   API_PUBLIC_BASE_URL: "https://api.kybr.com.br/",
-  API_BFF_KEY: "",
+  API_BFF_KEY: SENSITIVE,
   CLIENT_IP_HEADER: "x-vercel-forwarded-for",
+  ENABLE_EXPERIMENTAL_COREPACK: "1",
   VERCEL: "1",
 };
 
@@ -27,6 +32,12 @@ function check(
 }
 
 describe("parseDotenv", () => {
+  it("reads the CLI's Sensitive placeholder as the literal [SENSITIVE]", () => {
+    expect(parseDotenv('API_BFF_KEY="[SENSITIVE]"\n')).toEqual({
+      API_BFF_KEY: SENSITIVE,
+    });
+  });
+
   it("reads quoted and bare values and skips comments", () => {
     expect(
       parseDotenv('# Created by Vercel CLI\nA="1"\nB=two\n\nC=""\n'),
@@ -110,6 +121,29 @@ describe("checkDeployEnv", () => {
       expect(
         check({ ...env, API_BFF_KEY: "readable-key-value" }, target),
       ).toEqual(["API_BFF_KEY must be a Sensitive variable in Vercel"]);
+    },
+  );
+
+  it.each(["preview", "production"] as const)(
+    "accepts a Sensitive API_BFF_KEY in %s, whether pulled as [SENSITIVE] or empty",
+    (target) => {
+      const env = target === "preview" ? preview : production;
+      expect(check({ ...env, API_BFF_KEY: SENSITIVE }, target)).toEqual([]);
+      expect(check({ ...env, API_BFF_KEY: "" }, target)).toEqual([]);
+    },
+  );
+
+  it.each([
+    "API_BASE_URL",
+    "API_PUBLIC_BASE_URL",
+    "CLIENT_IP_HEADER",
+    "ENABLE_EXPERIMENTAL_COREPACK",
+  ])(
+    "refuses %s marked Sensitive, with the fix, not a misleading format error",
+    (key) => {
+      expect(check({ ...preview, [key]: SENSITIVE }, "preview")).toEqual([
+        `${key} is marked Sensitive in Vercel; it must be a plain variable so CI can check it (delete it and re-add it without Sensitive)`,
+      ]);
     },
   );
 

@@ -12,10 +12,10 @@
 // - API_ALLOW_LOOPBACK_HTTP is never set in a deployed environment.
 // - CLIENT_IP_HEADER is x-vercel-forwarded-for, with no trusted hops.
 // - No NEXT_PUBLIC_* variable: it would be inlined into the client bundle.
-// - API_BFF_KEY is Sensitive: `vercel env pull` returns an empty value for a
-//   Sensitive variable, so a readable value means the toggle was missed
-//   (Security DV-03). Its presence isn't checked: the build fails without it
-//   (lib/env-schema.ts).
+// - API_BFF_KEY is Sensitive: `vercel env pull` can't read a Sensitive value
+//   back, so a readable value means the toggle was missed (Security DV-03).
+//   Its presence isn't checked: the build fails without it (lib/env-schema.ts).
+// - The plain variables are not Sensitive: CI must read them to check them.
 //
 // It names variables, never their values.
 
@@ -24,6 +24,19 @@ import { pathToFileURL } from "node:url";
 
 const VERCEL_CLIENT_IP_HEADER = "x-vercel-forwarded-for";
 const API_URL_KEYS = ["API_BASE_URL", "API_PUBLIC_BASE_URL"];
+
+// What `vercel env pull` writes in place of a Sensitive value: vercel@60.1.3
+// defines SENSITIVE_ENV_VALUE_PLACEHOLDER = "[SENSITIVE]"
+// (dist/chunks/chunk-7CTHRXTG.js) and logs 'Wrote "[SENSITIVE]" as
+// placeholders'. Other CLI versions may write an empty value instead.
+const SENSITIVE_PLACEHOLDER = "[SENSITIVE]";
+
+// Non-secret config that must stay readable, so CI can check it.
+const PLAIN_KEYS = [
+  ...API_URL_KEYS,
+  "CLIENT_IP_HEADER",
+  "ENABLE_EXPERIMENTAL_COREPACK",
+];
 
 /**
  * Parses the dotenv file `vercel env pull` writes (KEY="value" lines).
@@ -68,7 +81,17 @@ export function checkDeployEnv(env, { target, productionApiOrigin }) {
   const problems = [];
   const productionOrigin = new URL(productionApiOrigin).origin;
 
+  const markedSensitive = new Set(
+    PLAIN_KEYS.filter((key) => env[key] === SENSITIVE_PLACEHOLDER),
+  );
+  for (const key of markedSensitive) {
+    problems.push(
+      `${key} is marked Sensitive in Vercel; it must be a plain variable so CI can check it (delete it and re-add it without Sensitive)`,
+    );
+  }
+
   for (const key of API_URL_KEYS) {
+    if (markedSensitive.has(key)) continue;
     const value = env[key];
     if (value === undefined || value === "") {
       problems.push(`${key} is missing`);
@@ -87,7 +110,12 @@ export function checkDeployEnv(env, { target, productionApiOrigin }) {
     }
   }
 
-  if (env.API_BFF_KEY !== undefined && env.API_BFF_KEY !== "") {
+  const bffKey = env.API_BFF_KEY;
+  if (
+    bffKey !== undefined &&
+    bffKey !== "" &&
+    bffKey !== SENSITIVE_PLACEHOLDER
+  ) {
     problems.push("API_BFF_KEY must be a Sensitive variable in Vercel");
   }
   if (env.API_ALLOW_LOOPBACK_HTTP !== undefined) {
@@ -95,7 +123,10 @@ export function checkDeployEnv(env, { target, productionApiOrigin }) {
       "API_ALLOW_LOOPBACK_HTTP must not be set in a deployed environment",
     );
   }
-  if (env.CLIENT_IP_HEADER?.toLowerCase() !== VERCEL_CLIENT_IP_HEADER) {
+  if (
+    !markedSensitive.has("CLIENT_IP_HEADER") &&
+    env.CLIENT_IP_HEADER?.toLowerCase() !== VERCEL_CLIENT_IP_HEADER
+  ) {
     problems.push(`CLIENT_IP_HEADER must be ${VERCEL_CLIENT_IP_HEADER}`);
   }
   if (env.CLIENT_IP_TRUSTED_HOPS !== undefined) {
