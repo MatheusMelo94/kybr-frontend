@@ -1,0 +1,159 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { describe, expect, it } from "vitest";
+
+// Token values of record: spec § Design Handoff 6 and plan § 7 (approved, U5).
+const LIGHT_COLORS = {
+  "--color-surface": "#ffffff",
+  "--color-surface-raised": "#f3f3f3",
+  "--color-field": "#f0f0f0",
+  "--color-field-line": "#8a8a8a",
+  "--color-ink": "#141414",
+  "--color-ink-muted": "#696969",
+  "--color-line": "#e0e0e0",
+  "--color-line-soft": "#f0f0f0",
+  "--color-accent": "#141414",
+  "--color-accent-ink": "#ffffff",
+  "--color-focus": "#141414",
+  "--color-success": "#1f9d55",
+  "--color-success-ink": "#157a45",
+  "--color-danger-ink": "#c4302a",
+} as const;
+
+const DARK_COLORS: Record<keyof typeof LIGHT_COLORS, string> = {
+  "--color-surface": "#111111",
+  "--color-surface-raised": "#1b1b1b",
+  "--color-field": "#1f1f1f",
+  "--color-field-line": "#6f6f6f",
+  "--color-ink": "#f5f5f5",
+  "--color-ink-muted": "#9a9a9a",
+  "--color-line": "#2e2e2e",
+  "--color-line-soft": "#222222",
+  "--color-accent": "#f5f5f5",
+  "--color-accent-ink": "#141414",
+  "--color-focus": "#f5f5f5",
+  "--color-success": "#1f9d55",
+  "--color-success-ink": "#1f9d55",
+  "--color-danger-ink": "#e5534b",
+};
+
+const OTHER_TOKENS = {
+  "--font-sans": "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
+  "--text-body": "0.9375rem",
+  "--text-secondary": "0.8125rem",
+  "--text-title": "2rem",
+  "--text-title--line-height": "1.15",
+  "--font-weight-title": "652",
+  "--font-weight-body": "456",
+  "--font-weight-strong": "600",
+  "--font-weight-lead": "300",
+  "--radius-sm": "0.25rem",
+  "--radius-md": "0.5rem",
+  "--radius-lg": "1rem",
+  "--radius-xl": "1.5rem",
+  "--radius-full": "9999px",
+  "--container-link": "30rem",
+  "--ease-out-quart": "cubic-bezier(0.25, 1, 0.5, 1)",
+  "--ease-in-out-quart": "cubic-bezier(0.76, 0, 0.24, 1)",
+  "--duration-fast": "150ms",
+  "--duration-base": "250ms",
+  "--duration-slow": "450ms",
+  "--duration-loop": "1.4s",
+} as const;
+
+const css = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), "../app/globals.css"),
+  "utf8",
+);
+
+/** Returns the body of the first `{ … }` block that starts at or after `marker`. */
+function blockAfter(source: string, marker: string): string {
+  const start = source.indexOf(marker);
+  if (start === -1) throw new Error(`marker not found: ${marker}`);
+  const open = source.indexOf("{", start);
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === "{") depth++;
+    if (source[i] === "}") depth--;
+    if (depth === 0) return source.slice(open + 1, i);
+  }
+  throw new Error(`unclosed block after: ${marker}`);
+}
+
+function declarations(block: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const match of block.matchAll(
+    /(--[\w-]+|--[\w-]+-\*)\s*:\s*([^;]+);/g,
+  )) {
+    const [, name, value] = match;
+    if (name !== undefined && value !== undefined)
+      found.set(name, value.trim());
+  }
+  return found;
+}
+
+const theme = declarations(blockAfter(css, "@theme {"));
+const base = blockAfter(css, "@layer base {");
+const darkBySystem = declarations(
+  blockAfter(
+    blockAfter(base, "@media (prefers-color-scheme: dark) {"),
+    ':root:not([data-theme="light"]) {',
+  ),
+);
+const darkByAttribute = declarations(blockAfter(base, '[data-theme="dark"] {'));
+
+describe("app/globals.css", () => {
+  it("starts with the Tailwind import", () => {
+    expect(css.trimStart().startsWith('@import "tailwindcss";')).toBe(true);
+  });
+
+  it.each(["--color-*", "--radius-*", "--shadow-*", "--font-*"])(
+    "resets the %s namespace so only brand tokens exist",
+    (namespace) => {
+      expect(theme.get(namespace)).toBe("initial");
+    },
+  );
+
+  it.each(Object.entries(LIGHT_COLORS))(
+    "declares %s = %s (light)",
+    (name, value) => {
+      expect(theme.get(name)).toBe(value);
+    },
+  );
+
+  it.each(Object.entries(DARK_COLORS))(
+    "swaps %s to %s under the dark system setting",
+    (name, value) => {
+      expect(darkBySystem.get(name)).toBe(value);
+    },
+  );
+
+  it.each(Object.entries(DARK_COLORS))(
+    'swaps %s to %s under [data-theme="dark"]',
+    (name, value) => {
+      expect(darkByAttribute.get(name)).toBe(value);
+    },
+  );
+
+  it.each(Object.entries(OTHER_TOKENS))("declares %s = %s", (name, value) => {
+    expect(theme.get(name)).toBe(value);
+  });
+
+  it("declares no shadow tokens (no shadows, per the brand)", () => {
+    expect(
+      [...theme.keys()].filter(
+        (name) => name.startsWith("--shadow-") && name !== "--shadow-*",
+      ),
+    ).toEqual([]);
+  });
+
+  it("defines the dark variant for both the system setting and the data-theme hook", () => {
+    const variant = blockAfter(css, "@custom-variant dark {");
+
+    expect(variant).toContain('[data-theme="dark"]');
+    expect(variant).toContain("@media (prefers-color-scheme: dark)");
+    expect(variant).toContain(':not([data-theme="light"])');
+  });
+});
