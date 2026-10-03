@@ -12,10 +12,12 @@
 // - API_ALLOW_LOOPBACK_HTTP is never set in a deployed environment.
 // - CLIENT_IP_HEADER is x-vercel-forwarded-for, with no trusted hops.
 // - No NEXT_PUBLIC_* variable: it would be inlined into the client bundle.
+// - API_BFF_KEY is Sensitive: `vercel env pull` returns an empty value for a
+//   Sensitive variable, so a readable value means the toggle was missed
+//   (Security DV-03). Its presence isn't checked: the build fails without it
+//   (lib/env-schema.ts).
 //
-// It names variables, never their values. API_BFF_KEY isn't checked here: a
-// Sensitive variable can't be read back, and the build fails without it
-// (lib/env-schema.ts).
+// It names variables, never their values.
 
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -85,6 +87,9 @@ export function checkDeployEnv(env, { target, productionApiOrigin }) {
     }
   }
 
+  if (env.API_BFF_KEY !== undefined && env.API_BFF_KEY !== "") {
+    problems.push("API_BFF_KEY must be a Sensitive variable in Vercel");
+  }
   if (env.API_ALLOW_LOOPBACK_HTTP !== undefined) {
     problems.push(
       "API_ALLOW_LOOPBACK_HTTP must not be set in a deployed environment",

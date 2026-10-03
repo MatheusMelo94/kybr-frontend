@@ -103,6 +103,16 @@ describe("checkDeployEnv", () => {
     ]);
   });
 
+  it.each(["preview", "production"] as const)(
+    "requires API_BFF_KEY to be Sensitive in %s: a readable value means it isn't (DV-03)",
+    (target) => {
+      const env = target === "preview" ? preview : production;
+      expect(
+        check({ ...env, API_BFF_KEY: "readable-key-value" }, target),
+      ).toEqual(["API_BFF_KEY must be a Sensitive variable in Vercel"]);
+    },
+  );
+
   it("never echoes a value", () => {
     const leaky = "https://leaky-value.example.app";
     const problems = check(
