@@ -629,6 +629,22 @@ describe("D4 case state", () => {
     expect((await readCase(CASE_TOKENS.unstable)).response.status).toBe(500);
   });
 
+  it("the recover control acts only on tokinstavel-<suffix> tokens, and answers 404 otherwise (review 0013)", async () => {
+    server.use(...mockControlHandlers);
+    const recover = (token: string): Promise<Response> =>
+      fetch(`${API}/__mock/links/${SLUGS.ok}/cases/${token}/recover`, {
+        method: "POST",
+      });
+
+    expect(recoverCase(SLUGS.ok, "tokqualquer0000000000000")).toBe(false);
+    expect((await recover("tokqualquer0000000000000")).status).toBe(404);
+    expect((await readCase("tokqualquer0000000000000")).response.status).toBe(
+      404,
+    );
+    expect((await recover(CASE_TOKENS.unstable)).status).toBe(404);
+    expect((await recover(`${CASE_TOKENS.unstable}-c3`)).status).toBe(204);
+  });
+
   it("S12: 500 when the case read fails", async () => {
     const { response, body } = await readCase(CASE_TOKENS.unstable);
 

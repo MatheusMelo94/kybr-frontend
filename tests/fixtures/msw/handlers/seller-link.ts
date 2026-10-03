@@ -94,11 +94,11 @@ export function recoverLink(slug: string): void {
 
 /**
  * S12 → a readable case: a per-test tokinstavel-<suffix> token reads as a
- * settled pending case under `slug` from now on. The fixed S12 token never
- * recovers.
+ * settled pending case under `slug` from now on. It acts on nothing else (the
+ * fixed S12 token never recovers), and says whether it did (review 0013).
  */
-export function recoverCase(slug: string, token: string): void {
-  if (token === CASE_TOKENS.unstable) return;
+export function recoverCase(slug: string, token: string): boolean {
+  if (!token.startsWith(`${CASE_TOKENS.unstable}-`)) return false;
   store.recoveredCases.add(token);
   store.cases.set(token, {
     slug,
@@ -109,6 +109,7 @@ export function recoverCase(slug: string, token: string): void {
     settled: true,
     uploads: new Map(),
   });
+  return true;
 }
 
 // --- Per-test case controls (QA test plan G1–G6) ------------------------------
@@ -598,8 +599,8 @@ export const mockControlHandlers: RequestHandler[] = [
     return new HttpResponse(null, { status: 204 });
   }),
   http.post("*/__mock/links/:slug/cases/:token/recover", ({ params }) => {
-    recoverCase(String(params.slug), String(params.token));
-    return new HttpResponse(null, { status: 204 });
+    const recovered = recoverCase(String(params.slug), String(params.token));
+    return new HttpResponse(null, { status: recovered ? 204 : 404 });
   }),
   http.post("*/__mock/cases", async ({ request }) => {
     const input = (await request.json().catch(() => ({}))) as MockCaseInput;
