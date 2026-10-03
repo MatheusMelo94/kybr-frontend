@@ -1,0 +1,21 @@
+# Keep the build context small and free of local secrets and docs
+# (frontend-devops-conventions.md § Dockerfile Baseline: no secrets baked in).
+.git
+.github
+.claude
+.vscode
+node_modules
+.next
+coverage
+playwright-report
+blob-report
+test-results
+.lighthouseci
+.vercel
+.env
+.env.*
+!.env.example
+docs
+Kybr — frontend.md
+Dockerfile
+.dockerignore
