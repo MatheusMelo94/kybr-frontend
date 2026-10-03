@@ -1,0 +1,44 @@
+# Grouped weekly updates (frontend-devops-conventions.md § Project Setup;
+# frontend-security-conventions.md § Supply Chain). CI must pass before merge.
+# Security updates are not grouped and arrive as soon as an advisory lands.
+version: 2
+updates:
+  - package-ecosystem: npm # covers pnpm (pnpm-lock.yaml)
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # Next.js stays on 15.x; a move to 16 needs an ADR (CLAUDE.md).
+      - dependency-name: next
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint-config-next
+        update-types: [version-update:semver-major]
+      # Node 22 LTS is the CI and runtime target; types follow it.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/*"]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    commit-message:
+      prefix: chore(ci)
+    groups:
+      actions:
+        patterns: ["*"]
