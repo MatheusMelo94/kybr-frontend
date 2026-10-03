@@ -23,7 +23,7 @@ const MODULES = {
   shared: sharedCopy,
 };
 
-// Spec v2 § Content & Copy, verbatim, grouped by the per-screen module that holds
+// Spec v3 § Content & Copy, verbatim, grouped by the per-screen module that holds
 // each key. Item rows are keyed pending.item.<CODE>.title/.description, and
 // document labels pending.document.<TIPO>. Spec notes (e.g. "shown for … when a
 // URL exists") are not copy and are left out.
@@ -45,6 +45,7 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "form.lookup.loading": "Buscando os dados da empresa…",
     "form.lookup.found": "Empresa encontrada: {razao_social}.",
     "form.lookup.activity": "Atividade principal: {atividade}",
+    "form.lookup.location": "{municipio}, {uf}",
     "form.lookup.notfound":
       "Ainda não encontramos os dados dessa empresa. Você pode continuar: vamos conferir com calma.",
     "form.lookup.failed":
@@ -219,6 +220,7 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "privacy.line": "Usamos estes dados só para verificar sua empresa.",
     "privacy.link": "Como tratamos seus dados",
     "external.sr": "(abre em outra aba)",
+    "a11y.cpf_masked": "CPF oculto",
   },
 };
 
@@ -237,6 +239,7 @@ const PLACEHOLDERS = new Set([
   "documento",
   "situacao",
   "dias",
+  "municipio",
 ]);
 
 const allStrings = Object.values(MODULES).flatMap(

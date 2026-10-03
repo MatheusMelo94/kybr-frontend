@@ -1,4 +1,4 @@
-// Spec v2 § Content & Copy, verbatim. Cadastro (form) `/v/{slug}`: form.*, plus
+// Spec v3 § Content & Copy, verbatim. Cadastro (form) `/v/{slug}`: form.*, plus
 // the load error and Link not found screens. Fill placeholders with fill() from
 // features/seller-link/format.ts. Never edit a string here without the spec
 // changing first (the UX Strategist owns the copy).
@@ -19,6 +19,7 @@ export const formCopy = {
   "form.lookup.loading": "Buscando os dados da empresa…",
   "form.lookup.found": "Empresa encontrada: {razao_social}.",
   "form.lookup.activity": "Atividade principal: {atividade}",
+  "form.lookup.location": "{municipio}, {uf}",
   "form.lookup.notfound":
     "Ainda não encontramos os dados dessa empresa. Você pode continuar: vamos conferir com calma.",
   "form.lookup.failed":

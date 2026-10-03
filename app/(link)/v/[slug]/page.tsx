@@ -5,6 +5,7 @@ import type { JSX } from "react";
 import { MarketplaceName } from "@/features/seller-link/components/marketplace-name";
 import { PrivacyFooter } from "@/features/seller-link/components/privacy-footer";
 import { StepIndicator } from "@/features/seller-link/components/step-indicator";
+import { VerificationForm } from "@/features/seller-link/components/verification-form";
 import { formCopy } from "@/features/seller-link/copy/form";
 import { slugParamsSchema } from "@/features/seller-link/route-params";
 import { getPublicLink } from "@/lib/api/public-link";
@@ -36,7 +37,7 @@ export default async function FormPage({
           {formCopy["form.lead"]}
         </p>
       </div>
-      {/* The verification form (CNPJ, name, submit) arrives in T15–T18. */}
+      <VerificationForm slug={slug} />
       <PrivacyFooter slug={slug} />
     </div>
   );
