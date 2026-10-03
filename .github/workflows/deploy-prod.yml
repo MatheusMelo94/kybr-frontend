@@ -204,6 +204,7 @@ jobs:
 
       - name: Verify production (health, security headers)
         env:
+          EXPECT_SINGLE_HSTS: "true"
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: sh scripts/check-deploy-headers.sh "$PRODUCTION_URL"
 

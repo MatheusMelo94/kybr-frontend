@@ -15,6 +15,10 @@
 # refused (401/403). For generated *.vercel.app URLs, which run with real env
 # and must stay behind Deployment Protection (Security DV-06). Not for the
 # public production domain.
+#
+# EXPECT_SINGLE_HSTS=true: the response has exactly one Strict-Transport-
+# Security field, with our value (Security DV-07). For the production domain;
+# Vercel may add its own on *.vercel.app.
 set -eu
 
 base="${1:?Usage: check-deploy-headers.sh <base-url>}"
@@ -67,6 +71,12 @@ expect_header "permissions-policy: camera=(), microphone=(), geolocation=(), pay
 expect_header "cross-origin-opener-policy: same-origin"
 expect_header "x-frame-options: deny"
 expect_header "x-robots-tag: noindex, nofollow"
+
+if [ "${EXPECT_SINGLE_HSTS:-}" = "true" ]; then
+  hsts_fields=$(printf '%s\n' "$headers" | grep '^strict-transport-security:' || true)
+  [ "$hsts_fields" = "strict-transport-security: max-age=31536000; includesubdomains; preload" ] ||
+    fail "expected exactly one Strict-Transport-Security field with our value"
+fi
 
 csp=$(printf '%s\n' "$headers" | grep '^content-security-policy:' || true)
 [ -n "$csp" ] || fail "missing header: content-security-policy"
