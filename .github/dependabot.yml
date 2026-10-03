@@ -30,6 +30,25 @@ updates:
       - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
 
+  # The deploy workflows' CLIs (Vercel CLI, Lighthouse CI). Separate lockfile;
+  # nothing here ships in the app.
+  - package-ecosystem: npm
+    directory: /.github/deploy-tools
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 2
+    # Security DV-02: matches minimumReleaseAge in its pnpm-workspace.yaml.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore(ci)
+    groups:
+      deploy-tools:
+        patterns: ["*"]
+
   - package-ecosystem: github-actions
     directories: ["/", "/.github/actions/*"]
     schedule:

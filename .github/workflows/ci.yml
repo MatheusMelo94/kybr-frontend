@@ -90,6 +90,64 @@ jobs:
       # (auditConfig.ignoreGhsas), each with a reason and a revisit date.
       - run: pnpm audit --audit-level=high
 
+      # The deploy workflows' CLIs (.github/deploy-tools), outside the app's
+      # lockfile (Security DV-02). Critical blocks; reviewed exceptions are in
+      # .github/deploy-tools/pnpm-workspace.yaml. High and below are reported
+      # in the run summary without blocking: the advisories sit in the CLIs'
+      # local builders, which the workflows don't run.
+      - name: Audit the deploy tools (blocks on critical)
+        run: pnpm --dir .github/deploy-tools audit --audit-level=critical
+
+      - name: Report the deploy tools' advisories (non-blocking)
+        if: always()
+        run: |
+          {
+            echo "### Deploy tools audit (non-blocking below critical)"
+            echo '```'
+            pnpm --dir .github/deploy-tools audit --audit-level=high | tail -n 3 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  container:
+    name: Docker fallback (build, health)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # frontend-devops-conventions.md § Dockerfile Baseline: the portable
+      # fallback must build and pass its HEALTHCHECK. Runtime values are
+      # placeholders; nothing here is a secret.
+      - name: Build the image
+        run: docker build --tag kybr-frontend:ci .
+
+      - name: Run it and wait for the health check
+        run: |
+          docker run --detach --name app --publish 3000:3000 \
+            --env API_BASE_URL=https://api.example.invalid \
+            --env API_PUBLIC_BASE_URL=https://api.example.invalid \
+            --env API_BFF_KEY=ci-runtime-placeholder-not-a-secret \
+            --env CLIENT_IP_HEADER=x-forwarded-for \
+            --env CLIENT_IP_TRUSTED_HOPS=1 \
+            kybr-frontend:ci
+          status=starting
+          for _ in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' app)
+            [ "$status" = "healthy" ] && break
+            sleep 2
+          done
+          docker logs app
+          if [ "$status" != "healthy" ]; then
+            echo "Container is $status, not healthy. Health check log:" >&2
+            docker inspect --format '{{json .State.Health}}' app >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error http://localhost:3000/api/health
+          [ "$(docker exec app id -u)" != "0" ] || { echo "Container runs as root." >&2; exit 1; }
+
   e2e:
     name: E2E (${{ matrix.project }})
     needs: verify
@@ -159,3 +217,19 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
+
+  # Staging = Vercel Preview (ADR-0005; frontend-devops-conventions.md § CI
+  # Pipeline Shape › deploy-staging.yml). Only after every check above passes
+  # on this commit, only for pushes (never fork PRs), never for Dependabot
+  # (no deploy secrets), and only once the user turns it on with the
+  # VERCEL_DEPLOY_ENABLED repository variable (docs/devops/vercel-setup.md).
+  deploy-staging:
+    name: Deploy staging
+    needs: [verify, audit, container, e2e]
+    if: github.event_name == 'push' && github.actor != 'dependabot[bot]' && vars.VERCEL_DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/deploy-staging.yml
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

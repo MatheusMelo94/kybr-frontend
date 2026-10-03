@@ -1,0 +1,246 @@
+# Deploy production (frontend-devops-conventions.md § CI Pipeline Shape ›
+# deploy-prod.yml; § Rollback Policy). Manual only, and off until the user
+# sets the PRODUCTION_ENABLED repository variable: there's no backend yet
+# (Pre-Contract), and Production must never point at a mock.
+#
+# Flow (ADR-0005):
+#   gate    -> owner only, from main, release tag typed twice, a GO Deploy
+#              Checklist named, CI (with the preview deploy) green on this SHA
+#   stage   -> Production env check, then a *staged* production build on
+#              Vercel (`--prod --skip-domain`: built with the Production env
+#              vars, serving no traffic), smoked on its own URL
+#   promote -> `vercel promote` of that exact deployment (no rebuild), smoke
+#              of the production domain, automatic rollback to last-known-good
+#              if it fails, then the release tag
+#
+# Vercel rebuilds a *preview* when it's promoted, with the Production env
+# vars, so the artifact that's promoted is the staged production build that
+# passed its smoke, never a new one.
+#
+# Approval gate: GitHub environment protection (required reviewers) isn't
+# available for private repositories on the Free plan, so the gate is in the
+# workflow (owner-only actor, typed confirmation, GO checklist reference).
+# On Pro/Team, add `environment: production` to the stage and promote jobs
+# with the owner as required reviewer (docs/devops/vercel-setup.md).
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to create on success (vX.Y.Z)
+        required: true
+        type: string
+      confirm:
+        description: Type the release tag again to confirm
+        required: true
+        type: string
+      checklist:
+        description: The Deploy Checklist with the GO (docs/deploys/YYYY-MM-DD_vX.Y.Z_vN.md)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_TELEMETRY_DISABLED: "1"
+
+jobs:
+  gate:
+    name: Gate (owner, main, GO checklist, green CI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      CONFIRM: ${{ inputs.confirm }}
+      CHECKLIST: ${{ inputs.checklist }}
+      PRODUCTION_ENABLED: ${{ vars.PRODUCTION_ENABLED }}
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+      ACTOR: ${{ github.actor }}
+      # On a re-run, github.actor stays the original initiator (Security DV-05).
+      TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+      OWNER: ${{ github.repository_owner }}
+      REF: ${{ github.ref }}
+      SHA: ${{ github.sha }}
+      REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check the trigger and the inputs
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [ "$PRODUCTION_ENABLED" = "true" ] ||
+            fail "Production deploys are off (repository variable PRODUCTION_ENABLED). Production needs the real API first."
+          [ -n "$PRODUCTION_URL" ] || fail "The repository variable PRODUCTION_URL is not set."
+          [ "$REF" = "refs/heads/main" ] || fail "Production deploys run from main only."
+          [ "$ACTOR" = "$OWNER" ] && [ "$TRIGGERING_ACTOR" = "$OWNER" ] ||
+            fail "Only the repository owner can deploy to production, or re-run a production deploy."
+          printf '%s' "$RELEASE_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' ||
+            fail "release_tag must look like v1.2.3."
+          [ "$CONFIRM" = "$RELEASE_TAG" ] || fail "confirm must repeat the release tag exactly."
+          printf '%s' "$CHECKLIST" | grep -qE '^docs/deploys/[0-9]{4}-[0-9]{2}-[0-9]{2}_v[0-9]+\.[0-9]+\.[0-9]+_v[0-9]+\.md$' ||
+            fail "checklist must be docs/deploys/YYYY-MM-DD_vX.Y.Z_vN.md."
+          case "$CHECKLIST" in
+            *"_${RELEASE_TAG}_v"*) ;;
+            *) fail "The checklist must be the one for ${RELEASE_TAG}." ;;
+          esac
+
+      - name: Check the release tag is new
+        run: |
+          if gh api "repos/$REPO/git/ref/tags/$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "::error::Tag $RELEASE_TAG already exists."
+            exit 1
+          fi
+
+      # deploy-staging runs inside CI, so a green push run means the checks
+      # and the preview smoke both passed on this exact commit.
+      - name: Check CI passed on this commit
+        run: |
+          passed=$(gh run list --repo "$REPO" --workflow ci.yml --commit "$SHA" \
+            --event push --status success --json databaseId --jq 'length')
+          if [ "$passed" -eq 0 ]; then
+            echo "::error::No successful CI run (push) for $SHA. Wait for CI, or fix it first."
+            exit 1
+          fi
+
+  stage:
+    name: Staged production build and smoke
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/deploy-tools
+
+      # Production points at the production API only (never a mock), with no
+      # API_ALLOW_LOOPBACK_HTTP and x-vercel-forwarded-for (F02, F08, F15).
+      - name: Check the Production environment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PRODUCTION_API_ORIGIN: ${{ vars.PRODUCTION_API_ORIGIN || 'https://api.kybr.com.br' }}
+        run: |
+          env_file="$RUNNER_TEMP/production.env"
+          trap 'rm -f "$env_file"' EXIT
+          vercel env pull "$env_file" --environment=production --yes > /dev/null
+          node scripts/check-deploy-env.mjs "$env_file" production
+
+      - name: Deploy a staged production build (no traffic)
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          url=$(vercel deploy --prod --skip-domain --yes --archive=tgz \
+            --meta githubCommitSha="$COMMIT_SHA" \
+            --meta releaseTag="$RELEASE_TAG")
+          if ! printf '%s' "$url" | grep -qE '^https://[a-z0-9.-]+\.vercel\.app$'; then
+            echo "Unexpected deploy output; no deployment URL found." >&2
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke the staged build (health, security headers)
+        env:
+          EXPECT_PROTECTED: "true"
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        run: sh scripts/check-deploy-headers.sh "$DEPLOY_URL"
+
+  promote:
+    name: Promote, verify, tag
+    needs: stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # the release tag only
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      STAGED_URL: ${{ needs.stage.outputs.url }}
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      CHECKLIST: ${{ inputs.checklist }}
+      COMMIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/deploy-tools
+
+      # § Rollback Policy: note last-known-good before promoting. Empty on the
+      # very first production deploy.
+      - name: Record last-known-good
+        id: lkg
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          lkg=$(vercel inspect "$PRODUCTION_URL" 2>&1 |
+            grep -oE 'dpl_[A-Za-z0-9]+' | head -n 1 || true)
+          echo "id=$lkg" >> "$GITHUB_OUTPUT"
+          echo "Last-known-good: ${lkg:-none (first production deploy)}"
+
+      - name: Promote the staged build
+        id: promote
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel promote "$STAGED_URL" --yes --timeout=5m
+
+      - name: Verify production (health, security headers)
+        env:
+          EXPECT_SINGLE_HSTS: "true"
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: sh scripts/check-deploy-headers.sh "$PRODUCTION_URL"
+
+      # Instant rollback: re-points the domain, no rebuild (< 5 min target).
+      - name: Roll back to last-known-good
+        if: failure() && steps.promote.outcome == 'success'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          LKG: ${{ steps.lkg.outputs.id }}
+        run: |
+          if [ -z "$LKG" ]; then
+            echo "::error::No last-known-good deployment. Remove the production domain or fix forward."
+            exit 1
+          fi
+          vercel rollback "$LKG" --timeout=5m
+          echo "::error::Production failed verification and was rolled back to $LKG."
+
+      - name: Tag the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh api "repos/$REPO/git/refs" -f ref="refs/tags/$RELEASE_TAG" -f sha="$COMMIT_SHA" > /dev/null
+
+      - name: Summary
+        if: always()
+        env:
+          LKG: ${{ steps.lkg.outputs.id }}
+          PROMOTED: ${{ steps.promote.outcome }}
+        run: |
+          {
+            echo "### Production: $RELEASE_TAG"
+            echo ""
+            echo "- Deploy Checklist (GO): \`$CHECKLIST\`"
+            echo "- Commit: \`$COMMIT_SHA\`"
+            echo "- Promoted deployment: $STAGED_URL (promote: $PROMOTED)"
+            echo "- Domain: $PRODUCTION_URL"
+            echo "- Last-known-good: ${LKG:-none}"
+            echo "- Rollback: \`vercel rollback ${LKG:-<deployment-id>}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

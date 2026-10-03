@@ -185,6 +185,41 @@ describe("parseServerEnv", () => {
     ).toContain("CLIENT_IP_HEADER");
   });
 
+  describe("on Vercel (VERCEL=1, threat model F02)", () => {
+    const vercel = {
+      ...production,
+      VERCEL: "1",
+      CLIENT_IP_HEADER: "x-vercel-forwarded-for",
+      CLIENT_IP_TRUSTED_HOPS: undefined,
+    };
+
+    it("accepts Vercel's own client IP header as a single value", () => {
+      const parsed = parseServerEnv(vercel);
+
+      expect(parsed.CLIENT_IP_HEADER).toBe("x-vercel-forwarded-for");
+      expect(parsed.CLIENT_IP_TRUSTED_HOPS).toBeUndefined();
+    });
+
+    it.each(["x-forwarded-for", "x-real-ip", "cf-connecting-ip"])(
+      "rejects CLIENT_IP_HEADER=%s: a proxy in front of Vercel may rewrite it",
+      (header) => {
+        expect(
+          parseError({
+            ...vercel,
+            CLIENT_IP_HEADER: header,
+            CLIENT_IP_TRUSTED_HOPS: "1",
+          }),
+        ).toContain("CLIENT_IP_HEADER");
+      },
+    );
+
+    it("does not apply off Vercel", () => {
+      expect(
+        parseServerEnv({ ...production, VERCEL: undefined }).CLIENT_IP_HEADER,
+      ).toBe("x-forwarded-for");
+    });
+  });
+
   it("never echoes a variable's value in the error", () => {
     const leaky = "s3cr3t-value-that-must-not-leak";
     expect(parseError({ ...production, API_BFF_KEY: leaky })).not.toContain(

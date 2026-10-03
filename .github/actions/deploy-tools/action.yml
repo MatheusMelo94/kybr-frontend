@@ -1,0 +1,32 @@
+name: Deploy tools
+description: >-
+  Node 22 and pnpm (via ./.github/actions/setup, without the app install), then
+  the Vercel CLI and Lighthouse CI from .github/deploy-tools, installed with
+  --frozen-lockfile and put on PATH (frontend-security-conventions.md § Supply
+  Chain). Their lockfile is separate from the app's: these CLIs never ship.
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup
+      with:
+        install: "false"
+
+    - name: Cache the deploy tools
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .github/deploy-tools/node_modules
+        key: deploy-tools-${{ runner.os }}-${{ hashFiles('.github/deploy-tools/pnpm-lock.yaml') }}
+
+    - name: Install the deploy tools
+      shell: bash
+      working-directory: .github/deploy-tools
+      run: |
+        pnpm install --frozen-lockfile
+        echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+    - name: Show the tool versions
+      shell: bash
+      run: |
+        vercel --version
+        lhci --version

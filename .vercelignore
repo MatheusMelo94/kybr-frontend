@@ -1,0 +1,22 @@
+# Files the Vercel CLI must never upload (frontend-devops-conventions.md
+# § Secrets Integration). The deploy workflows upload a clean checkout, so
+# this guards a manual `vercel deploy` from a working copy.
+
+# Local-only docs and brief (CLAUDE.md § Local-only files)
+docs/
+/Kybr — frontend.md
+
+# Env files: deployed values live in Vercel's environment variables
+.env
+.env.*
+!.env.example
+
+# Build output, dependencies, test and tool artifacts
+.next/
+node_modules/
+coverage/
+playwright-report/
+blob-report/
+test-results/
+.lighthouseci/
+.claude/

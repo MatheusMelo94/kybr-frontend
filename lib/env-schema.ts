@@ -16,6 +16,13 @@ export const LIST_VALUED_IP_HEADERS: ReadonlySet<string> = new Set([
   "x-forwarded-for",
 ]);
 
+/**
+ * The client IP header on Vercel (ADR-0005). Vercel's edge sets it to the
+ * client's IP, and a proxy in front of Vercel can't rewrite it, unlike
+ * x-forwarded-for and x-real-ip (F02).
+ */
+const VERCEL_CLIENT_IP_HEADER = "x-vercel-forwarded-for";
+
 const serverEnvSchema = z
   .object({
     NODE_ENV: z
@@ -44,6 +51,20 @@ const serverEnvSchema = z
       .transform(Number)
       .pipe(z.number().int().min(1).max(10))
       .optional(),
+    // Set to "1" by Vercel itself at build and run time.
+    VERCEL: z.string().optional(),
+  })
+  .superRefine((env, ctx) => {
+    if (
+      env.VERCEL === "1" &&
+      env.CLIENT_IP_HEADER !== VERCEL_CLIENT_IP_HEADER
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["CLIENT_IP_HEADER"],
+        message: `Must be ${VERCEL_CLIENT_IP_HEADER} on Vercel`,
+      });
+    }
   })
   .transform(({ CLIENT_IP_TRUSTED_HOPS, ...env }) =>
     // Hops mean nothing for a single-value header, so they're dropped.

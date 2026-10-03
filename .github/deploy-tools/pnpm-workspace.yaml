@@ -1,0 +1,22 @@
+# A separate pnpm root for the deploy workflows' CLIs (.github/actions/deploy-tools).
+# Dependency build scripts stay blocked, as in the app (CLAUDE.md › Toolchain).
+allowBuilds:
+  # Bundled by the Vercel CLI for local builds; the deploy workflows build on Vercel.
+  esbuild: false
+
+# Security DV-02: never resolve a release younger than 7 days (in minutes).
+# These CLIs run next to VERCEL_TOKEN; a fresh release is the window that
+# npm worm compromises use.
+minimumReleaseAge: 10080
+
+# Reviewed exceptions for `pnpm audit --audit-level=critical` in ci.yml
+# (Security DV-02; same pattern as the app's F18 entry).
+auditConfig:
+  ignoreGhsas:
+    # tar <= 7.5.18 (parse DoS), via vercel > @vercel/container. That's the
+    # CLI's local container builder, which `vercel build` uses; our workflows
+    # only run `vercel deploy` (built on Vercel), env pull, promote, rollback
+    # and inspect, and never parse an untrusted archive. No vercel release
+    # older than 7 days fixes it. Revisit 2026-11-03, or on the next vercel
+    # bump.
+    - GHSA-23hp-3jrh-7fpw
