@@ -3,7 +3,7 @@
 # every pushed branch gets a preview, built on Vercel in gru1 against the
 # Preview env vars (the hosted mock API while the backend is Pre-Contract).
 #
-# ci.yml calls this after verify, audit and e2e pass on the same commit, so a
+# ci.yml calls this after verify, audit, container and e2e pass on the same commit, so a
 # preview never exists for a red SHA. Vercel's Git integration is off
 # (vercel.json), so this is the only way a preview is made.
 #
@@ -73,7 +73,7 @@ jobs:
         run: |
           env_file="$RUNNER_TEMP/preview.env"
           trap 'rm -f "$env_file"' EXIT
-          vercel env pull "$env_file" --environment=preview --yes --token="$VERCEL_TOKEN" > /dev/null
+          vercel env pull "$env_file" --environment=preview --yes > /dev/null
           node scripts/check-deploy-env.mjs "$env_file" preview
 
       # Built on Vercel, so the Sensitive env vars never leave Vercel.
@@ -84,7 +84,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           COMMIT_REF: ${{ github.ref_name }}
         run: |
-          url=$(vercel deploy --cwd _deploy --yes --archive=tgz --token="$VERCEL_TOKEN" \
+          url=$(vercel deploy --cwd _deploy --yes --archive=tgz \
             --meta githubCommitSha="$COMMIT_SHA" \
             --meta githubCommitRef="$COMMIT_REF")
           if ! printf '%s' "$url" | grep -qE '^https://[a-z0-9.-]+\.vercel\.app$'; then

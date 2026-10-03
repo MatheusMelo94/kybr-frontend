@@ -221,7 +221,7 @@ jobs:
   # VERCEL_DEPLOY_ENABLED repository variable (docs/devops/vercel-setup.md).
   deploy-staging:
     name: Deploy staging
-    needs: [verify, audit, e2e]
+    needs: [verify, audit, container, e2e]
     if: github.event_name == 'push' && github.actor != 'dependabot[bot]' && vars.VERCEL_DEPLOY_ENABLED == 'true'
     uses: ./.github/workflows/deploy-staging.yml
     secrets:

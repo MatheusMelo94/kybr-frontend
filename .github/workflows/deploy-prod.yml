@@ -136,7 +136,7 @@ jobs:
         run: |
           env_file="$RUNNER_TEMP/production.env"
           trap 'rm -f "$env_file"' EXIT
-          vercel env pull "$env_file" --environment=production --yes --token="$VERCEL_TOKEN" > /dev/null
+          vercel env pull "$env_file" --environment=production --yes > /dev/null
           node scripts/check-deploy-env.mjs "$env_file" production
 
       - name: Deploy a staged production build (no traffic)
@@ -146,7 +146,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          url=$(vercel deploy --prod --skip-domain --yes --archive=tgz --token="$VERCEL_TOKEN" \
+          url=$(vercel deploy --prod --skip-domain --yes --archive=tgz \
             --meta githubCommitSha="$COMMIT_SHA" \
             --meta releaseTag="$RELEASE_TAG")
           if ! printf '%s' "$url" | grep -qE '^https://[a-z0-9.-]+\.vercel\.app$'; then
@@ -191,7 +191,7 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          lkg=$(vercel inspect "$PRODUCTION_URL" --token="$VERCEL_TOKEN" 2>&1 |
+          lkg=$(vercel inspect "$PRODUCTION_URL" 2>&1 |
             grep -oE 'dpl_[A-Za-z0-9]+' | head -n 1 || true)
           echo "id=$lkg" >> "$GITHUB_OUTPUT"
           echo "Last-known-good: ${lkg:-none (first production deploy)}"
@@ -200,7 +200,7 @@ jobs:
         id: promote
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: vercel promote "$STAGED_URL" --yes --timeout=5m --token="$VERCEL_TOKEN"
+        run: vercel promote "$STAGED_URL" --yes --timeout=5m
 
       - name: Verify production (health, security headers)
         env:
@@ -219,7 +219,7 @@ jobs:
             echo "::error::No last-known-good deployment. Remove the production domain or fix forward."
             exit 1
           fi
-          vercel rollback "$LKG" --timeout=5m --token="$VERCEL_TOKEN"
+          vercel rollback "$LKG" --timeout=5m
           echo "::error::Production failed verification and was rolled back to $LKG."
 
       - name: Tag the release
