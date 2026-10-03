@@ -89,6 +89,10 @@ export function VerificationForm({ slug, passthrough }: Props): JSX.Element {
   const nameInput = useRef<HTMLInputElement>(null);
   // The CNPJ whose lookup is in flight; a response for any other is stale.
   const current = useRef<string | null>(null);
+  // Every lookup this visit, by CNPJ: "pending" until it settles. Re-entering
+  // a CNPJ after an edit restores its result without a second D2 call
+  // (review 0003; CNPJá credits, threat model F03).
+  const lookups = useRef(new Map<string, Lookup | "pending">());
   // F17: one UUID per submit attempt, reused on retry while the inputs are
   // unchanged, so a lost response can't create a second case.
   const idempotencyKey = useRef<string | null>(null);
@@ -181,25 +185,20 @@ export function VerificationForm({ slug, passthrough }: Props): JSX.Element {
       current.current = null;
       setLookup({ status: "idle" });
     }
+    const known = lookups.current.get(next);
+    if (known !== undefined && next !== current.current) {
+      current.current = next;
+      if (known === "pending") showLoading(next);
+      else showResult(known);
+    }
   }
 
-  async function lookUp(target: string): Promise<void> {
-    current.current = target;
+  function showLoading(target: string): void {
     setLookup({ status: "loading", cnpj: target });
     setAnnouncement(formCopy["form.lookup.loading"]);
+  }
 
-    let next: Lookup;
-    try {
-      const result = await lookupCompanyAction(slug, target);
-      next = result.ok
-        ? { status: "found", cnpj: target, company: result.company }
-        : { status: result.reason, cnpj: target };
-    } catch {
-      // The action itself couldn't be reached (offline): the same note, no retry.
-      next = { status: "failed", cnpj: target };
-    }
-    if (current.current !== target) return;
-
+  function showResult(next: Lookup): void {
     setLookup(next);
     setAnnouncement(
       next.status === "found"
@@ -212,6 +211,27 @@ export function VerificationForm({ slug, passthrough }: Props): JSX.Element {
               : "form.lookup.failed"
           ],
     );
+  }
+
+  async function lookUp(target: string): Promise<void> {
+    // Already looked up (or in flight): changeCnpj has restored it.
+    if (lookups.current.has(target)) return;
+    current.current = target;
+    lookups.current.set(target, "pending");
+    showLoading(target);
+
+    let next: Lookup;
+    try {
+      const result = await lookupCompanyAction(slug, target);
+      next = result.ok
+        ? { status: "found", cnpj: target, company: result.company }
+        : { status: result.reason, cnpj: target };
+    } catch {
+      // The action itself couldn't be reached (offline): the same note, no retry.
+      next = { status: "failed", cnpj: target };
+    }
+    lookups.current.set(target, next);
+    if (current.current === target) showResult(next);
   }
 
   function submit(event: FormEvent<HTMLFormElement>): void {

@@ -143,10 +143,66 @@ describe("VerificationForm: CNPJ lookup", () => {
       expect(
         screen.getByRole("button", { name: "Verificar empresa" }),
       ).toBeEnabled();
-      await act(async () => new Promise((done) => setTimeout(done, 50)));
+      // Flush every pending task: a retry would have been dispatched by now.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
       expect(lookup).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("review 0003: re-entering the same CNPJ after an edit restores its block, with no second lookup", async () => {
+    const user = userEvent.setup();
+    lookup.mockResolvedValue(FOUND);
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await user.type(cnpjInput(), "11222333000181");
+    await screen.findByText("Campinas, SP");
+    await user.type(cnpjInput(), "{Backspace}");
+    expect(screen.queryByTestId("company-block")).toBeNull();
+    await user.type(cnpjInput(), "1");
+
+    expect(screen.getByText("Campinas, SP")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Empresa encontrada: JOAO CARLOS SILVA CPF oculto.",
+    );
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
+  it("review 0003: going back to an earlier CNPJ reuses its result (one D2 call per CNPJ)", async () => {
+    const user = userEvent.setup();
+    lookup.mockResolvedValue(FOUND);
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await user.type(cnpjInput(), "11222333000181");
+    await screen.findByText("Campinas, SP");
+    await user.clear(cnpjInput());
+    await user.type(cnpjInput(), "12345678000195");
+    await user.clear(cnpjInput());
+    await user.type(cnpjInput(), "11222333000181");
+
+    expect(screen.getByText("Campinas, SP")).toBeInTheDocument();
+    expect(lookup).toHaveBeenCalledTimes(2);
+  });
+
+  it("review 0003: re-entering the same CNPJ while its lookup runs shows the skeleton, then the result", async () => {
+    const user = userEvent.setup();
+    const pending = deferred<typeof FOUND>();
+    lookup.mockReturnValue(pending.promise);
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await user.type(cnpjInput(), "11222333000181");
+    await user.type(cnpjInput(), "{Backspace}1");
+    expect(screen.getByTestId("company-block")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    await act(async () => pending.resolve(FOUND));
+
+    expect(screen.getByText("Campinas, SP")).toBeInTheDocument();
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
 
   it("AC 7: ignores a stale response once the CNPJ has been edited", async () => {
     const user = userEvent.setup();
