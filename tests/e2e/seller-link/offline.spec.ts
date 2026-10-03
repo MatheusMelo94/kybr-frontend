@@ -1,101 +1,103 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import {
-  CASE_TOKENS,
-  SLUGS,
-  cnpjFor,
-} from "../../fixtures/factories/seller-link.ts";
+import { SLUGS } from "../../fixtures/factories/seller-link.ts";
+import { expectNoAxeViolations } from "../fixtures/axe.ts";
+import { createCase, setCaseState } from "../fixtures/mock-api.ts";
+import { isSameDocument, markDocument, nextCheck } from "../fixtures/live.ts";
 
-const MOCK_API = "http://localhost:4010"; // playwright.config.ts
 const BANNER = "Sem conexão. Assim que a internet voltar, continuamos daqui.";
 
-/** Resolves when the page sends its next status check (a Server Action POST). */
-function nextCheck(page: Page): Promise<unknown> {
-  return page.waitForRequest(
-    (request) =>
-      request.method() === "POST" && !!request.headers()["next-action"],
-    { timeout: 3_000 },
-  );
+function banner(page: Page): ReturnType<Page["getByRole"]> {
+  return page.getByRole("status").filter({ hasText: BANNER });
 }
 
-/** Marks the document; the mark survives only if it's never reloaded. */
-async function markDocument(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    (window as unknown as { __sameDocument: boolean }).__sameDocument = true;
-  });
-}
-
-async function sameDocument(page: Page): Promise<boolean | undefined> {
-  return page.evaluate(
-    () => (window as unknown as { __sameDocument?: boolean }).__sameDocument,
-  );
+function h1(page: Page, name: string): ReturnType<Page["getByRole"]> {
+  return page.getByRole("heading", { level: 1, name });
 }
 
 test.describe("offline @feature-seller-link", () => {
-  test("AC 29 (verificando): the banner shows, the page never hard-navigates, the 10 s switch still happens, and checks resume online", async ({
+  test("AC 29 (verificando): the banner shows, the 10 s switch still happens offline, and checks resume online with no hard navigation", async ({
     page,
     context,
     request,
   }) => {
-    test.setTimeout(40_000);
-    const created = await request.post(
-      `${MOCK_API}/public/v/${SLUGS.ok}/verify`,
-      {
-        headers: { "idempotency-key": crypto.randomUUID() },
-        data: { cnpj: cnpjFor("lento"), responsavel: "Maria Exemplo" },
-      },
-    );
-    const { token } = (await created.json()) as { token: string };
+    const token = await createCase(request, { ageMs: 7_000 });
 
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
-    ).toBeVisible();
+    await expect(h1(page, "Verificando sua empresa")).toBeVisible();
     await markDocument(page);
 
     await context.setOffline(true);
-    await expect(
-      page.getByRole("status").filter({ hasText: BANNER }),
-    ).toBeVisible();
+    await expect(banner(page)).toBeVisible();
+    await expectNoAxeViolations(page);
 
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Sua empresa está em análise",
-      }),
-    ).toBeVisible({ timeout: 12_000 });
-    await expect(page.getByText(BANNER)).toBeVisible();
-    expect(await sameDocument(page)).toBe(true);
+    await expect(h1(page, "Sua empresa está em análise")).toBeVisible({
+      timeout: 6_000,
+    });
+    await expect(banner(page)).toBeVisible();
+    expect(await isSameDocument(page)).toBe(true);
 
     const resumed = nextCheck(page);
     await context.setOffline(false);
     await resumed;
     await expect(page.getByText(BANNER)).toHaveCount(0);
-    expect(await sameDocument(page)).toBe(true);
+    expect(await isSameDocument(page)).toBe(true);
   });
 
-  test("AC 29 (em análise): the banner shows offline; back online it goes and a check runs at once", async ({
+  test("AC 29 (em análise): a result reached while offline shows as soon as the connection returns", async ({
     page,
     context,
+    request,
   }) => {
-    await page.goto(`/v/${SLUGS.ok}/c/${CASE_TOKENS.processing}`);
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Sua empresa está em análise",
-      }),
-    ).toBeVisible();
+    const token = await createCase(request, {
+      ageMs: 11_000,
+      responsavel: "Maria Exemplo",
+    });
+
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await expect(h1(page, "Sua empresa está em análise")).toBeVisible();
     await markDocument(page);
 
     await context.setOffline(true);
-    await expect(
-      page.getByRole("status").filter({ hasText: BANNER }),
-    ).toBeVisible();
+    await expect(banner(page)).toBeVisible();
+    await setCaseState(request, token, { kind: "aprovado" });
 
     const resumed = nextCheck(page);
     await context.setOffline(false);
     await resumed;
+
+    const result = h1(page, "Tudo certo, Maria.");
+    await expect(result).toBeVisible({ timeout: 5_000 });
+    await expect(result).toBeFocused();
     await expect(page.getByText(BANNER)).toHaveCount(0);
-    expect(await sameDocument(page)).toBe(true);
+    expect(await isSameDocument(page)).toBe(true);
+  });
+
+  test("Q2 (Architect-pending): a check that fails at the network level while the browser says online shows the banner; the next successful check hides it", async ({
+    page,
+    request,
+  }) => {
+    const token = await createCase(request);
+
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await expect(h1(page, "Verificando sua empresa")).toBeVisible();
+    await markDocument(page);
+
+    // Drop status checks at the network level; the browser stays "online".
+    const dropChecks = async (
+      route: Parameters<Parameters<Page["route"]>[1]>[0],
+    ): Promise<void> => {
+      if (route.request().headers()["next-action"])
+        await route.abort("internetdisconnected");
+      else await route.continue();
+    };
+    await page.route(`**/v/${SLUGS.ok}/c/${token}`, dropChecks);
+
+    await expect(banner(page)).toBeVisible({ timeout: 4_000 });
+    expect(await isSameDocument(page)).toBe(true);
+
+    await page.unroute(`**/v/${SLUGS.ok}/c/${token}`, dropChecks);
+    await expect(page.getByText(BANNER)).toHaveCount(0, { timeout: 4_000 });
+    expect(await isSameDocument(page)).toBe(true);
   });
 });

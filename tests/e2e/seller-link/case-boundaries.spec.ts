@@ -1,32 +1,16 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
+import { CASE_TOKENS, SLUGS } from "../../fixtures/factories/seller-link.ts";
+import { expectNoAxeViolations } from "../fixtures/axe.ts";
 import {
-  CASE_TOKENS,
-  SLUGS,
-  cnpjFor,
-} from "../../fixtures/factories/seller-link.ts";
+  MOCK_API,
+  caseReads,
+  createCase,
+  delayCaseReads,
+  uniqueKey,
+} from "../fixtures/mock-api.ts";
 
-const MOCK_API = "http://localhost:4010"; // playwright.config.ts
-
-// Per-test keys keep the 4 parallel projects apart (their own D1 cache entry,
-// their own unstable case).
-function unique(prefix: string, projectName: string): string {
-  return `${prefix}-${projectName}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-/** Creates a case through the mock's D3, as the form would. */
-async function createCase(
-  request: APIRequestContext,
-  slug: string,
-): Promise<string> {
-  const response = await request.post(`${MOCK_API}/public/v/${slug}/verify`, {
-    headers: { "idempotency-key": crypto.randomUUID() },
-    data: { cnpj: cnpjFor("aprovado"), responsavel: "Maria Exemplo" },
-  });
-  return ((await response.json()) as { token: string }).token;
-}
-
-/** The HTML with the per-request CSP nonce and the token taken out. */
+/** The HTML with the per-request CSP nonce and the token taken out (QA plan Q6). */
 function normalized(html: string, token: string): string {
   return html
     .replaceAll(/nonce="[^"]*"/g, 'nonce=""')
@@ -35,8 +19,9 @@ function normalized(html: string, token: string): string {
 }
 
 test.describe("case route boundaries @feature-seller-link", () => {
-  test("AC 27: a malformed token is Case not found, with a 404 status", async ({
+  test("AC 27: a malformed token is Case not found, with a 404 status and no API call", async ({
     page,
+    request,
   }) => {
     const response = await page.goto(`/v/${SLUGS.ok}/c/curto`);
 
@@ -52,6 +37,8 @@ test.describe("case route boundaries @feature-seller-link", () => {
     await expect(
       page.getByRole("link", { name: "Começar de novo" }),
     ).toHaveAttribute("href", `/v/${SLUGS.ok}`);
+    expect(await caseReads(request, "curto")).toBe(0);
+    await expectNoAxeViolations(page);
   });
 
   test("AC 27: an unknown token is Case not found, never indexed; Começar de novo opens the empty form", async ({
@@ -99,7 +86,7 @@ test.describe("case route boundaries @feature-seller-link", () => {
     page,
     request,
   }, testInfo) => {
-    const token = unique(CASE_TOKENS.unstable, testInfo.project.name);
+    const token = uniqueKey(CASE_TOKENS.unstable, testInfo);
 
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
     await expect(
@@ -111,6 +98,7 @@ test.describe("case route boundaries @feature-seller-link", () => {
     await expect(
       page.getByText("Confira sua conexão e tente de novo."),
     ).toBeVisible();
+    await expectNoAxeViolations(page);
 
     await request.post(
       `${MOCK_API}/__mock/links/${SLUGS.ok}/cases/${token}/recover`,
@@ -125,16 +113,18 @@ test.describe("case route boundaries @feature-seller-link", () => {
   test("AC 26: a reload shows the case skeleton, then the current state", async ({
     page,
     request,
-  }, testInfo) => {
-    const slug = unique(SLUGS.slow, testInfo.project.name);
-    const token = await createCase(request, slug);
+  }) => {
+    const token = await createCase(request);
+    await delayCaseReads(request, token, 1_500);
 
-    await page.goto(`/v/${slug}/c/${token}`, { waitUntil: "commit" });
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`, { waitUntil: "commit" });
     await expect(page.getByTestId("case-skeleton")).toBeVisible();
     await expect(page.getByTestId("form-skeleton")).toHaveCount(0);
 
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
+    ).toBeVisible();
     await expect(page.getByTestId("case-skeleton")).toHaveCount(0);
-    await expect(page.getByText(/Passo [23] de 3/)).toBeAttached();
+    await expect(page.getByText("Passo 2 de 3")).toBeAttached();
   });
 });

@@ -1,204 +1,199 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { CASE_PRESETS, SLUGS } from "../../fixtures/factories/seller-link.ts";
+import { expectNoAxeViolations } from "../fixtures/axe.ts";
 import {
-  expect,
-  test,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
-
+  createCase,
+  deleteCase,
+  disableLink,
+  failCaseReads,
+  setCaseState,
+  uniqueKey,
+} from "../fixtures/mock-api.ts";
 import {
-  CASE_TOKENS,
-  SLUGS,
-  cnpjFor,
-  type CnpjScenario,
-} from "../../fixtures/factories/seller-link.ts";
+  isSameDocument,
+  markDocument,
+  recordChecks,
+} from "../fixtures/live.ts";
 
-const MOCK_API = "http://localhost:4010"; // playwright.config.ts
+// Held cases ("retido", backdated by ageMs) set the server's elapsed time, so
+// nothing here waits for S10's real 14 s (QA test plan § Making timing
+// deterministic).
 
-/** Creates a case through the mock's D3, as the form would; it starts now. */
-async function createCase(
-  request: APIRequestContext,
-  scenario: CnpjScenario,
-  slug: string = SLUGS.ok,
-): Promise<string> {
-  const response = await request.post(`${MOCK_API}/public/v/${slug}/verify`, {
-    headers: { "idempotency-key": crypto.randomUUID() },
-    data: { cnpj: cnpjFor(scenario), responsavel: "Maria Exemplo" },
-  });
-  return ((await response.json()) as { token: string }).token;
+const VERIFYING = "Verificando sua empresa";
+const ANALYSIS = "Sua empresa está em análise";
+
+function h1(page: Page, name: string): ReturnType<Page["getByRole"]> {
+  return page.getByRole("heading", { level: 1, name });
 }
 
-/** Records when each status check (a Server Action POST) leaves the page. */
-function recordChecks(page: Page): number[] {
-  const sent: number[] = [];
-  page.on("request", (request) => {
-    if (request.method() === "POST" && request.headers()["next-action"])
-      sent.push(Date.now());
-  });
-  return sent;
+/** CaseViewTransition's polite region saying `text` (the offline banner has its own). */
+function announcement(page: Page, text: string): ReturnType<Page["getByRole"]> {
+  return page.getByRole("status").filter({ hasText: text });
 }
 
 test.describe("live status @feature-seller-link", () => {
-  test("AC 15 / AC 17 (S10): verificando at step 2, then em análise at 10 s from criado_em, with no navigation", async ({
+  test("AC 15 / AC 17: verificando at step 2, then em análise at 10 s from criado_em, in the same document, focused and announced", async ({
     page,
     request,
   }) => {
-    const token = await createCase(request, "lento");
-    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
-    // Survives only if the document is never reloaded.
-    await page.evaluate(() => {
-      (window as unknown as { __sameDocument: boolean }).__sameDocument = true;
-    });
+    const token = await createCase(request, { ageMs: 8_000 });
 
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await expect(h1(page, VERIFYING)).toBeVisible();
+    await markDocument(page);
     await expect(page.getByText("Passo 2 de 3")).toBeAttached();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
-    ).toBeVisible();
     // The view's status line (the polite region says it too, T25).
     await expect(
       page.locator("p", {
         hasText: "Consultando Receita Federal, Simples Nacional e SINTEGRA…",
       }),
     ).toBeVisible();
+    await expectNoAxeViolations(page);
 
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Sua empresa está em análise",
-      }),
-    ).toBeVisible({ timeout: 12_000 });
+    await expect(h1(page, ANALYSIS)).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText(/^A consulta está demorando/)).toBeVisible();
     await expect(page.getByText(/^Este endereço também mostra/)).toBeVisible();
     await expect(page.getByText("Passo 2 de 3")).toBeAttached();
-    // T25: the switch moves focus to the new h1 and announces it.
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Sua empresa está em análise",
-      }),
-    ).toBeFocused();
-    await expect(
-      page
-        .getByRole("status")
-        .filter({ hasText: "Sua empresa está em análise" }),
-    ).toHaveCount(1);
-    expect(
-      await page.evaluate(
-        () =>
-          (window as unknown as { __sameDocument?: boolean }).__sameDocument,
-      ),
-    ).toBe(true);
+    await expect(h1(page, ANALYSIS)).toBeFocused();
+    await expect(announcement(page, ANALYSIS)).toHaveCount(1);
+    expect(await isSameDocument(page)).toBe(true);
+    await expectNoAxeViolations(page);
   });
 
   test("AC 17: a reload after 10 s renders em análise directly", async ({
     page,
+    request,
   }) => {
-    await page.goto(`/v/${SLUGS.ok}/c/${CASE_TOKENS.processing}`);
+    const token = await createCase(request, { ageMs: 11_000 });
 
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Sua empresa está em análise",
-      }),
-    ).toBeVisible();
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+
+    await expect(h1(page, ANALYSIS)).toBeVisible();
     await expect(page.getByText(/^A consulta está demorando/)).toBeVisible();
-    await expect(page.getByText("Verificando sua empresa")).toHaveCount(0);
+    await expect(page.getByText(VERIFYING)).toHaveCount(0);
   });
 
-  test("AC 18 (S7): no company data shows analysis.body.notfound right away", async ({
+  test("AC 18: no company data shows analysis.body.notfound at once, processing or pending with no items", async ({
     page,
     request,
   }) => {
-    const token = await createCase(request, "sem-dados");
+    const processing = await createCase(request, { kind: "sem-dados" });
+    const pendingNoItems = await createCase(
+      request,
+      CASE_PRESETS.pendingNoItemsNoData,
+    );
 
-    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
-
-    await expect(page.getByText("Passo 2 de 3")).toBeAttached();
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Sua empresa está em análise",
-      }),
-    ).toBeVisible();
-    await expect(
-      page.getByText(
-        "Ainda não encontramos os dados da sua empresa. Vamos conferir e avisar o resultado por e-mail.",
-      ),
-    ).toBeVisible();
+    for (const token of [processing, pendingNoItems]) {
+      await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+      await expect(page.getByText("Passo 2 de 3")).toBeAttached();
+      await expect(h1(page, ANALYSIS)).toBeVisible();
+      await expect(
+        page.getByText(
+          "Ainda não encontramos os dados da sua empresa. Vamos conferir e avisar o resultado por e-mail.",
+        ),
+      ).toBeVisible();
+    }
+    await expectNoAxeViolations(page);
   });
 
-  test("AC 16 (S4): the result shows within 10 s, focused and announced", async ({
+  test("AC 15 / AC 16: checks every 2 s while verifying; the result shows on the next check, focused and announced", async ({
     page,
     request,
   }) => {
-    const token = await createCase(request, "aprovado");
+    const token = await createCase(request, { responsavel: "Maria Exemplo" });
+    const checks = recordChecks(page);
 
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
-    ).toBeVisible();
+    await expect(h1(page, VERIFYING)).toBeVisible();
+    await expect.poll(() => checks.length, { timeout: 8_000 }).toBe(3);
+    const gaps = checks
+      .slice(1)
+      .map((sentAt, index) => sentAt - (checks[index] ?? 0));
+    for (const gap of gaps) {
+      expect(gap).toBeGreaterThan(1_500);
+      expect(gap).toBeLessThan(3_500);
+    }
 
-    const result = page.getByRole("heading", {
-      level: 1,
-      name: "Tudo certo, Maria.",
-    });
-    await expect(result).toBeVisible({ timeout: 10_000 });
+    await setCaseState(request, token, { kind: "aprovado" });
+
+    const result = h1(page, "Tudo certo, Maria.");
+    await expect(result).toBeVisible({ timeout: 4_000 });
     await expect(result).toBeFocused();
     await expect(page.getByRole("status")).toHaveText("Tudo certo, Maria.");
     await expect(page.getByText("Passo 3 de 3")).toBeAttached();
   });
 
-  test("AC 15 / AC 17 (S10): checks every 2 s while verifying; the result that arrives during em análise replaces it, announced", async ({
+  test("AC 17 (arrival): a result that arrives during em análise replaces it on the next 10 s check, announced", async ({
     page,
     request,
   }) => {
-    test.setTimeout(60_000);
-    const token = await createCase(request, "lento");
-    const checks = recordChecks(page);
+    const token = await createCase(request, {
+      ageMs: 11_000,
+      responsavel: "Maria Exemplo",
+    });
 
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Sua empresa está em análise",
-      }),
-    ).toBeVisible({ timeout: 12_000 });
-    const whileVerifying = [...checks];
+    await expect(h1(page, ANALYSIS)).toBeVisible();
+    await setCaseState(request, token, { kind: "aprovado" });
 
-    // S10 is approved at about 14 s; on em análise the next check is ≤ 10 s away.
-    const result = page.getByRole("heading", {
-      level: 1,
-      name: "Tudo certo, Maria.",
-    });
-    await expect(result).toBeVisible({ timeout: 25_000 });
+    const result = h1(page, "Tudo certo, Maria.");
+    await expect(result).toBeVisible({ timeout: 12_000 });
     await expect(result).toBeFocused();
     await expect(page.getByRole("status")).toHaveText("Tudo certo, Maria.");
-
-    expect(whileVerifying.length).toBeGreaterThanOrEqual(3);
-    for (const [index, sentAt] of whileVerifying.entries()) {
-      if (index === 0) continue;
-      const gap = sentAt - (whileVerifying[index - 1] ?? sentAt);
-      expect(gap).toBeGreaterThan(1_500);
-      expect(gap).toBeLessThan(3_500);
-    }
   });
 
-  test("AC 17: a CASO_NAO_ENCONTRADO check refreshes to Case not found", async ({
+  test("rule 7: a check the API fails stays silent, and checking carries on", async ({
+    page,
+    request,
+  }) => {
+    const token = await createCase(request, { responsavel: "Maria Exemplo" });
+
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await expect(h1(page, VERIFYING)).toBeVisible();
+    await failCaseReads(request, token, 503, 1);
+    await setCaseState(request, token, { kind: "aprovado" });
+
+    // The failed check is retried after 5 s; the next one finds the result.
+    await expect(h1(page, "Tudo certo, Maria.")).toBeVisible({
+      timeout: 9_000,
+    });
+    await expect(page.getByText(/Sem conexão/)).toHaveCount(0);
+  });
+
+  test("AC 17 / rule 7: a case that disappears refreshes to Case not found", async ({
+    page,
+    request,
+  }) => {
+    const token = await createCase(request);
+
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await expect(h1(page, VERIFYING)).toBeVisible();
+    await deleteCase(request, token);
+
+    await expect(h1(page, "Cadastro não encontrado")).toBeVisible({
+      timeout: 5_000,
+    });
+    await expect(
+      page.getByRole("link", { name: "Começar de novo" }),
+    ).toHaveAttribute("href", `/v/${SLUGS.ok}`);
+  });
+
+  test("Q3: a link disabled while the case is open shows Link not found", async ({
     page,
     request,
   }, testInfo) => {
-    const slug = `${SLUGS.perTest}-${testInfo.project.name}-${Math.random().toString(36).slice(2, 8)}`;
-    const token = await createCase(request, "lento", slug);
+    const slug = uniqueKey(SLUGS.perTest, testInfo);
+    const token = await createCase(request, { slug });
 
     await page.goto(`/v/${slug}/c/${token}`);
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
-    ).toBeVisible();
-    // D4 now answers 404 for this link's cases.
-    await request.post(`${MOCK_API}/__mock/links/${slug}/disable`);
+    await expect(h1(page, VERIFYING)).toBeVisible();
+    await disableLink(request, slug);
 
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Cadastro não encontrado" }),
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(h1(page, "Link não encontrado")).toBeVisible({
+      timeout: 5_000,
+    });
+    await expectNoAxeViolations(page);
   });
 
   test("AC 39: 12.ABC.345/01DE-35 (S16) goes from the form through verificando to tudo certo", async ({
@@ -216,11 +211,10 @@ test.describe("live status @feature-seller-link", () => {
     );
     await page.getByRole("button", { name: "Verificar empresa" }).click();
 
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Tudo certo, Maria." }),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(h1(page, VERIFYING)).toBeVisible();
+    await expect(h1(page, "Tudo certo, Maria.")).toBeVisible({
+      timeout: 10_000,
+    });
+    await expectNoAxeViolations(page);
   });
 });
