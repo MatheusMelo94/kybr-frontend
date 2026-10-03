@@ -19,7 +19,8 @@ export default defineConfig({
       CLIENT_IP_HEADER: "x-forwarded-for",
       CLIENT_IP_TRUSTED_HOPS: "1",
     },
-    // Playwright owns tests/e2e.
-    exclude: [...configDefaults.exclude, "tests/e2e/**"],
+    // Playwright owns tests/e2e. Agent worktrees under .claude/ hold other
+    // branches' copies of the suite and must never be collected here.
+    exclude: [...configDefaults.exclude, "tests/e2e/**", ".claude/**"],
   },
 });

@@ -19,6 +19,8 @@ const eslintConfig = [
       "blob-report/**",
       "test-results/**",
       "next-env.d.ts",
+      // Agent worktrees: other branches' checkouts, linted on their own branch.
+      ".claude/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
