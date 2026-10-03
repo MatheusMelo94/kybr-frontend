@@ -1,21 +1,35 @@
 import type { JSX } from "react";
 
+import { ApprovedView } from "@/features/seller-link/components/case/approved-view";
+import { blockedCopy } from "@/features/seller-link/copy/blocked";
 import { caseCopy } from "@/features/seller-link/copy/case";
 import { pendingCopy } from "@/features/seller-link/copy/pending";
-import { blockedCopy } from "@/features/seller-link/copy/blocked";
-import { resultsCopy } from "@/features/seller-link/copy/results";
-import { fill, primeiroNome } from "@/features/seller-link/format";
 import type { CaseViewKey } from "@/features/seller-link/types";
-import type { PublicCase } from "@/lib/api/schemas/public-link";
+import type { CaseResult, PublicCase } from "@/lib/api/schemas/public-link";
 
 type Props = {
   viewKey: CaseViewKey;
   publicCase: PublicCase;
+  /** The workspace name from D1. */
+  marketplace: string;
 };
 
+/**
+ * A result view's data. deriveCaseView returns a result key only once the
+ * case has left processing, and the schema requires resultado from then on.
+ */
+function resultOf(publicCase: PublicCase): CaseResult {
+  if (publicCase.resultado === undefined)
+    throw new Error("A result view needs a case with a resultado");
+  return publicCase.resultado;
+}
+
 /** The case page's view for `viewKey` (plan § 3, case page). */
-export function CaseContent({ viewKey, publicCase }: Props): JSX.Element {
-  const responsavel = publicCase.resultado?.responsavel ?? "";
+export function CaseContent({
+  viewKey,
+  publicCase,
+  marketplace,
+}: Props): JSX.Element {
   switch (viewKey) {
     case "verifying":
       return (
@@ -28,11 +42,10 @@ export function CaseContent({ viewKey, publicCase }: Props): JSX.Element {
       );
     case "approved":
       return (
-        <h1 className="text-title font-title">
-          {fill(resultsCopy["approved.h1"], {
-            primeiro_nome: primeiroNome(responsavel),
-          })}
-        </h1>
+        <ApprovedView
+          resultado={resultOf(publicCase)}
+          marketplace={marketplace}
+        />
       );
     case "pending":
       return (

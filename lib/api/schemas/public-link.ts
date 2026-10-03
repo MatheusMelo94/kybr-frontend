@@ -254,3 +254,8 @@ export const publicCaseSchema = z
   });
 
 export type PublicCase = z.output<typeof publicCaseSchema>;
+
+/** A decided case's seller-facing result: what the result views render. */
+export type CaseResult = NonNullable<PublicCase["resultado"]>;
+
+export type Confirmation = NonNullable<CaseResult["confirmacoes"]>[number];

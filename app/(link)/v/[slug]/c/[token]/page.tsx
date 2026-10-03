@@ -33,7 +33,11 @@ export default async function CasePage({
   return (
     <div className="flex flex-col gap-6">
       <StepIndicator step={view.step} />
-      <CaseContent viewKey={view.viewKey} publicCase={caseResult.publicCase} />
+      <CaseContent
+        viewKey={view.viewKey}
+        publicCase={caseResult.publicCase}
+        marketplace={link.link.nome}
+      />
     </div>
   );
 }

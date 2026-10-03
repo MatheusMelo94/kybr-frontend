@@ -95,6 +95,7 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "approved.seal": "Vendedor verificado",
     "approved.h1": "Tudo certo, {primeiro_nome}.",
     "approved.body": "A empresa {razao_social} está liberada para vender.",
+    "approved.body.nodata": "Sua empresa está liberada para vender.",
     "approved.row.situacao.label": "Situação na Receita",
     "approved.row.situacao.value": "ativa",
     "approved.row.ie.label": "Inscrição estadual",
