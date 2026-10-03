@@ -6,10 +6,12 @@ import { revalidateTag } from "next/cache";
 
 import {
   lookupCompanyAction,
+  pollCaseViewAction,
   startVerification,
 } from "@/features/seller-link/actions";
 import { server } from "@/tests/fixtures/msw/server";
 import {
+  CASE_TOKENS,
   MEI_CNPJS,
   SLUGS,
   cnpjFor,
@@ -242,6 +244,108 @@ describe("startVerification (D3 write)", () => {
     );
 
     expect(await startVerification(input)).toEqual({
+      ok: false,
+      reason: "failed",
+    });
+  });
+});
+
+describe("pollCaseViewAction (read-only, ADR-0004a)", () => {
+  it.each([
+    [CASE_TOKENS.aprovado, "approved"],
+    [CASE_TOKENS.pendente, "pending"],
+    [CASE_TOKENS.bloqueado, "blocked"],
+    [CASE_TOKENS.processing, "analysis-timeout"],
+    [CASE_TOKENS.semDados, "analysis-notfound"],
+  ])("returns only the view key for %s (%s)", async (token, viewKey) => {
+    expect(await pollCaseViewAction(SLUGS.ok, token)).toEqual({
+      ok: true,
+      viewKey,
+    });
+  });
+
+  it("derives verificando with the same rules as the page, from the server clock", async () => {
+    const created = await fetch(
+      "http://api.kybr.test/public/v/loja-exemplo/verify",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          cnpj: cnpjFor("lento"),
+          responsavel: "Maria Exemplo Silva",
+        }),
+      },
+    );
+    const { token } = (await created.json()) as { token: string };
+
+    expect(await pollCaseViewAction(SLUGS.ok, token)).toEqual({
+      ok: true,
+      viewKey: "verifying",
+    });
+  });
+
+  it("sends the client IP and gives up after 4 s (status checks, plan § 4)", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const seen: Request[] = [];
+    server.events.on("request:start", ({ request }) => {
+      seen.push(request.clone());
+    });
+
+    await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.aprovado);
+
+    expect(timeout).toHaveBeenCalledWith(4_000);
+    expect(seen[0]?.headers.get("x-kybr-client-ip")).toBe("203.0.113.7");
+    server.events.removeAllListeners();
+  });
+
+  it.each([
+    ["an unknown token", SLUGS.ok, CASE_TOKENS.unknown],
+    ["a token from another slug", SLUGS.other, CASE_TOKENS.aprovado],
+  ])(
+    "%s is not_found (the page then shows Case not found)",
+    async (_name, slug, token) => {
+      expect(await pollCaseViewAction(slug, token)).toEqual({
+        ok: false,
+        reason: "not_found",
+      });
+    },
+  );
+
+  it.each([
+    ["a malformed token", SLUGS.ok, "../../x"],
+    ["a non-string slug", 42, CASE_TOKENS.aprovado],
+    ["a missing token", SLUGS.ok, undefined],
+  ])("rejects %s before any API call", async (_name, slug, token) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    expect(await pollCaseViewAction(slug, token)).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("S12: a 5xx is a failed check, never a throw", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.unstable)).toEqual({
+      ok: false,
+      reason: "failed",
+    });
+  });
+
+  it("a response that breaks the schema is a failed check, never a throw", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    server.use(
+      http.get("http://api.kybr.test/public/v/:slug/cases/:token", () =>
+        HttpResponse.json({ estado: "approved" }),
+      ),
+    );
+
+    expect(await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.aprovado)).toEqual({
       ok: false,
       reason: "failed",
     });

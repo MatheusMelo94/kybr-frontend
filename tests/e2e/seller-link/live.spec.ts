@@ -1,4 +1,9 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 
 import {
   CASE_TOKENS,
@@ -13,15 +18,23 @@ const MOCK_API = "http://localhost:4010"; // playwright.config.ts
 async function createCase(
   request: APIRequestContext,
   scenario: CnpjScenario,
+  slug: string = SLUGS.ok,
 ): Promise<string> {
-  const response = await request.post(
-    `${MOCK_API}/public/v/${SLUGS.ok}/verify`,
-    {
-      headers: { "idempotency-key": crypto.randomUUID() },
-      data: { cnpj: cnpjFor(scenario), responsavel: "Maria Exemplo" },
-    },
-  );
+  const response = await request.post(`${MOCK_API}/public/v/${slug}/verify`, {
+    headers: { "idempotency-key": crypto.randomUUID() },
+    data: { cnpj: cnpjFor(scenario), responsavel: "Maria Exemplo" },
+  });
   return ((await response.json()) as { token: string }).token;
+}
+
+/** Records when each status check (a Server Action POST) leaves the page. */
+function recordChecks(page: Page): number[] {
+  const sent: number[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"])
+      sent.push(Date.now());
+  });
+  return sent;
 }
 
 test.describe("live status @feature-seller-link", () => {
@@ -109,5 +122,103 @@ test.describe("live status @feature-seller-link", () => {
         "Ainda não encontramos os dados da sua empresa. Vamos conferir e avisar o resultado por e-mail.",
       ),
     ).toBeVisible();
+  });
+
+  test("AC 16 (S4): the result shows within 10 s, focused and announced", async ({
+    page,
+    request,
+  }) => {
+    const token = await createCase(request, "aprovado");
+
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
+    ).toBeVisible();
+
+    const result = page.getByRole("heading", {
+      level: 1,
+      name: "Tudo certo, Maria.",
+    });
+    await expect(result).toBeVisible({ timeout: 10_000 });
+    await expect(result).toBeFocused();
+    await expect(page.getByRole("status")).toHaveText("Tudo certo, Maria.");
+    await expect(page.getByText("Passo 3 de 3")).toBeAttached();
+  });
+
+  test("AC 15 / AC 17 (S10): checks every 2 s while verifying; the result that arrives during em análise replaces it, announced", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(60_000);
+    const token = await createCase(request, "lento");
+    const checks = recordChecks(page);
+
+    await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Sua empresa está em análise",
+      }),
+    ).toBeVisible({ timeout: 12_000 });
+    const whileVerifying = [...checks];
+
+    // S10 is approved at about 14 s; on em análise the next check is ≤ 10 s away.
+    const result = page.getByRole("heading", {
+      level: 1,
+      name: "Tudo certo, Maria.",
+    });
+    await expect(result).toBeVisible({ timeout: 25_000 });
+    await expect(result).toBeFocused();
+    await expect(page.getByRole("status")).toHaveText("Tudo certo, Maria.");
+
+    expect(whileVerifying.length).toBeGreaterThanOrEqual(3);
+    for (const [index, sentAt] of whileVerifying.entries()) {
+      if (index === 0) continue;
+      const gap = sentAt - (whileVerifying[index - 1] ?? sentAt);
+      expect(gap).toBeGreaterThan(1_500);
+      expect(gap).toBeLessThan(3_500);
+    }
+  });
+
+  test("AC 17: a CASO_NAO_ENCONTRADO check refreshes to Case not found", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const slug = `${SLUGS.perTest}-${testInfo.project.name}-${Math.random().toString(36).slice(2, 8)}`;
+    const token = await createCase(request, "lento", slug);
+
+    await page.goto(`/v/${slug}/c/${token}`);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
+    ).toBeVisible();
+    // D4 now answers 404 for this link's cases.
+    await request.post(`${MOCK_API}/__mock/links/${slug}/disable`);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Cadastro não encontrado" }),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("AC 39: 12.ABC.345/01DE-35 (S16) goes from the form through verificando to tudo certo", async ({
+    page,
+  }) => {
+    await page.goto(`/v/${SLUGS.ok}`);
+    await page
+      .getByRole("textbox", { name: "CNPJ da empresa" })
+      .pressSequentially("12abc34501de35");
+    await page
+      .getByRole("textbox", { name: "Nome completo do responsável" })
+      .fill("Maria Exemplo");
+    await expect(page.getByTestId("company-block")).not.toHaveAttribute(
+      "aria-busy",
+    );
+    await page.getByRole("button", { name: "Verificar empresa" }).click();
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Verificando sua empresa" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Tudo certo, Maria." }),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

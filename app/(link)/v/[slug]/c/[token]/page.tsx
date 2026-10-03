@@ -40,6 +40,8 @@ export default async function CasePage({
         announcement={caseAnnouncement(view.viewKey, caseResult.publicCase)}
       >
         <CaseContent
+          slug={slug}
+          token={token}
           view={view}
           publicCase={caseResult.publicCase}
           link={link.link}

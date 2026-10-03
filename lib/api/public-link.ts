@@ -168,11 +168,12 @@ export type PublicCaseResult =
  * token from another slug, an unknown slug and a malformed slug or token are
  * all the same not-found, so nothing leaks whether a case exists (SEC § Error
  * Responses). A 5xx or a response that breaks the schema throws, for the case
- * route's error boundary.
+ * route's error boundary. Status checks pass a shorter `timeoutMs`.
  */
 export async function getPublicCase(
   slug: string,
   token: string,
+  options: { timeoutMs?: number } = {},
 ): Promise<PublicCaseResult> {
   if (!isValidSlug(slug) || !isValidToken(token))
     return { ok: false, reason: "not_found" };
@@ -182,6 +183,7 @@ export async function getPublicCase(
     schema: publicCaseSchema,
     cache: "no-store",
     forwardClientIp: true,
+    ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
   });
   if (result.ok) return { ok: true, publicCase: result.data };
   if (

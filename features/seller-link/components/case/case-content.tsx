@@ -15,6 +15,9 @@ import type {
 } from "@/lib/api/schemas/public-link";
 
 type Props = {
+  /** The validated route params, for the status checks. */
+  slug: string;
+  token: string;
   view: CaseView;
   publicCase: PublicCase;
   /** The link info from D1: the workspace name and the seller contact. */
@@ -32,12 +35,21 @@ function resultOf(publicCase: PublicCase): CaseResult {
 }
 
 /** The case page's view (plan § 3, case page; tech-design § 2). */
-export function CaseContent({ view, publicCase, link }: Props): JSX.Element {
+export function CaseContent({
+  slug,
+  token,
+  view,
+  publicCase,
+  link,
+}: Props): JSX.Element {
   switch (view.viewKey) {
     case "verifying":
       // Both nodes render on the server; the client swaps them at 10 s.
       return (
         <CaseLiveStatus
+          mode="switch"
+          slug={slug}
+          token={token}
           msUntilTimeout={view.msUntilTimeout}
           verifying={<VerifyingView />}
           analysis={<AnalysisView variant="timeout" />}
@@ -48,9 +60,23 @@ export function CaseContent({ view, publicCase, link }: Props): JSX.Element {
         />
       );
     case "analysis-timeout":
-      return <AnalysisView variant="timeout" />;
     case "analysis-notfound":
-      return <AnalysisView variant="notfound" />;
+      // Checks continue while the page is open (spec AC 17).
+      return (
+        <>
+          <CaseLiveStatus
+            mode="watch"
+            slug={slug}
+            token={token}
+            viewKey={view.viewKey}
+          />
+          <AnalysisView
+            variant={
+              view.viewKey === "analysis-timeout" ? "timeout" : "notfound"
+            }
+          />
+        </>
+      );
     case "approved":
       return (
         <ApprovedView

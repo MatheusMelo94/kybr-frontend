@@ -6,6 +6,14 @@ import { CaseLiveStatus } from "@/features/seller-link/components/case/case-live
 import { CaseViewTransition } from "@/features/seller-link/components/case/case-view-transition";
 import { VerifyingView } from "@/features/seller-link/components/case/verifying-view";
 
+// The checks (T26) are covered in case-live-status.test.tsx; here they only
+// keep answering "still verifying".
+vi.mock("@/features/seller-link/actions", () => ({
+  pollCaseViewAction: async () => ({ ok: true, viewKey: "verifying" }),
+}));
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
 describe("VerifyingView", () => {
   it("AC 15: verifying.h1 and verifying.status", () => {
     render(<VerifyingView />);
@@ -92,6 +100,9 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
   function renderSwitch(msUntilTimeout: number): ReturnType<typeof render> {
     return render(
       <CaseLiveStatus
+        mode="switch"
+        slug="loja-exemplo"
+        token="tokaprovado0000000000000"
         msUntilTimeout={msUntilTimeout}
         verifying={<h1>verificando</h1>}
         analysis={<h1>em análise</h1>}
@@ -134,6 +145,9 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
     render(
       <CaseViewTransition viewKey="verifying" announcement="Consultando…">
         <CaseLiveStatus
+          mode="switch"
+          slug="loja-exemplo"
+          token="tokaprovado0000000000000"
           msUntilTimeout={3_000}
           verifying={<VerifyingView />}
           analysis={<AnalysisView variant="timeout" />}
@@ -160,7 +174,7 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
     );
   });
 
-  it("stops its timer on unmount", () => {
+  it("stops its timers on unmount", () => {
     const { unmount } = renderSwitch(5_000);
 
     unmount();

@@ -3,14 +3,19 @@
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
 
-import type { CompanySummary } from "@/features/seller-link/types";
+import { deriveCaseView } from "@/features/seller-link/case-view";
+import type { CaseViewKey, CompanySummary } from "@/features/seller-link/types";
 import {
   fieldIssues,
   verifySchema,
   type FieldIssues,
 } from "@/features/seller-link/schemas";
-import { isValidSlug } from "@/lib/api/path";
-import { createVerification, lookupCompany } from "@/lib/api/public-link";
+import { isValidSlug, isValidToken } from "@/lib/api/path";
+import {
+  createVerification,
+  getPublicCase,
+  lookupCompany,
+} from "@/lib/api/public-link";
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 
 // Server Actions are public POST endpoints (frontend-security-conventions.md
@@ -127,5 +132,48 @@ export async function startVerification(
       };
     case "failed":
       return { ok: false, reason: "failed" };
+  }
+}
+
+const caseArgsSchema = z.object({
+  slug: z.string().refine(isValidSlug),
+  token: z.string().refine(isValidToken),
+});
+
+// Half the page read's 8 s: a late check is simply replaced by the next one
+// (plan § 4).
+const STATUS_CHECK_TIMEOUT_MS = 4_000;
+
+export type PollCaseViewResult =
+  | { ok: true; viewKey: CaseViewKey }
+  | { ok: false; reason: "not_found" | "failed" };
+
+/**
+ * Read-only status check for the case page (ADR-0004a; tech-design § 3 rule
+ * 1): called by CaseLiveStatus on a timer. It returns only the view key,
+ * derived by the same function and clock as the page, never the case itself.
+ * An unknown, foreign or malformed token is `not_found` (the page then
+ * refreshes to Case not found). Any other failure is `failed`, never a throw:
+ * a thrown action reaches the client as a network failure.
+ */
+export async function pollCaseViewAction(
+  slug: unknown,
+  token: unknown,
+): Promise<PollCaseViewResult> {
+  const args = caseArgsSchema.safeParse({ slug, token });
+  if (!args.success) return { ok: false, reason: "not_found" };
+
+  try {
+    const result = await getPublicCase(args.data.slug, args.data.token, {
+      timeoutMs: STATUS_CHECK_TIMEOUT_MS,
+    });
+    if (!result.ok) return { ok: false, reason: "not_found" };
+    return {
+      ok: true,
+      viewKey: deriveCaseView(result.publicCase, Date.now()).viewKey,
+    };
+  } catch {
+    // getPublicCase already logged it, by shape (5xx, timeout, bad response).
+    return { ok: false, reason: "failed" };
   }
 }
