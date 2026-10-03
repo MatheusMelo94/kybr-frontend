@@ -50,3 +50,6 @@ Thumbs.db
 # specs and DDRs stay local (not pushed)
 docs/specs/
 docs/ddr/
+
+# project brief stays local
+/Kybr — frontend.md
