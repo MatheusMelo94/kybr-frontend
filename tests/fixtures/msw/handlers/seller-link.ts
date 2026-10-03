@@ -27,8 +27,11 @@ import {
   isValidCnpj,
   maskEmail,
   scenarioForCnpj,
+  type CaseKind,
+  type CaseOverride,
   type CaseRecord,
   type DocumentType,
+  type PublicCase,
   type PublicLink,
 } from "../../factories/seller-link.ts";
 
@@ -48,6 +51,12 @@ type Store = {
   /** tokinstavel-<suffix> tokens that read normally from now on (POST …/cases/:token/recover). */
   recoveredCases: Set<string>;
   disabledLinks: Set<string>;
+  /** D4 reads to fail next, per token (POST /__mock/cases/:token/fail). */
+  caseFailures: Map<string, { status: number; times: number }>;
+  /** D4 latency per token (POST /__mock/cases/:token/delay). */
+  caseDelays: Map<string, number>;
+  /** D4 reads per token string, whatever the outcome (GET …/reads). */
+  caseReads: Map<string, number>;
   /** The last D3 body per slug, as received (GET /__mock/links/:slug/last-verify). */
   lastVerify: Map<string, JsonBodyType>;
 };
@@ -59,6 +68,9 @@ function createStore(): Store {
     recoveredLinks: new Set(),
     recoveredCases: new Set(),
     disabledLinks: new Set(),
+    caseFailures: new Map(),
+    caseDelays: new Map(),
+    caseReads: new Map(),
     lastVerify: new Map(),
   };
 }
@@ -97,6 +109,129 @@ export function recoverCase(slug: string, token: string): void {
     settled: true,
     uploads: new Map(),
   });
+}
+
+// --- Per-test case controls (QA test plan G1–G6) ------------------------------
+// Served only by the HTTP mock API, so parallel E2E projects each own their
+// cases (never POST /__mock/reset under fullyParallel).
+
+const CASE_KINDS: readonly CaseKind[] = [
+  "aprovado",
+  "pendente",
+  "bloqueado",
+  "sem-dados",
+  "sem-dados-documento",
+  "sem-dados-aprovado",
+  "lento",
+  "processando",
+  "retido",
+  "tudo-recebido",
+  "decidido",
+];
+const ESTADOS: readonly PublicCase["estado"][] = [
+  "processing",
+  "pending",
+  "approved",
+  "blocked",
+];
+
+export type MockCaseInput = {
+  slug?: string;
+  /** How the case resolves; default "retido" (held processing, G3). */
+  kind?: CaseKind;
+  /** Backdates criado_em by this much: the only way to set the server's elapsed time (G1). */
+  ageMs?: number;
+  /** An explicit estado + resultado, served verbatim. */
+  estado?: PublicCase["estado"];
+  resultado?: Record<string, unknown>;
+  cnpj?: string;
+  responsavel?: string;
+};
+
+function isCaseKind(value: unknown): value is CaseKind {
+  return CASE_KINDS.includes(value as CaseKind);
+}
+
+function isEstado(value: unknown): value is PublicCase["estado"] {
+  return ESTADOS.includes(value as PublicCase["estado"]);
+}
+
+/** The override in a body, or undefined; throws for a bad estado. */
+function overrideFrom(input: {
+  estado?: unknown;
+  resultado?: unknown;
+}): CaseOverride | undefined {
+  if (input.estado === undefined) return undefined;
+  if (!isEstado(input.estado)) throw new Error("bad estado");
+  const resultado =
+    typeof input.resultado === "object" && input.resultado !== null
+      ? (input.resultado as Record<string, unknown>)
+      : undefined;
+  return { estado: input.estado, ...(resultado && { resultado }) };
+}
+
+/** G1: a new case with a fresh X3 token. */
+export function createMockCase(input: MockCaseInput = {}): string {
+  if (input.kind !== undefined && !isCaseKind(input.kind))
+    throw new Error("bad kind");
+  const override = overrideFrom(input);
+  const token = Buffer.from(
+    crypto.getRandomValues(new Uint8Array(18)),
+  ).toString("base64url");
+  store.cases.set(token, {
+    slug: input.slug ?? SLUGS.ok,
+    kind: input.kind ?? "retido",
+    cnpj: input.cnpj ?? cnpjFor("aprovado"),
+    responsavel: input.responsavel ?? buildResponsavel(token),
+    createdAt: Date.now() - (input.ageMs ?? 0),
+    settled: false,
+    uploads: new Map(),
+    ...(override && { override }),
+  });
+  return token;
+}
+
+/** G2: a new kind, or an explicit estado + resultado. False for an unknown token. */
+export function setMockCaseState(
+  token: string,
+  change: { kind?: unknown; estado?: unknown; resultado?: unknown },
+): boolean {
+  const record = store.cases.get(token);
+  if (!record) return false;
+  const override = overrideFrom(change);
+  if (override) {
+    record.override = override;
+    return true;
+  }
+  if (!isCaseKind(change.kind)) throw new Error("bad kind");
+  record.kind = change.kind;
+  record.settled = true;
+  delete record.override;
+  return true;
+}
+
+/** G2: the case is gone; D4 answers CASO_NAO_ENCONTRADO. */
+export function deleteMockCase(token: string): void {
+  store.cases.delete(token);
+}
+
+/** G4: the next `times` D4 reads answer `status`. */
+export function failCaseReads(
+  token: string,
+  status: number,
+  times: number,
+): void {
+  store.caseFailures.set(token, { status, times });
+}
+
+/** G5: every D4 read of this token waits `ms`. */
+export function delayCaseReads(token: string, ms: number): void {
+  store.caseDelays.set(token, ms);
+}
+
+/** G6: how many D4 reads this token string got. */
+export function caseReadCount(token: string): number {
+  return store.caseReads.get(token) ?? 0;
 }
 
 /** True while a case read must fail with 500 (S12 and its per-test variants). */
@@ -324,9 +459,17 @@ export const sellerLinkHandlers: RequestHandler[] = [
   }),
 
   // D4: case state
-  http.get("*/public/v/:slug/cases/:token", ({ params }) => {
+  http.get("*/public/v/:slug/cases/:token", async ({ params }) => {
     const slug = String(params.slug);
     const token = String(params.token);
+    store.caseReads.set(token, caseReadCount(token) + 1);
+    const latency = store.caseDelays.get(token);
+    if (latency !== undefined) await delay(latency);
+    const failure = store.caseFailures.get(token);
+    if (failure !== undefined && failure.times > 0) {
+      failure.times -= 1;
+      return apiError(failure.status, "ERRO_INTERNO");
+    }
     if (isUnstableCase(token)) return apiError(500, "ERRO_INTERNO");
     if (!linkFor(slug)) return apiError(404, "LINK_NAO_ENCONTRADO");
     const record = caseFor(slug, token);
@@ -458,6 +601,57 @@ export const mockControlHandlers: RequestHandler[] = [
     recoverCase(String(params.slug), String(params.token));
     return new HttpResponse(null, { status: 204 });
   }),
+  http.post("*/__mock/cases", async ({ request }) => {
+    const input = (await request.json().catch(() => ({}))) as MockCaseInput;
+    try {
+      return HttpResponse.json(
+        { token: createMockCase(input) },
+        { status: 201 },
+      );
+    } catch {
+      return new HttpResponse(null, { status: 400 });
+    }
+  }),
+  http.post("*/__mock/cases/:token/state", async ({ params, request }) => {
+    const change = (await request.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    try {
+      return new HttpResponse(null, {
+        status: setMockCaseState(String(params.token), change) ? 204 : 404,
+      });
+    } catch {
+      return new HttpResponse(null, { status: 400 });
+    }
+  }),
+  http.delete("*/__mock/cases/:token", ({ params }) => {
+    deleteMockCase(String(params.token));
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post("*/__mock/cases/:token/fail", async ({ params, request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      status?: unknown;
+      times?: unknown;
+    };
+    failCaseReads(
+      String(params.token),
+      typeof body.status === "number" ? body.status : 500,
+      typeof body.times === "number" ? body.times : 1,
+    );
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post("*/__mock/cases/:token/delay", async ({ params, request }) => {
+    const body = (await request.json().catch(() => ({}))) as { ms?: unknown };
+    delayCaseReads(
+      String(params.token),
+      typeof body.ms === "number" ? body.ms : 0,
+    );
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.get("*/__mock/cases/:token/reads", ({ params }) =>
+    HttpResponse.json({ reads: caseReadCount(String(params.token)) }),
+  ),
   http.post("*/__mock/links/:slug/disable", ({ params }) => {
     disableLink(String(params.slug));
     return new HttpResponse(null, { status: 204 });

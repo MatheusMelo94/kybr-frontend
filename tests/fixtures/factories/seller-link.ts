@@ -271,6 +271,7 @@ export type CaseKind =
   | "sem-dados-aprovado"
   | "lento"
   | "processando"
+  | "retido"
   | "tudo-recebido"
   | "decidido";
 
@@ -288,8 +289,16 @@ export type CaseRecord = {
   createdAt: number;
   /** Fixed-token cases skip the processing window. */
   settled: boolean;
+  /** An explicit D4 state (POST /__mock/cases, …/state): served verbatim. */
+  override?: CaseOverride;
   emailMasked?: string;
   uploads: Map<DocumentType, UploadState>;
+};
+
+/** An explicit estado + resultado for a case (QA test plan G1/G2 and the presets). */
+export type CaseOverride = {
+  estado: PublicCase["estado"];
+  resultado?: Record<string, unknown>;
 };
 
 export type PublicCase = {
@@ -321,6 +330,10 @@ function pendingItems(record: CaseRecord): Record<string, unknown>[] {
 /** D4 body for a case at `now`. */
 export function buildPublicCase(record: CaseRecord, now: number): PublicCase {
   const criado_em = new Date(record.createdAt).toISOString();
+  if (record.override !== undefined) {
+    const { estado, resultado } = record.override;
+    return { estado, criado_em, ...(resultado !== undefined && { resultado }) };
+  }
   const shared = {
     responsavel: record.responsavel,
     consultado_em: criado_em,
@@ -361,8 +374,10 @@ export function buildPublicCase(record: CaseRecord, now: number): PublicCase {
       return { estado: "approved", criado_em, resultado: noData };
   }
 
-  // Still processing, with no result yet, however long ago it was created.
-  if (record.kind === "processando") return { estado: "processing", criado_em };
+  // Still processing, with no result yet, however long ago it was created
+  // (retido: held until a test changes it, QA test plan G3).
+  if (record.kind === "processando" || record.kind === "retido")
+    return { estado: "processing", criado_em };
 
   const resultAfter =
     record.kind === "lento" ? SLOW_RESULT_AFTER_MS : RESULT_AFTER_MS;
@@ -474,3 +489,140 @@ export function buildFixedCases(): Map<string, CaseRecord> {
     ?.uploads.set("RESPONSAVEL", { files: 2, bytes: 2048, format: "photos" });
   return cases;
 }
+
+// --- Presets (QA test plan G8, G10–G12) --------------------------------------
+// D4 bodies for POST /__mock/cases or …/state, contract-shaped (synthetic).
+
+const PRESET_NAME = "Maria Exemplo Silva";
+const PRESET_DATE = FIXED_CASE_CREATED_AT;
+const PRESET_DEADLINE = "2026-10-03T12:00:00.000Z";
+const RECEITA_URL =
+  "https://www.gov.br/receitafederal/exemplo-regularizar-cnpj";
+const SEFAZ_URL = "https://portal.fazenda.sp.gov.br/exemplo-regularizar-ie";
+
+const withCompany = {
+  razao_social: "Comercial Exemplo de Peças Ltda.",
+  responsavel: PRESET_NAME,
+  consultado_em: PRESET_DATE,
+};
+const withoutCompany = {
+  responsavel: PRESET_NAME,
+  variante: "DADOS_NAO_ENCONTRADOS",
+};
+
+type PendingItemBody = {
+  codigo: string;
+  documento_tipo?: DocumentType;
+  documentos_enviados?: number;
+  situacao?: string;
+  dias?: number;
+  url_regularizacao?: string;
+};
+
+function blocked(motivo: Record<string, unknown>): {
+  estado: "blocked";
+  resultado: Record<string, unknown>;
+} {
+  return { estado: "blocked", resultado: { ...withCompany, motivo } };
+}
+
+export const CASE_PRESETS = {
+  /** G8: no data, pending with no items → em análise (analysis-notfound). */
+  pendingNoItemsNoData: {
+    estado: "pending",
+    resultado: { ...withoutCompany, prazo_revisao: PRESET_DEADLINE, itens: [] },
+  },
+  /** G8: no data, approved with one confirmation row. */
+  approvedNoDataOneRow: {
+    estado: "approved",
+    resultado: {
+      ...withoutCompany,
+      confirmacoes: [{ codigo: "RESPONSAVEL_CONFERE" }],
+    },
+  },
+  /** G8: no data, blocked: only GENERICO can come up. */
+  blockedNoData: {
+    estado: "blocked",
+    resultado: { ...withoutCompany, motivo: { codigo: "GENERICO" } },
+  },
+  /** G8: contract-violating: no data with a reason other than GENERICO. */
+  blockedNoDataNonGenerico: {
+    estado: "blocked",
+    resultado: { ...withoutCompany, motivo: { codigo: "MEI" } },
+  },
+  /** G10: every item code and every documento_tipo, with URLs on gov.br. */
+  pendingCatalogue: {
+    estado: "pending",
+    resultado: {
+      ...withCompany,
+      prazo_revisao: PRESET_DEADLINE,
+      itens: [
+        {
+          codigo: "DOCUMENTO_RESPONSAVEL",
+          documento_tipo: "RESPONSAVEL",
+          documentos_enviados: 0,
+        },
+        ...DOCUMENT_TYPES.map((documento_tipo): PendingItemBody => ({
+          codigo: "DOCUMENTO_SOLICITADO",
+          documento_tipo,
+          documentos_enviados: 0,
+        })),
+        { codigo: "IE_NAO_ENCONTRADA", url_regularizacao: SEFAZ_URL },
+        { codigo: "IE_SUSPENSA" },
+        {
+          codigo: "SITUACAO_IRREGULAR",
+          situacao: "baixada",
+          url_regularizacao: RECEITA_URL,
+        },
+        { codigo: "ATIVIDADE_FORA_DA_CATEGORIA" },
+        { codigo: "EMPRESA_RECENTE", dias: 1 },
+        { codigo: "EMPRESA_RECENTE", dias: 12 },
+        { codigo: "MEI" },
+      ] satisfies PendingItemBody[],
+    },
+  },
+  /** G11: one blocked case per motivo code, with and without a URL, plus an unknown code. */
+  blocked: {
+    SITUACAO_IRREGULAR: blocked({
+      codigo: "SITUACAO_IRREGULAR",
+      situacao: "suspensa",
+      url_regularizacao: RECEITA_URL,
+    }),
+    SITUACAO_IRREGULAR_SEM_URL: blocked({
+      codigo: "SITUACAO_IRREGULAR",
+      situacao: "nula",
+    }),
+    RESPONSAVEL_NAO_SOCIO: blocked({ codigo: "RESPONSAVEL_NAO_SOCIO" }),
+    EMPRESA_RECENTE: blocked({ codigo: "EMPRESA_RECENTE" }),
+    ATIVIDADE_FORA_DA_CATEGORIA: blocked({
+      codigo: "ATIVIDADE_FORA_DA_CATEGORIA",
+    }),
+    IE_NAO_ENCONTRADA: blocked({
+      codigo: "IE_NAO_ENCONTRADA",
+      url_regularizacao: SEFAZ_URL,
+    }),
+    IE_NAO_ENCONTRADA_SEM_URL: blocked({ codigo: "IE_NAO_ENCONTRADA" }),
+    IE_SUSPENSA: blocked({
+      codigo: "IE_SUSPENSA",
+      url_regularizacao: SEFAZ_URL,
+    }),
+    MEI: blocked({ codigo: "MEI" }),
+    GENERICO: blocked({ codigo: "GENERICO" }),
+    /** Unknown to the frontend: shown as GENERICO. */
+    DESCONHECIDO: blocked({ codigo: "VEREDITO_NOVO" }),
+  },
+  /** G12: approved with two of the three rows, out of spec order. */
+  approvedSubset: {
+    estado: "approved",
+    resultado: {
+      ...withCompany,
+      confirmacoes: [
+        { codigo: "RESPONSAVEL_CONFERE" },
+        { codigo: "SITUACAO_ATIVA" },
+      ],
+    },
+  },
+} as const satisfies Record<
+  string,
+  CaseOverride | Record<string, CaseOverride>
+>;
