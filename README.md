@@ -58,13 +58,25 @@ The seller link routes come with tasks T13, T20 and T32. Every page renders per 
 
 ## Commands
 
-| Command                         | What it does                                                                 |
-| ------------------------------- | ---------------------------------------------------------------------------- |
-| `pnpm dev`                      | Dev server (Turbopack)                                                       |
-| `pnpm build` / `pnpm start`     | Production build (webpack) and server                                        |
-| `pnpm typecheck`                | `tsc --noEmit`                                                               |
-| `pnpm lint`                     | ESLint over the repo                                                         |
-| `pnpm test` / `pnpm test:watch` | Vitest, run once or in watch mode                                            |
-| `pnpm test:e2e`                 | Playwright, all four projects. Use `--grep @feature-<slug>` for one feature. |
+| Command                         | What it does                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm dev`                      | Dev server (Turbopack)                                                             |
+| `pnpm build` / `pnpm start`     | Production build (webpack) and server                                              |
+| `pnpm typecheck`                | `tsc --noEmit`                                                                     |
+| `pnpm lint`                     | ESLint over the repo                                                               |
+| `pnpm test` / `pnpm test:watch` | Vitest, run once or in watch mode                                                  |
+| `pnpm test:e2e`                 | Playwright, all four projects. Use `--grep @feature-<slug>` for one feature.       |
+| `pnpm check:bundle`             | After `pnpm build`: fails if a route's First Load JS is over `bundle-budget.json`  |
+| `pnpm check:secrets`            | After `pnpm build`: greps the build output for secret prefixes and `BUNDLE_CANARY` |
 
 The suite check before every commit is `pnpm typecheck && pnpm lint && pnpm test`. Add `pnpm build` when a change touches `app/`, a `'use client'` boundary, `next.config.ts` or env.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push, on Node 22 with the pinned pnpm:
+
+1. **verify:** `pnpm install --frozen-lockfile`, `typecheck`, `lint`, `test`, a production `build` with placeholder env, then `check:bundle` and `check:secrets`.
+2. **audit:** `pnpm audit --audit-level=high`. Reviewed exceptions are in `pnpm-workspace.yaml` (`auditConfig.ignoreGhsas`), each with a reason and a revisit date.
+3. **e2e:** after verify passes, Playwright once per project (chromium-desktop, chromium-mobile, webkit-mobile, firefox-desktop) against the mock API. On failure the report is uploaded as an artifact.
+
+Bundle budgets in `bundle-budget.json` belong to the Frontend Architect (ADR-0003: 130 kB gzip on `/v/*`, 180 kB elsewhere). Change them only by plan or ADR, never to make CI green. Actions are pinned to commit SHAs; Dependabot (`.github/dependabot.yml`) proposes grouped weekly updates. There is no deploy workflow yet.

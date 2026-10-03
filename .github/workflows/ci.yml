@@ -1,0 +1,161 @@
+# CI (frontend-devops-conventions.md § CI Pipeline Shape). Production posture.
+# Actions are pinned to commit SHAs (frontend-security-conventions.md § Supply Chain).
+#
+# Runs on every push to any branch. A PR from a branch in this repo gets the
+# same checks, because GitHub attaches them to the head commit.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+    # Same-repo PR branches are already covered by the push run; this catches
+    # PRs from forks only.
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build, bundle guards
+    # Skip the PR run for same-repo branches: the push run already covers that commit.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+      - name: Cache the Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'components/**', 'features/**', 'lib/**', 'middleware.ts', 'next.config.ts') }}
+          restore-keys: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      # A production build with placeholder values. lib/env.ts validates them at
+      # build time. Nothing here is a secret: API_BFF_KEY is a sentinel that the
+      # secret grep below must never find in the output. The URLs are https:
+      # (no loopback allowance) so the build sees deployed-shape values.
+      - name: Build
+        run: pnpm build
+        env:
+          API_BASE_URL: https://api.example.invalid
+          API_PUBLIC_BASE_URL: https://api.example.invalid
+          API_BFF_KEY: ci-bundle-canary-not-a-secret-7f3a9c2e51
+          CLIENT_IP_HEADER: x-forwarded-for
+          CLIENT_IP_TRUSTED_HOPS: "1"
+
+      # ADR-0003: First Load JS <= 130 kB gzip on /v/*; 180 kB elsewhere.
+      - name: Bundle guard
+        run: pnpm check:bundle
+
+      - name: Secret grep of the build output
+        run: pnpm check:secrets
+        env:
+          BUNDLE_CANARY: ci-bundle-canary-not-a-secret-7f3a9c2e51
+
+  audit:
+    name: Dependency audit (high+)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+        with:
+          install: "false"
+
+      # Reads pnpm-lock.yaml. Reviewed exceptions live in pnpm-workspace.yaml
+      # (auditConfig.ignoreGhsas), each with a reason and a revisit date.
+      - run: pnpm audit --audit-level=high
+
+  e2e:
+    name: E2E (${{ matrix.project }})
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      # Production matrix (frontend-qa-conventions.md § Browser & Device Matrix).
+      matrix:
+        include:
+          - project: chromium-desktop
+            browser: chromium
+          - project: chromium-mobile
+            browser: chromium
+          - project: webkit-mobile
+            browser: webkit
+          - project: firefox-desktop
+            browser: firefox
+    env:
+      # E2E only: the Playwright webServer runs a production build against the
+      # http: mock API on loopback. Never set in a deployed environment
+      # (threat model F08).
+      API_ALLOW_LOOPBACK_HTTP: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Read the Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ matrix.browser }}
+
+      - name: Install the browser and its OS dependencies
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Install the browser's OS dependencies
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps ${{ matrix.browser }}
+
+      - name: Cache the Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: next-e2e-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'components/**', 'features/**', 'lib/**', 'middleware.ts', 'next.config.ts') }}
+          restore-keys: next-e2e-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      # playwright.config.ts starts the MSW mock API and `pnpm build && pnpm start`.
+      - name: Run Playwright
+        run: pnpm test:e2e --project=${{ matrix.project }}
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

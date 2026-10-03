@@ -1,0 +1,42 @@
+name: Setup Node and pnpm
+description: >-
+  Node 22 LTS, pnpm from packageManager via corepack, cached pnpm store, and
+  pnpm install --frozen-lockfile (frontend-devops-conventions.md § CI Pipeline
+  Shape; frontend-security-conventions.md § Supply Chain).
+
+inputs:
+  install:
+    description: Run pnpm install --frozen-lockfile.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node 22
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        node-version: 22
+
+    - name: Enable corepack (pnpm pinned by packageManager)
+      shell: bash
+      run: |
+        corepack enable
+        pnpm --version
+
+    - name: Locate the pnpm store
+      id: pnpm-store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache the pnpm store
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-store-${{ runner.os }}-
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile
