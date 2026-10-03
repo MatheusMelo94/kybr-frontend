@@ -1,0 +1,373 @@
+import { Faker, base, pt_BR } from "@faker-js/faker";
+
+// Shared Pre-Contract fixtures for the seller link (QA-owned). Shapes follow
+// docs/specs/seller-link-verification/contract-request.md (D1–D7, X1–X4).
+// Synthetic data only: CNPJs are generated from made-up roots, names and
+// addresses come from seeded faker, and every domain is under .test.
+//
+// Relative imports in tests/fixtures keep the .ts extension: `pnpm mock:api`
+// runs these files with Node's built-in type stripping.
+
+/** Scenarios reachable by CNPJ (lookup D2, verify D3, then the case D4). */
+export type CnpjScenario =
+  | "aprovado" // S4
+  | "pendente" // S5
+  | "bloqueado" // S6
+  | "sem-dados" // S7
+  | "limite-consulta" // S8
+  | "limite-cnpj" // S9
+  | "limite-geral" // S9
+  | "lento"; // S10
+
+/** Every mocked error carries this `message`. It must never reach the screen (AC 36). */
+export const ERROR_SENTINEL = "MSG-BACKEND-NAO-EXIBIR";
+
+export const SLUGS = {
+  ok: "loja-exemplo", // S1
+  other: "outra-loja", // a second live link (URL contact); S11 slug mismatch
+  unknown: "loja-inexistente", // S2
+  unstable: "loja-instavel", // S3: 500 until recovered (POST /__mock/links/:slug/recover)
+} as const;
+
+/** Fixed case tokens (X3 pattern). Their cases exist as soon as the mock starts. */
+export const CASE_TOKENS = {
+  aprovado: "tokaprovado0000000000000", // S4
+  pendente: "tokpendente0000000000000", // S5
+  bloqueado: "tokbloqueado000000000000", // S6
+  semDados: "toksemdados0000000000000", // S7
+  allReceived: "tokrecebido0000000000000", // S14
+  decided: "tokdecidido000000000000", // S15
+  unknown: "tokdesconhecido00000000", // S11: never exists
+  unstable: "tokinstavel000000000000", // S12: the read fails with 500
+} as const;
+
+/** Put one of these in an uploaded file's name to force that D6 outcome (S13). */
+export const UPLOAD_MARKERS = {
+  tooLarge: "__413__",
+  badFormat: "__415__",
+  decided: "__409__",
+  rateLimited: "__429__",
+  networkDrop: "__drop__",
+} as const;
+
+export const RETRY_AFTER_SECONDS = {
+  lookup: 60,
+  verify: 540,
+  upload: 60,
+} as const;
+
+/** A case created through D3 stays `processing` this long, then shows its result. */
+export const RESULT_AFTER_MS = 3_000;
+/** S10: still processing past the 10 s switch, approved at about 14 s. */
+export const SLOW_RESULT_AFTER_MS = 14_000;
+
+/** When the fixed-token cases were created. Fixed, so screenshots stay stable. */
+export const FIXED_CASE_CREATED_AT = "2026-10-01T12:00:00.000Z";
+
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+export const DOCUMENT_TYPES = [
+  "CONTRATO_SOCIAL_OU_CCMEI",
+  "PROCURACAO",
+  "COMPROVANTE_ENDERECO",
+  "CARTAO_CNPJ",
+  "RESPONSAVEL",
+] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+export type PublicLink = {
+  nome: string;
+  contato_vendedor: { tipo: "email" | "url"; valor: string };
+};
+
+export const PUBLIC_LINKS: Readonly<Record<string, PublicLink>> = {
+  [SLUGS.ok]: {
+    nome: "Loja Exemplo",
+    contato_vendedor: { tipo: "email", valor: "vendedores@loja-exemplo.test" },
+  },
+  [SLUGS.other]: {
+    nome: "Outra Loja",
+    contato_vendedor: { tipo: "url", valor: "https://outra-loja.test/ajuda" },
+  },
+  [SLUGS.unstable]: {
+    nome: "Loja Instável",
+    contato_vendedor: { tipo: "email", valor: "contato@loja-instavel.test" },
+  },
+};
+
+// --- CNPJ -------------------------------------------------------------------
+
+const CNPJ_ROOTS: Record<CnpjScenario, string> = {
+  aprovado: "481537290001",
+  pendente: "572648130001",
+  bloqueado: "639271540001",
+  "sem-dados": "714385620001",
+  "limite-consulta": "825496730001",
+  "limite-cnpj": "936517840001",
+  "limite-geral": "147628950001",
+  lento: "258739160001",
+};
+
+const FIRST_WEIGHTS = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+const SECOND_WEIGHTS = [6, ...FIRST_WEIGHTS];
+
+function checkDigit(digits: string, weights: number[]): number {
+  const sum = weights.reduce(
+    (total, weight, index) => total + Number(digits[index]) * weight,
+    0,
+  );
+  const remainder = sum % 11;
+  return remainder < 2 ? 0 : 11 - remainder;
+}
+
+/** The two CNPJ check digits for the first 12 digits (Receita Federal algorithm). */
+export function cnpjCheckDigits(first12: string): string {
+  const first = checkDigit(first12, FIRST_WEIGHTS);
+  const second = checkDigit(`${first12}${first}`, SECOND_WEIGHTS);
+  return `${first}${second}`;
+}
+
+export function isValidCnpj(cnpj: string): boolean {
+  return (
+    /^\d{14}$/.test(cnpj) &&
+    !/^(\d)\1{13}$/.test(cnpj) &&
+    cnpjCheckDigits(cnpj.slice(0, 12)) === cnpj.slice(12)
+  );
+}
+
+/** A synthetic, check-digit-valid CNPJ (14 digits, unmasked) for a scenario. */
+export function cnpjFor(scenario: CnpjScenario): string {
+  const root = CNPJ_ROOTS[scenario];
+  return `${root}${cnpjCheckDigits(root)}`;
+}
+
+/** The scenario a CNPJ belongs to. Any other valid CNPJ behaves like "aprovado". */
+export function scenarioForCnpj(cnpj: string): CnpjScenario | undefined {
+  return (Object.keys(CNPJ_ROOTS) as CnpjScenario[]).find(
+    (scenario) => cnpjFor(scenario) === cnpj,
+  );
+}
+
+// --- Seeded synthetic data ----------------------------------------------------
+
+function fakerFor(key: string): Faker {
+  const faker = new Faker({ locale: [pt_BR, base] });
+  let seed = 0;
+  for (const char of key) seed = (seed * 31 + char.charCodeAt(0)) >>> 0;
+  faker.seed(seed);
+  return faker;
+}
+
+export type Company = {
+  razao_social: string;
+  endereco: string;
+  cnae: { codigo: string; descricao: string };
+};
+
+/** D2 body for a CNPJ. The same CNPJ always gives the same company. */
+export function buildCompany(cnpj: string): Company {
+  const faker = fakerFor(`company:${cnpj}`);
+  return {
+    razao_social: `${faker.company.name()} Ltda.`,
+    endereco: `${faker.location.street()}, ${faker.number.int({ min: 10, max: 1999 })}, ${faker.location.city()} - ${faker.location.state({ abbreviated: true })}`,
+    cnae: {
+      codigo: "4530-7/03",
+      descricao:
+        "Comércio a varejo de peças e acessórios novos para veículos automotores",
+    },
+  };
+}
+
+/** A synthetic full name for fixed-token cases. */
+export function buildResponsavel(key: string): string {
+  return fakerFor(`person:${key}`).person.fullName();
+}
+
+/** "joao@empresa.com.br" → "j•••@empresa.com.br" (D4 email_contato_mascarado). */
+export function maskEmail(email: string): string {
+  const [local = "", domain = ""] = email.split("@");
+  return `${local.slice(0, 1)}•••@${domain}`;
+}
+
+// --- Cases (D4) ---------------------------------------------------------------
+
+/** How a case resolves. D3-created cases take it from the CNPJ scenario. */
+export type CaseKind =
+  | "aprovado"
+  | "pendente"
+  | "bloqueado"
+  | "sem-dados"
+  | "lento"
+  | "tudo-recebido"
+  | "decidido";
+
+export type UploadState = {
+  files: number;
+  bytes: number;
+  format: "pdf" | "photos";
+};
+
+export type CaseRecord = {
+  slug: string;
+  kind: CaseKind;
+  cnpj: string;
+  responsavel: string;
+  createdAt: number;
+  /** Fixed-token cases skip the processing window. */
+  settled: boolean;
+  emailMasked?: string;
+  uploads: Map<DocumentType, UploadState>;
+};
+
+export type PublicCase = {
+  estado: "processing" | "pending" | "approved" | "blocked";
+  criado_em: string;
+  resultado?: Record<string, unknown>;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The pending items for S5 / S14: not a partner, no IE, activity out of category, young company. */
+function pendingItems(record: CaseRecord): Record<string, unknown>[] {
+  return [
+    {
+      codigo: "DOCUMENTO_RESPONSAVEL",
+      documento_tipo: "RESPONSAVEL",
+      documentos_enviados: record.uploads.get("RESPONSAVEL")?.files ?? 0,
+    },
+    {
+      codigo: "IE_NAO_ENCONTRADA",
+      url_regularizacao: "https://sefaz.uf.test/regularizar-ie",
+    },
+    { codigo: "ATIVIDADE_FORA_DA_CATEGORIA" },
+    { codigo: "EMPRESA_RECENTE", dias: 3 },
+  ];
+}
+
+/** D4 body for a case at `now`. */
+export function buildPublicCase(record: CaseRecord, now: number): PublicCase {
+  const criado_em = new Date(record.createdAt).toISOString();
+  const shared = {
+    responsavel: record.responsavel,
+    consultado_em: criado_em,
+    ...(record.emailMasked !== undefined && {
+      email_contato_mascarado: record.emailMasked,
+    }),
+  };
+
+  if (record.kind === "sem-dados") {
+    // Contract gap: ResultadoPublico requires razao_social, but this company
+    // has no data yet. The mock omits it until the backend decides.
+    return {
+      estado: "processing",
+      criado_em,
+      resultado: { ...shared, variante: "DADOS_NAO_ENCONTRADOS" },
+    };
+  }
+
+  const resultAfter =
+    record.kind === "lento" ? SLOW_RESULT_AFTER_MS : RESULT_AFTER_MS;
+  if (!record.settled && now - record.createdAt < resultAfter) {
+    return { estado: "processing", criado_em };
+  }
+
+  const company = {
+    razao_social: buildCompany(record.cnpj).razao_social,
+    ...shared,
+  };
+  switch (record.kind) {
+    case "aprovado":
+    case "lento":
+      return {
+        estado: "approved",
+        criado_em,
+        resultado: {
+          ...company,
+          confirmacoes: [
+            { codigo: "SITUACAO_ATIVA" },
+            { codigo: "IE_ATIVA", uf: "SP" },
+            { codigo: "RESPONSAVEL_CONFERE" },
+          ],
+        },
+      };
+    case "pendente":
+    case "tudo-recebido":
+      return {
+        estado: "pending",
+        criado_em,
+        resultado: {
+          ...company,
+          prazo_revisao: new Date(record.createdAt + 2 * DAY_MS).toISOString(),
+          itens: pendingItems(record),
+        },
+      };
+    case "bloqueado":
+      return {
+        estado: "blocked",
+        criado_em,
+        resultado: {
+          ...company,
+          motivo: {
+            codigo: "SITUACAO_IRREGULAR",
+            situacao: "inapta",
+            url_regularizacao: "https://receita.test/regularizar-cnpj",
+          },
+        },
+      };
+    case "decidido":
+      return {
+        estado: "blocked",
+        criado_em,
+        resultado: { ...company, motivo: { codigo: "GENERICO" } },
+      };
+  }
+}
+
+/** The kind of case a D3 verify creates for a CNPJ. */
+export function caseKindFor(cnpj: string): CaseKind {
+  switch (scenarioForCnpj(cnpj)) {
+    case "pendente":
+      return "pendente";
+    case "bloqueado":
+      return "bloqueado";
+    case "sem-dados":
+      return "sem-dados";
+    case "lento":
+      return "lento";
+    default:
+      return "aprovado";
+  }
+}
+
+/** The cases behind CASE_TOKENS, as they are when the mock starts. */
+export function buildFixedCases(): Map<string, CaseRecord> {
+  const createdAt = Date.parse(FIXED_CASE_CREATED_AT);
+  const fixed = (
+    kind: CaseKind,
+    scenario: CnpjScenario,
+    token: string,
+  ): [string, CaseRecord] => [
+    token,
+    {
+      slug: SLUGS.ok,
+      kind,
+      cnpj: cnpjFor(scenario),
+      responsavel: buildResponsavel(token),
+      createdAt,
+      settled: true,
+      uploads: new Map(),
+    },
+  ];
+  const cases = new Map([
+    fixed("aprovado", "aprovado", CASE_TOKENS.aprovado),
+    fixed("pendente", "pendente", CASE_TOKENS.pendente),
+    fixed("bloqueado", "bloqueado", CASE_TOKENS.bloqueado),
+    fixed("sem-dados", "sem-dados", CASE_TOKENS.semDados),
+    fixed("tudo-recebido", "pendente", CASE_TOKENS.allReceived),
+    fixed("decidido", "pendente", CASE_TOKENS.decided),
+  ]);
+  cases
+    .get(CASE_TOKENS.allReceived)
+    ?.uploads.set("RESPONSAVEL", { files: 2, bytes: 2048, format: "photos" });
+  return cases;
+}
