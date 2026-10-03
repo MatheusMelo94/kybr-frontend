@@ -159,3 +159,19 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 14
+
+  # Staging = Vercel Preview (ADR-0005; frontend-devops-conventions.md § CI
+  # Pipeline Shape › deploy-staging.yml). Only after every check above passes
+  # on this commit, only for pushes (never fork PRs), never for Dependabot
+  # (no deploy secrets), and only once the user turns it on with the
+  # VERCEL_DEPLOY_ENABLED repository variable (docs/devops/vercel-setup.md).
+  deploy-staging:
+    name: Deploy staging
+    needs: [verify, audit, e2e]
+    if: github.event_name == 'push' && github.actor != 'dependabot[bot]' && vars.VERCEL_DEPLOY_ENABLED == 'true'
+    uses: ./.github/workflows/deploy-staging.yml
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
