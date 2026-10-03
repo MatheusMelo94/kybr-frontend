@@ -13,6 +13,10 @@ import {
 // Runs with Node's built-in TypeScript type stripping (Node >= 22.18).
 
 const port = Number(process.env.MOCK_API_PORT ?? "4010");
+// Loopback only: the /__mock/* controls create cases and inject failures, so
+// nothing else on the network should reach them (security finding M2-06). A
+// CI setup that needs the mock from another container sets MOCK_API_HOST.
+const host = process.env.MOCK_API_HOST ?? "127.0.0.1";
 
 const app = createServer(...mockControlHandlers, ...sellerLinkHandlers);
 
@@ -29,6 +33,6 @@ createHttpServer((request, response) => {
     return end(...args);
   }) as typeof response.end;
   app(request, response);
-}).listen(port, () => {
-  console.log(`Kybr mock API (Pre-Contract D1–D6) on http://localhost:${port}`);
+}).listen(port, host, () => {
+  console.log(`Kybr mock API (Pre-Contract D1–D6) on http://${host}:${port}`);
 });
