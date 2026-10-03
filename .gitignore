@@ -47,9 +47,11 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# specs and DDRs stay local (not pushed)
+# specs, DDRs, ADRs and tech designs stay local (not pushed)
 docs/specs/
 docs/ddr/
+docs/adr/
+docs/tech-design/
 
 # project brief stays local
 /Kybr — frontend.md
