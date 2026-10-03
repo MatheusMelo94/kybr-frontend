@@ -1,0 +1,130 @@
+#!/usr/bin/env node
+// Deploy env check: fails when a Vercel environment is wired wrong. The deploy
+// workflows run it on the file `vercel env pull` writes, before deploying.
+//
+//   node scripts/check-deploy-env.mjs <env-file> <preview|production>
+//
+// Rules (frontend-devops-conventions.md § Environment Model; threat model F02,
+// F08, F15; plan § 14):
+// - Production points at PRODUCTION_API_ORIGIN only, never a mock. Preview
+//   never points at it (cross-wiring is a NO-GO).
+// - The API URLs are https:.
+// - API_ALLOW_LOOPBACK_HTTP is never set in a deployed environment.
+// - CLIENT_IP_HEADER is x-vercel-forwarded-for, with no trusted hops.
+// - No NEXT_PUBLIC_* variable: it would be inlined into the client bundle.
+//
+// It names variables, never their values. API_BFF_KEY isn't checked here: a
+// Sensitive variable can't be read back, and the build fails without it
+// (lib/env-schema.ts).
+
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const VERCEL_CLIENT_IP_HEADER = "x-vercel-forwarded-for";
+const API_URL_KEYS = ["API_BASE_URL", "API_PUBLIC_BASE_URL"];
+
+/**
+ * Parses the dotenv file `vercel env pull` writes (KEY="value" lines).
+ * @param {string} text
+ * @returns {Record<string, string>}
+ */
+export function parseDotenv(text) {
+  /** @type {Record<string, string>} */
+  const env = {};
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line.trim());
+    if (!match?.[1]) continue;
+    const raw = match[2] ?? "";
+    env[match[1]] =
+      raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')
+        ? raw.slice(1, -1)
+        : raw;
+  }
+  return env;
+}
+
+/**
+ * @param {string} value
+ * @returns {URL | undefined}
+ */
+function toUrl(value) {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Returns one message per problem; an empty list means the environment is fine.
+ * @param {Record<string, string | undefined>} env
+ * @param {{ target: "preview" | "production", productionApiOrigin: string }} options
+ * @returns {string[]}
+ */
+export function checkDeployEnv(env, { target, productionApiOrigin }) {
+  /** @type {string[]} */
+  const problems = [];
+  const productionOrigin = new URL(productionApiOrigin).origin;
+
+  for (const key of API_URL_KEYS) {
+    const value = env[key];
+    if (value === undefined || value === "") {
+      problems.push(`${key} is missing`);
+      continue;
+    }
+    const url = toUrl(value);
+    if (url === undefined || url.protocol !== "https:") {
+      problems.push(`${key} must be an https: URL`);
+      continue;
+    }
+    if (target === "production" && url.origin !== productionOrigin) {
+      problems.push(`${key} must be ${productionOrigin} in production`);
+    }
+    if (target === "preview" && url.origin === productionOrigin) {
+      problems.push(`${key} must not be the production API in preview`);
+    }
+  }
+
+  if (env.API_ALLOW_LOOPBACK_HTTP !== undefined) {
+    problems.push(
+      "API_ALLOW_LOOPBACK_HTTP must not be set in a deployed environment",
+    );
+  }
+  if (env.CLIENT_IP_HEADER?.toLowerCase() !== VERCEL_CLIENT_IP_HEADER) {
+    problems.push(`CLIENT_IP_HEADER must be ${VERCEL_CLIENT_IP_HEADER}`);
+  }
+  if (env.CLIENT_IP_TRUSTED_HOPS !== undefined) {
+    problems.push("CLIENT_IP_TRUSTED_HOPS must not be set");
+  }
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("NEXT_PUBLIC_")) {
+      problems.push(`${key}: no NEXT_PUBLIC_* variable is allowed`);
+    }
+  }
+  return problems;
+}
+
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  const [file, target] = process.argv.slice(2);
+  if (!file || (target !== "preview" && target !== "production")) {
+    console.error(
+      "Usage: node scripts/check-deploy-env.mjs <env-file> <preview|production>",
+    );
+    process.exit(2);
+  }
+  const problems = checkDeployEnv(parseDotenv(readFileSync(file, "utf8")), {
+    target,
+    productionApiOrigin:
+      process.env.PRODUCTION_API_ORIGIN || "https://api.kybr.com.br",
+  });
+  if (problems.length > 0) {
+    console.error(`Deploy env check FAILED (${target}):`);
+    for (const problem of problems) console.error(`  ${problem}`);
+    process.exit(1);
+  }
+  console.log(`Deploy env check: ${target} is wired correctly.`);
+}
