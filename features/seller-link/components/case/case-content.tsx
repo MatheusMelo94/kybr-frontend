@@ -1,10 +1,12 @@
 import type { JSX } from "react";
 
+import { AnalysisView } from "@/features/seller-link/components/case/analysis-view";
 import { ApprovedView } from "@/features/seller-link/components/case/approved-view";
 import { BlockedView } from "@/features/seller-link/components/case/blocked-view";
+import { CaseLiveStatus } from "@/features/seller-link/components/case/case-live-status";
 import { PendingView } from "@/features/seller-link/components/case/pending-view";
-import { caseCopy } from "@/features/seller-link/copy/case";
-import type { CaseViewKey } from "@/features/seller-link/types";
+import { VerifyingView } from "@/features/seller-link/components/case/verifying-view";
+import type { CaseView } from "@/features/seller-link/types";
 import type {
   CaseResult,
   PublicCase,
@@ -12,7 +14,7 @@ import type {
 } from "@/lib/api/schemas/public-link";
 
 type Props = {
-  viewKey: CaseViewKey;
+  view: CaseView;
   publicCase: PublicCase;
   /** The link info from D1: the workspace name and the seller contact. */
   link: PublicLink;
@@ -28,18 +30,22 @@ function resultOf(publicCase: PublicCase): CaseResult {
   return publicCase.resultado;
 }
 
-/** The case page's view for `viewKey` (plan § 3, case page). */
-export function CaseContent({ viewKey, publicCase, link }: Props): JSX.Element {
-  switch (viewKey) {
+/** The case page's view (plan § 3, case page; tech-design § 2). */
+export function CaseContent({ view, publicCase, link }: Props): JSX.Element {
+  switch (view.viewKey) {
     case "verifying":
+      // Both nodes render on the server; the client swaps them at 10 s.
       return (
-        <h1 className="text-title font-title">{caseCopy["verifying.h1"]}</h1>
+        <CaseLiveStatus
+          msUntilTimeout={view.msUntilTimeout}
+          verifying={<VerifyingView />}
+          analysis={<AnalysisView variant="timeout" />}
+        />
       );
     case "analysis-timeout":
+      return <AnalysisView variant="timeout" />;
     case "analysis-notfound":
-      return (
-        <h1 className="text-title font-title">{caseCopy["analysis.h1"]}</h1>
-      );
+      return <AnalysisView variant="notfound" />;
     case "approved":
       return (
         <ApprovedView

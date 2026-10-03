@@ -54,6 +54,7 @@ export const CASE_TOKENS = {
   semDadosDocumento: "toksemdadosdoc0000000000", // S7: a document requested by Renata
   semDadosAprovado: "toksemdadosok00000000000", // S7: the same case approved
   allReceived: "tokrecebido0000000000000", // S14
+  processing: "tokprocessando0000000000", // S10 held: processing, no result yet
   decided: "tokdecidido000000000000", // S15
   unknown: "tokdesconhecido00000000", // S11: never exists
   unstable: "tokinstavel000000000000", // S12: the read fails with 500
@@ -269,6 +270,7 @@ export type CaseKind =
   | "sem-dados-documento"
   | "sem-dados-aprovado"
   | "lento"
+  | "processando"
   | "tudo-recebido"
   | "decidido";
 
@@ -358,6 +360,9 @@ export function buildPublicCase(record: CaseRecord, now: number): PublicCase {
     case "sem-dados-aprovado":
       return { estado: "approved", criado_em, resultado: noData };
   }
+
+  // Still processing, with no result yet, however long ago it was created.
+  if (record.kind === "processando") return { estado: "processing", criado_em };
 
   const resultAfter =
     record.kind === "lento" ? SLOW_RESULT_AFTER_MS : RESULT_AFTER_MS;
@@ -461,6 +466,7 @@ export function buildFixedCases(): Map<string, CaseRecord> {
     fixed("sem-dados-documento", "sem-dados", CASE_TOKENS.semDadosDocumento),
     fixed("sem-dados-aprovado", "sem-dados", CASE_TOKENS.semDadosAprovado),
     fixed("tudo-recebido", "pendente", CASE_TOKENS.allReceived),
+    fixed("processando", "lento", CASE_TOKENS.processing),
     fixed("decidido", "pendente", CASE_TOKENS.decided),
   ]);
   cases

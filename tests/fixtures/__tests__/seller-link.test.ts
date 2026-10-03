@@ -569,6 +569,15 @@ describe("D4 case state", () => {
     expect(body.resultado).not.toHaveProperty("consultado_em");
   });
 
+  it("S10 (held): a fixed case still processing long past the 10 s switch, with no result yet", async () => {
+    const { body } = await readCase(CASE_TOKENS.processing);
+
+    expect(body).toEqual({
+      estado: "processing",
+      criado_em: "2026-10-01T12:00:00.000Z",
+    });
+  });
+
   it("S10: still processing past 10 s, approved at 14 s", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-03T12:00:00Z"));

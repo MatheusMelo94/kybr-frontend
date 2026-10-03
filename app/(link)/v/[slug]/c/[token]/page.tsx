@@ -34,7 +34,7 @@ export default async function CasePage({
     <div className="flex flex-col gap-6">
       <StepIndicator step={view.step} />
       <CaseContent
-        viewKey={view.viewKey}
+        view={view}
         publicCase={caseResult.publicCase}
         link={link.link}
       />
