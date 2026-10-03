@@ -17,7 +17,8 @@ export type CnpjScenario =
   | "limite-consulta" // S8
   | "limite-cnpj" // S9
   | "limite-geral" // S9
-  | "lento"; // S10
+  | "lento" // S10
+  | "aprovado-alfanumerico"; // S16
 
 /** Every mocked error carries this `message`. It must never reach the screen (AC 36). */
 export const ERROR_SENTINEL = "MSG-BACKEND-NAO-EXIBIR";
@@ -27,7 +28,22 @@ export const SLUGS = {
   other: "outra-loja", // a second live link (URL contact); S11 slug mismatch
   unknown: "loja-inexistente", // S2
   unstable: "loja-instavel", // S3: 500 until recovered (POST /__mock/links/:slug/recover)
+  noAutofill: "loja-sem-autofill", // S19: D2 kill switch, 503 AUTOFILL_DESATIVADO
+  slow: "loja-lenta", // D1 answers like S1 after SLOW_LINK_DELAY_MS (skeleton tests)
+  perTest: "loja-teste", // loja-teste-<suffix>: like S1, and disable-able per test
 } as const;
+
+/**
+ * D1 delay for loja-lenta and loja-lenta-<suffix>. A per-test suffix lets each
+ * parallel E2E project miss the Next server's 60 s D1 cache, and own its own
+ * S3 toggle as loja-instavel-<suffix>.
+ */
+export const SLOW_LINK_DELAY_MS = 1_500;
+
+/** True for `base` itself and for `base-<suffix>`. */
+export function isSlugVariant(slug: string, base: string): boolean {
+  return slug === base || slug.startsWith(`${base}-`);
+}
 
 /** Fixed case tokens (X3 pattern). Their cases exist as soon as the mock starts. */
 export const CASE_TOKENS = {
@@ -89,6 +105,13 @@ export const PUBLIC_LINKS: Readonly<Record<string, PublicLink>> = {
     nome: "Outra Loja",
     contato_vendedor: { tipo: "url", valor: "https://outra-loja.test/ajuda" },
   },
+  [SLUGS.noAutofill]: {
+    nome: "Loja Sem Autofill",
+    contato_vendedor: {
+      tipo: "email",
+      valor: "contato@loja-sem-autofill.test",
+    },
+  },
   [SLUGS.unstable]: {
     nome: "Loja Instável",
     contato_vendedor: { tipo: "email", valor: "contato@loja-instavel.test" },
@@ -96,11 +119,14 @@ export const PUBLIC_LINKS: Readonly<Record<string, PublicLink>> = {
 };
 
 // --- CNPJ -------------------------------------------------------------------
+// Wire format (contract X5): 14 uppercase alphanumerics, ^[0-9A-Z]{12}[0-9]{2}$.
+// Spec v2 samples for S4–S6 and S16; made-up roots for the rest.
 
 const CNPJ_ROOTS: Record<CnpjScenario, string> = {
-  aprovado: "481537290001",
-  pendente: "572648130001",
-  bloqueado: "639271540001",
+  aprovado: "123456780001", // 12.345.678/0001-95
+  pendente: "987654320001", // 98.765.432/0001-98
+  bloqueado: "112223330001", // 11.222.333/0001-81
+  "aprovado-alfanumerico": "12ABC34501DE", // 12.ABC.345/01DE-35 (Receita's example)
   "sem-dados": "714385620001",
   "limite-consulta": "825496730001",
   "limite-cnpj": "936517840001",
@@ -108,34 +134,39 @@ const CNPJ_ROOTS: Record<CnpjScenario, string> = {
   lento: "258739160001",
 };
 
+// A separate implementation from lib/cnpj.ts (pnpm mock:api runs under plain
+// Node, without the @/ alias); a parity test keeps the two in agreement.
 const FIRST_WEIGHTS = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 const SECOND_WEIGHTS = [6, ...FIRST_WEIGHTS];
 
-function checkDigit(digits: string, weights: number[]): number {
+function checkDigit(characters: string, weights: number[]): number {
+  // Each character is worth its ASCII code minus 48 (0–9 → 0–9, A → 17 … Z → 42).
   const sum = weights.reduce(
-    (total, weight, index) => total + Number(digits[index]) * weight,
+    (total, weight, index) =>
+      total + (characters.charCodeAt(index) - 48) * weight,
     0,
   );
   const remainder = sum % 11;
   return remainder < 2 ? 0 : 11 - remainder;
 }
 
-/** The two CNPJ check digits for the first 12 digits (Receita Federal algorithm). */
+/** The two check digits for the first 12 characters (Receita, IN RFB 2.229/2024). */
 export function cnpjCheckDigits(first12: string): string {
   const first = checkDigit(first12, FIRST_WEIGHTS);
   const second = checkDigit(`${first12}${first}`, SECOND_WEIGHTS);
   return `${first}${second}`;
 }
 
+/** Strict wire-format check: what the mock accepts on D2 and D3. */
 export function isValidCnpj(cnpj: string): boolean {
   return (
-    /^\d{14}$/.test(cnpj) &&
-    !/^(\d)\1{13}$/.test(cnpj) &&
+    /^[0-9A-Z]{12}[0-9]{2}$/.test(cnpj) &&
+    !/^(.)\1{13}$/.test(cnpj) &&
     cnpjCheckDigits(cnpj.slice(0, 12)) === cnpj.slice(12)
   );
 }
 
-/** A synthetic, check-digit-valid CNPJ (14 digits, unmasked) for a scenario. */
+/** A check-digit-valid CNPJ in wire format (14 uppercase characters, unmasked). */
 export function cnpjFor(scenario: CnpjScenario): string {
   const root = CNPJ_ROOTS[scenario];
   return `${root}${cnpjCheckDigits(root)}`;
@@ -148,6 +179,22 @@ export function scenarioForCnpj(cnpj: string): CnpjScenario | undefined {
   );
 }
 
+// S18: MEI names carry the owner's CPF (synthetic). The mock masks it as the
+// backend must (contract X7), except for one contract-violating variant that
+// exercises the frontend backstop.
+const MEI_ROOTS = { masked: "369258140001", unmasked: "471582630001" } as const;
+
+/** S18 CNPJs, by how the mock returns the MEI name's CPF. */
+export const MEI_CNPJS = {
+  masked: `${MEI_ROOTS.masked}${cnpjCheckDigits(MEI_ROOTS.masked)}`,
+  unmasked: `${MEI_ROOTS.unmasked}${cnpjCheckDigits(MEI_ROOTS.unmasked)}`,
+} as const;
+
+export const MEI_NAMES = {
+  masked: "JOAO CARLOS SILVA ***.***.***-**",
+  unmasked: "JOAO CARLOS SILVA 12345678909",
+} as const;
+
 // --- Seeded synthetic data ----------------------------------------------------
 
 function fakerFor(key: string): Faker {
@@ -158,20 +205,40 @@ function fakerFor(key: string): Faker {
   return faker;
 }
 
+// A long razão social: two lines at 360 px and in the 480 px column. Sizes the
+// company block's reserved height (review M1 v1 finding 0001).
+const LONG_NAME_ROOT = "582936140001";
+
+/** The CNPJ whose D2 razão social is LONG_RAZAO_SOCIAL. */
+export const LONG_NAME_CNPJ = `${LONG_NAME_ROOT}${cnpjCheckDigits(LONG_NAME_ROOT)}`;
+
+export const LONG_RAZAO_SOCIAL =
+  "Comercial Exemplo de Peças Automotivas do Interior Ltda.";
+
+/** D2 projection (U-E, contract D2): name, activity, city and state. No street address. */
 export type Company = {
   razao_social: string;
-  endereco: string;
-  cnae: { codigo: string; descricao: string };
+  municipio: string;
+  uf: string;
+  cnae: { descricao: string };
 };
 
 /** D2 body for a CNPJ. The same CNPJ always gives the same company. */
 export function buildCompany(cnpj: string): Company {
   const faker = fakerFor(`company:${cnpj}`);
+  const fixedName =
+    cnpj === MEI_CNPJS.masked
+      ? MEI_NAMES.masked
+      : cnpj === MEI_CNPJS.unmasked
+        ? MEI_NAMES.unmasked
+        : cnpj === LONG_NAME_CNPJ
+          ? LONG_RAZAO_SOCIAL
+          : undefined;
   return {
-    razao_social: `${faker.company.name()} Ltda.`,
-    endereco: `${faker.location.street()}, ${faker.number.int({ min: 10, max: 1999 })}, ${faker.location.city()} - ${faker.location.state({ abbreviated: true })}`,
+    razao_social: fixedName ?? `${faker.company.name()} Ltda.`,
+    municipio: faker.location.city(),
+    uf: faker.location.state({ abbreviated: true }),
     cnae: {
-      codigo: "4530-7/03",
       descricao:
         "Comércio a varejo de peças e acessórios novos para veículos automotores",
     },

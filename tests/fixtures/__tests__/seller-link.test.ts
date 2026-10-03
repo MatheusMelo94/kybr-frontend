@@ -8,9 +8,16 @@ import {
   UPLOAD_MARKERS,
   cnpjCheckDigits,
   cnpjFor,
+  isValidCnpj,
+  MEI_CNPJS,
+  SLOW_LINK_DELAY_MS,
   type CnpjScenario,
 } from "@/tests/fixtures/factories/seller-link";
-import { recoverLink } from "@/tests/fixtures/msw/handlers/seller-link";
+import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
+import {
+  disableLink,
+  recoverLink,
+} from "@/tests/fixtures/msw/handlers/seller-link";
 
 // tests/setup.ts runs the MSW server with these handlers for every test file.
 const API = "http://api.kybr.test";
@@ -24,7 +31,9 @@ const SCENARIOS: CnpjScenario[] = [
   "limite-cnpj",
   "limite-geral",
   "lento",
+  "aprovado-alfanumerico",
 ];
+const CNPJ_WIRE_FORMAT = /^[0-9A-Z]{12}[0-9]{2}$/; // contract X5
 
 type Json = Record<string, unknown>;
 
@@ -111,11 +120,11 @@ afterEach(() => {
 
 describe("cnpjFor", () => {
   it.each(SCENARIOS)(
-    "returns 14 synthetic digits with valid check digits for %s",
+    "returns a wire-format CNPJ with valid check digits for %s",
     (scenario) => {
       const cnpj = cnpjFor(scenario);
 
-      expect(cnpj).toMatch(/^\d{14}$/);
+      expect(cnpj).toMatch(CNPJ_WIRE_FORMAT);
       expect(cnpj.slice(12)).toBe(cnpjCheckDigits(cnpj.slice(0, 12)));
       expect(new Set(cnpj).size).toBeGreaterThan(1);
     },
@@ -125,9 +134,43 @@ describe("cnpjFor", () => {
     expect(new Set(SCENARIOS.map(cnpjFor)).size).toBe(SCENARIOS.length);
   });
 
-  it("computes check digits with the Receita algorithm", () => {
-    // A well-known synthetic example: 11.222.333/0001-81.
+  it("pins the spec v2 samples to S4, S5, S6 and S16", () => {
+    expect(cnpjFor("aprovado")).toBe("12345678000195");
+    expect(cnpjFor("pendente")).toBe("98765432000198");
+    expect(cnpjFor("bloqueado")).toBe("11222333000181");
+    expect(cnpjFor("aprovado-alfanumerico")).toBe("12ABC34501DE35");
+  });
+
+  it("computes check digits with the Receita ASCII−48 rule", () => {
     expect(cnpjCheckDigits("112223330001")).toBe("81");
+    // Receita's illustrative alphanumeric example: 12.ABC.345/01DE-35.
+    expect(cnpjCheckDigits("12ABC34501DE")).toBe("35");
+  });
+});
+
+describe("fixture validator", () => {
+  // The fixtures keep their own implementation (pnpm mock:api runs under plain
+  // Node), so it must agree with lib/cnpj.ts on every spec case.
+  it.each([
+    "11.222.333/0001-81",
+    "12.345.678/0001-95",
+    "98.765.432/0001-98",
+    "12.ABC.345/01DE-35",
+    "12.ABC.345/01DE-36",
+    "12.ABC.345/01DE-3A",
+    "11.111.111/1111-11",
+    "AA.AAA.AAA/AAAA-AA",
+    "12.345.678/0001-90",
+    "12.ABC.345",
+  ])("agrees with lib/cnpj.ts on %s", (cnpj) => {
+    const wire = normalizeCnpj(cnpj);
+
+    expect(isValidCnpj(wire)).toBe(validateCnpj(wire) === "ok");
+  });
+
+  it("rejects lowercase or punctuated input (the wire format is strict)", () => {
+    expect(isValidCnpj("12abc34501de35")).toBe(false);
+    expect(isValidCnpj("12.ABC.345/01DE-35")).toBe(false);
   });
 });
 
@@ -173,8 +216,56 @@ describe("D1 link info", () => {
   });
 });
 
+describe("D1 per-test link variants (parallel-safe E2E keys)", () => {
+  it("S3: any loja-instavel-<suffix> fails on its own until that slug is recovered", async () => {
+    const first = await call(`/public/v/${SLUGS.unstable}-a1`);
+    expectErrorEnvelope(first.response, first.body, 500, "ERRO_INTERNO");
+
+    recoverLink(`${SLUGS.unstable}-a1`);
+
+    expect((await call(`/public/v/${SLUGS.unstable}-a1`)).response.status).toBe(
+      200,
+    );
+    expect((await call(`/public/v/${SLUGS.unstable}-b2`)).response.status).toBe(
+      500,
+    );
+  });
+
+  it("any loja-lenta-<suffix> answers like S1, after a delay (skeleton tests)", async () => {
+    const started = Date.now();
+    const { response, body } = await call(`/public/v/${SLUGS.slow}-a1`);
+
+    expect(response.status).toBe(200);
+    expect(body.nome).toEqual(expect.any(String));
+    expect(Date.now() - started).toBeGreaterThanOrEqual(
+      SLOW_LINK_DELAY_MS - 50,
+    );
+  });
+});
+
+describe("per-test live links (loja-teste-<suffix>) and disabling", () => {
+  it("answers like S1 until disabled, then 404s on D1, D2 and D3", async () => {
+    const slug = `${SLUGS.perTest}-a1`;
+    expect((await call(`/public/v/${slug}`)).response.status).toBe(200);
+
+    disableLink(slug);
+
+    const d1 = await call(`/public/v/${slug}`);
+    expectErrorEnvelope(d1.response, d1.body, 404, "LINK_NAO_ENCONTRADO");
+    const d2 = await call(
+      `/public/v/${slug}/lookup?cnpj=${cnpjFor("aprovado")}`,
+    );
+    expectErrorEnvelope(d2.response, d2.body, 404, "LINK_NAO_ENCONTRADO");
+    const d3 = await verify(cnpjFor("aprovado"), { slug });
+    expectErrorEnvelope(d3.response, d3.body, 404, "LINK_NAO_ENCONTRADO");
+    expect((await call(`/public/v/${SLUGS.perTest}-b2`)).response.status).toBe(
+      200,
+    );
+  });
+});
+
 describe("D2 company lookup", () => {
-  it("S4: answers the company", async () => {
+  it("S4: answers the U-E projection: name, activity, city and state, no street address", async () => {
     const { response, body } = await call(
       `/public/v/${SLUGS.ok}/lookup?cnpj=${cnpjFor("aprovado")}`,
     );
@@ -182,9 +273,34 @@ describe("D2 company lookup", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       razao_social: expect.any(String),
-      endereco: expect.any(String),
-      cnae: { codigo: expect.any(String), descricao: expect.any(String) },
+      municipio: expect.any(String),
+      uf: expect.stringMatching(/^[A-Z]{2}$/),
+      cnae: { descricao: expect.any(String) },
     });
+  });
+
+  it("S18: an MEI name with the CPF masked by the backend", async () => {
+    const { body } = await call(
+      `/public/v/${SLUGS.ok}/lookup?cnpj=${MEI_CNPJS.masked}`,
+    );
+
+    expect(body.razao_social).toBe("JOAO CARLOS SILVA ***.***.***-**");
+  });
+
+  it("S18: a contract-violating MEI name with the CPF unmasked (tests the frontend backstop)", async () => {
+    const { body } = await call(
+      `/public/v/${SLUGS.ok}/lookup?cnpj=${MEI_CNPJS.unmasked}`,
+    );
+
+    expect(body.razao_social).toBe("JOAO CARLOS SILVA 12345678909");
+  });
+
+  it("S19: the autofill kill switch answers 503 AUTOFILL_DESATIVADO", async () => {
+    const { response, body } = await call(
+      `/public/v/${SLUGS.noAutofill}/lookup?cnpj=${cnpjFor("aprovado")}`,
+    );
+
+    expectErrorEnvelope(response, body, 503, "AUTOFILL_DESATIVADO");
   });
 
   it("answers the same synthetic company every time", async () => {
@@ -222,6 +338,26 @@ describe("D2 company lookup", () => {
 
     expectErrorEnvelope(response, body, 400, "CNPJ_INVALIDO");
   });
+
+  it("S16: answers an alphanumeric CNPJ like a numeric one", async () => {
+    const { response, body } = await call(
+      `/public/v/${SLUGS.ok}/lookup?cnpj=${cnpjFor("aprovado-alfanumerico")}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(body.razao_social).toEqual(expect.any(String));
+  });
+
+  it.each(["12ABC34501DE36", "12ABC34501DE3A"])(
+    "S17: 400 CNPJ_INVALIDO for %s",
+    async (cnpj) => {
+      const { response, body } = await call(
+        `/public/v/${SLUGS.ok}/lookup?cnpj=${cnpj}`,
+      );
+
+      expectErrorEnvelope(response, body, 400, "CNPJ_INVALIDO");
+    },
+  );
 });
 
 describe("D3 start a verification", () => {
@@ -254,12 +390,15 @@ describe("D3 start a verification", () => {
     },
   );
 
-  it("422 CNPJ_INVALIDO with field for an invalid CNPJ", async () => {
-    const { response, body } = await verify("11222333000100");
+  it.each(["11222333000100", "12ABC34501DE36", "12ABC34501DE3A"])(
+    "422 CNPJ_INVALIDO with field for %s (S17)",
+    async (cnpj) => {
+      const { response, body } = await verify(cnpj);
 
-    expectErrorEnvelope(response, body, 422, "CNPJ_INVALIDO");
-    expect(body.field).toBe("cnpj");
-  });
+      expectErrorEnvelope(response, body, 422, "CNPJ_INVALIDO");
+      expect(body.field).toBe("cnpj");
+    },
+  );
 
   it("422 RESPONSAVEL_INVALIDO with field for a single-word name", async () => {
     const { response, body } = await verify(cnpjFor("aprovado"), {
@@ -280,6 +419,20 @@ describe("D3 start a verification", () => {
 });
 
 describe("D4 case state", () => {
+  it("S16: an alphanumeric CNPJ goes through processing to approved, like S4", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-03T12:00:00Z"));
+    const token = await createCase("aprovado-alfanumerico");
+
+    expect((await readCase(token)).body.estado).toBe("processing");
+
+    vi.setSystemTime(new Date("2026-10-03T12:00:03Z"));
+    expect((await readCase(token)).body).toMatchObject({
+      estado: "approved",
+      resultado: { confirmacoes: expect.any(Array) },
+    });
+  });
+
   it("S4: processing at first (no resultado), approved with three confirmations after 3 s", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-03T12:00:00Z"));

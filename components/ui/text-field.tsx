@@ -1,6 +1,7 @@
 import {
   useId,
   type ChangeEvent,
+  type CompositionEvent,
   type FocusEvent,
   type JSX,
   type Ref,
@@ -18,12 +19,19 @@ type Props = {
   type?: "text" | "email";
   inputMode?: "text" | "numeric" | "email";
   autoComplete?: string;
+  autoCapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";
+  /** Safari's non-standard autocorrect switch. */
+  autoCorrect?: "on" | "off";
+  spellCheck?: boolean;
   placeholder?: string;
   maxLength?: number;
   value?: string;
   defaultValue?: string;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
   onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
+  /** IME / dead-key composition: lets a filtering field leave the value alone while composing. */
+  onCompositionStart?: (event: CompositionEvent<HTMLInputElement>) => void;
+  onCompositionEnd?: (event: CompositionEvent<HTMLInputElement>) => void;
   className?: string;
   ref?: Ref<HTMLInputElement>;
 };
@@ -36,12 +44,17 @@ export function TextField({
   type = "text",
   inputMode,
   autoComplete,
+  autoCapitalize,
+  autoCorrect,
+  spellCheck,
   placeholder,
   maxLength,
   value,
   defaultValue,
   onChange,
   onBlur,
+  onCompositionStart,
+  onCompositionEnd,
   className,
   ref,
 }: Props): JSX.Element {
@@ -64,12 +77,17 @@ export function TextField({
         type={type}
         inputMode={inputMode}
         autoComplete={autoComplete}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+        spellCheck={spellCheck}
         placeholder={placeholder}
         maxLength={maxLength}
         value={value}
         defaultValue={defaultValue}
         onChange={onChange}
         onBlur={onBlur}
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         className={cn(

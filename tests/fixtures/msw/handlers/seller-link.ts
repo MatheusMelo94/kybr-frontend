@@ -1,4 +1,5 @@
 import {
+  delay,
   http,
   HttpResponse,
   type JsonBodyType,
@@ -12,17 +13,20 @@ import {
   MAX_UPLOAD_BYTES,
   PUBLIC_LINKS,
   RETRY_AFTER_SECONDS,
+  SLOW_LINK_DELAY_MS,
   SLUGS,
   UPLOAD_MARKERS,
   buildCompany,
   buildFixedCases,
   buildPublicCase,
   caseKindFor,
+  isSlugVariant,
   isValidCnpj,
   maskEmail,
   scenarioForCnpj,
   type CaseRecord,
   type DocumentType,
+  type PublicLink,
 } from "../../factories/seller-link.ts";
 
 // Pre-Contract handlers for D1–D6 (contract-request.md). One set serves Vitest
@@ -38,6 +42,9 @@ type Store = {
   cases: Map<string, CaseRecord>;
   idempotency: Map<string, Reply>;
   recoveredLinks: Set<string>;
+  disabledLinks: Set<string>;
+  /** The last D3 body per slug, as received (GET /__mock/links/:slug/last-verify). */
+  lastVerify: Map<string, JsonBodyType>;
 };
 
 function createStore(): Store {
@@ -45,6 +52,8 @@ function createStore(): Store {
     cases: buildFixedCases(),
     idempotency: new Map(),
     recoveredLinks: new Set(),
+    disabledLinks: new Set(),
+    lastVerify: new Map(),
   };
 }
 
@@ -53,6 +62,11 @@ let store = createStore();
 /** Back to the starting state: fixed cases only, no uploads, e-mails or idempotency keys. */
 export function resetSellerLinkMock(): void {
   store = createStore();
+}
+
+/** A link disabled mid-journey: D1, D2 and D3 answer 404 LINK_NAO_ENCONTRADO from now on. */
+export function disableLink(slug: string): void {
+  store.disabledLinks.add(slug);
 }
 
 /** S3 → S1: the unstable link starts answering. */
@@ -169,8 +183,13 @@ function isDocumentType(value: unknown): value is DocumentType {
 
 // --- Handlers -----------------------------------------------------------------
 
-const linkFor = (slug: string): (typeof PUBLIC_LINKS)[string] | undefined =>
-  PUBLIC_LINKS[slug];
+function linkFor(slug: string): PublicLink | undefined {
+  if (store.disabledLinks.has(slug)) return undefined;
+  if (isSlugVariant(slug, SLUGS.unstable)) return PUBLIC_LINKS[SLUGS.unstable];
+  if (isSlugVariant(slug, SLUGS.perTest)) return PUBLIC_LINKS[SLUGS.ok];
+  if (isSlugVariant(slug, SLUGS.slow)) return PUBLIC_LINKS[SLUGS.ok];
+  return PUBLIC_LINKS[slug];
+}
 
 function caseFor(slug: string, token: string): CaseRecord | undefined {
   const record = store.cases.get(token);
@@ -222,9 +241,13 @@ function startVerification(
 
 export const sellerLinkHandlers: RequestHandler[] = [
   // D1: link info
-  http.get("*/public/v/:slug", ({ params }) => {
+  http.get("*/public/v/:slug", async ({ params }) => {
     const slug = String(params.slug);
-    if (slug === SLUGS.unstable && !store.recoveredLinks.has(slug)) {
+    if (isSlugVariant(slug, SLUGS.slow)) await delay(SLOW_LINK_DELAY_MS);
+    if (
+      isSlugVariant(slug, SLUGS.unstable) &&
+      !store.recoveredLinks.has(slug)
+    ) {
       return apiError(500, "ERRO_INTERNO");
     }
     const link = linkFor(slug);
@@ -233,8 +256,10 @@ export const sellerLinkHandlers: RequestHandler[] = [
 
   // D2: company lookup
   http.get("*/public/v/:slug/lookup", ({ params, request }) => {
-    if (!linkFor(String(params.slug)))
-      return apiError(404, "LINK_NAO_ENCONTRADO");
+    const slug = String(params.slug);
+    if (!linkFor(slug)) return apiError(404, "LINK_NAO_ENCONTRADO");
+    // S19: the autofill kill switch (contract X6).
+    if (slug === SLUGS.noAutofill) return apiError(503, "AUTOFILL_DESATIVADO");
     const cnpj = new URL(request.url).searchParams.get("cnpj") ?? "";
     if (!isValidCnpj(cnpj))
       return apiError(400, "CNPJ_INVALIDO", { field: "cnpj" });
@@ -260,6 +285,7 @@ export const sellerLinkHandlers: RequestHandler[] = [
       cnpj?: unknown;
       responsavel?: unknown;
     };
+    store.lastVerify.set(String(params.slug), input as JsonBodyType);
     const result = startVerification(String(params.slug), input);
     if (key !== null) store.idempotency.set(key, result);
     return send(result);
@@ -395,5 +421,17 @@ export const mockControlHandlers: RequestHandler[] = [
   http.post("*/__mock/links/:slug/recover", ({ params }) => {
     recoverLink(String(params.slug));
     return new HttpResponse(null, { status: 204 });
+  }),
+  http.post("*/__mock/links/:slug/disable", ({ params }) => {
+    disableLink(String(params.slug));
+    return new HttpResponse(null, { status: 204 });
+  }),
+  // What D3 received last for this slug: lets E2E assert the URL → page →
+  // form → action → D3 leg (AC 12 ref / ext_id; review M1 v1 finding 0002).
+  http.get("*/__mock/links/:slug/last-verify", ({ params }) => {
+    const body = store.lastVerify.get(String(params.slug));
+    return body === undefined
+      ? new HttpResponse(null, { status: 404 })
+      : HttpResponse.json(body);
   }),
 ];

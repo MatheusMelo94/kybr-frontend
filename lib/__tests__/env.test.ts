@@ -9,12 +9,16 @@ const production = {
   API_BASE_URL: "https://api.kybr.test",
   API_PUBLIC_BASE_URL: "https://api.kybr.test",
   API_BFF_KEY: SECRET_KEY,
+  CLIENT_IP_HEADER: "x-forwarded-for",
+  CLIENT_IP_TRUSTED_HOPS: "1",
 };
 
 const development = {
   NODE_ENV: "development",
   API_BASE_URL: "http://localhost:4010",
   API_PUBLIC_BASE_URL: "http://localhost:4010",
+  CLIENT_IP_HEADER: "x-forwarded-for",
+  CLIENT_IP_TRUSTED_HOPS: "1",
 };
 
 function parseError(source: Record<string, string | undefined>): string {
@@ -27,21 +31,64 @@ function parseError(source: Record<string, string | undefined>): string {
 }
 
 describe("parseServerEnv", () => {
-  it("parses a complete production environment and defaults the client IP header", () => {
+  it("parses a complete production environment", () => {
     expect(parseServerEnv(production)).toEqual({
       NODE_ENV: "production",
       API_BASE_URL: "https://api.kybr.test",
       API_PUBLIC_BASE_URL: "https://api.kybr.test",
       API_BFF_KEY: SECRET_KEY,
       CLIENT_IP_HEADER: "x-forwarded-for",
+      CLIENT_IP_TRUSTED_HOPS: 1,
     });
   });
 
-  it("accepts a configured client IP header, normalized to lower case", () => {
+  it("accepts a single-value client IP header, normalized to lower case, without trusted hops", () => {
+    const parsed = parseServerEnv({
+      ...production,
+      CLIENT_IP_HEADER: "X-Real-IP",
+      CLIENT_IP_TRUSTED_HOPS: undefined,
+    });
+
+    expect(parsed.CLIENT_IP_HEADER).toBe("x-real-ip");
+    expect(parsed.CLIENT_IP_TRUSTED_HOPS).toBeUndefined();
+  });
+
+  it("ignores trusted hops for a single-value header", () => {
     expect(
-      parseServerEnv({ ...production, CLIENT_IP_HEADER: "X-Real-IP" })
-        .CLIENT_IP_HEADER,
-    ).toBe("x-real-ip");
+      parseServerEnv({ ...production, CLIENT_IP_HEADER: "cf-connecting-ip" })
+        .CLIENT_IP_TRUSTED_HOPS,
+    ).toBeUndefined();
+  });
+
+  it.each([development, production])(
+    "requires CLIENT_IP_HEADER, with no default (F02)",
+    (source) => {
+      expect(parseError({ ...source, CLIENT_IP_HEADER: undefined })).toContain(
+        "CLIENT_IP_HEADER",
+      );
+    },
+  );
+
+  it("requires CLIENT_IP_TRUSTED_HOPS for the list-valued x-forwarded-for", () => {
+    expect(
+      parseError({ ...production, CLIENT_IP_TRUSTED_HOPS: undefined }),
+    ).toContain("CLIENT_IP_TRUSTED_HOPS");
+  });
+
+  it.each(["0", "-1", "1.5", "abc", "11"])(
+    "rejects CLIENT_IP_TRUSTED_HOPS=%s (a whole number from 1 to 10)",
+    (hops) => {
+      expect(
+        parseError({ ...production, CLIENT_IP_TRUSTED_HOPS: hops }),
+      ).toContain("CLIENT_IP_TRUSTED_HOPS");
+    },
+  );
+
+  it("reads CLIENT_IP_TRUSTED_HOPS as a number", () => {
+    expect(
+      parseServerEnv({ ...production, CLIENT_IP_TRUSTED_HOPS: "2" })
+        .CLIENT_IP_TRUSTED_HOPS,
+    ).toBe(2);
   });
 
   it.each(["API_BASE_URL", "API_PUBLIC_BASE_URL"])(
@@ -87,6 +134,35 @@ describe("parseServerEnv", () => {
     ).toContain("API_PUBLIC_BASE_URL");
   });
 
+  it("requires an https: API_BASE_URL in production: the BFF key and PII travel on it (F08)", () => {
+    expect(
+      parseError({ ...production, API_BASE_URL: "http://api.kybr.test" }),
+    ).toContain("API_BASE_URL");
+  });
+
+  it("refuses a loopback http: API_BASE_URL in production unless explicitly allowed", () => {
+    expect(
+      parseError({ ...production, API_BASE_URL: "http://localhost:4010" }),
+    ).toContain("API_BASE_URL");
+    expect(
+      parseServerEnv({
+        ...production,
+        API_BASE_URL: "http://localhost:4010",
+        API_ALLOW_LOOPBACK_HTTP: "true",
+      }).API_BASE_URL,
+    ).toBe("http://localhost:4010");
+  });
+
+  it("never lets the loopback flag allow a non-loopback http: API_BASE_URL", () => {
+    expect(
+      parseError({
+        ...production,
+        API_BASE_URL: "http://api.kybr.test",
+        API_ALLOW_LOOPBACK_HTTP: "true",
+      }),
+    ).toContain("API_BASE_URL");
+  });
+
   it("allows a loopback http: API_PUBLIC_BASE_URL in production, for local production builds", () => {
     expect(
       parseServerEnv({
@@ -128,6 +204,7 @@ describe("env", () => {
     vi.stubEnv("API_PUBLIC_BASE_URL", "http://localhost:4010");
     vi.stubEnv("API_BFF_KEY", SECRET_KEY);
     vi.stubEnv("CLIENT_IP_HEADER", "x-real-ip");
+    vi.stubEnv("CLIENT_IP_TRUSTED_HOPS", "");
 
     const { env } = await import("@/lib/env");
 

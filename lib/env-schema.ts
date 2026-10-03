@@ -7,6 +7,15 @@ import { isLoopbackHostname } from "./safe-url";
 
 const httpUrl = z.url({ protocol: /^https?$/ });
 
+/**
+ * Client-IP headers whose value is a list that each proxy appends to (contract
+ * X2, threat model F02). Every other header is a single value the hosting
+ * platform overwrites (x-real-ip, cf-connecting-ip, fly-client-ip, …).
+ */
+export const LIST_VALUED_IP_HEADERS: ReadonlySet<string> = new Set([
+  "x-forwarded-for",
+]);
+
 const serverEnvSchema = z
   .object({
     NODE_ENV: z
@@ -16,22 +25,61 @@ const serverEnvSchema = z
     API_BASE_URL: httpUrl,
     // Kybr API base URL the browser uploads documents to (ADR-0004b). Not secret.
     API_PUBLIC_BASE_URL: httpUrl,
+    // Local and E2E production builds only: lets API_BASE_URL be http: on a
+    // loopback host (the mock API). Never set in a deployed environment (F08).
+    API_ALLOW_LOOPBACK_HTTP: z.enum(["true", "false"]).optional(),
     // Server-to-server secret sent as X-Kybr-BFF-Key (contract X2).
     API_BFF_KEY: z.string().min(32).optional(),
     // Header the hosting platform fills with the real client IP (contract X2).
+    // Required, with no default: it depends on the host (F02).
     CLIENT_IP_HEADER: z
       .string()
       .regex(/^[A-Za-z0-9-]+$/)
-      .transform((name) => name.toLowerCase())
-      .default("x-forwarded-for"),
+      .transform((name) => name.toLowerCase()),
+    // For a list-valued header: how many trusted proxies append to it, so the
+    // client's IP is that many entries from the right.
+    CLIENT_IP_TRUSTED_HOPS: z
+      .string()
+      .regex(/^\d+$/, "Must be a whole number from 1 to 10")
+      .transform(Number)
+      .pipe(z.number().int().min(1).max(10))
+      .optional(),
   })
+  .transform(({ CLIENT_IP_TRUSTED_HOPS, ...env }) =>
+    // Hops mean nothing for a single-value header, so they're dropped.
+    LIST_VALUED_IP_HEADERS.has(env.CLIENT_IP_HEADER)
+      ? { ...env, CLIENT_IP_TRUSTED_HOPS }
+      : { ...env, CLIENT_IP_TRUSTED_HOPS: undefined },
+  )
   .superRefine((env, ctx) => {
+    if (
+      LIST_VALUED_IP_HEADERS.has(env.CLIENT_IP_HEADER) &&
+      env.CLIENT_IP_TRUSTED_HOPS === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["CLIENT_IP_TRUSTED_HOPS"],
+        message: "Required when CLIENT_IP_HEADER is a list-valued header",
+      });
+    }
     if (env.NODE_ENV !== "production") return;
     if (env.API_BFF_KEY === undefined) {
       ctx.addIssue({
         code: "custom",
         path: ["API_BFF_KEY"],
         message: "Required in production",
+      });
+    }
+    // The BFF key and the seller's data travel on API_BASE_URL (F08).
+    const apiUrl = new URL(env.API_BASE_URL);
+    const loopbackAllowed =
+      env.API_ALLOW_LOOPBACK_HTTP === "true" &&
+      isLoopbackHostname(apiUrl.hostname);
+    if (apiUrl.protocol !== "https:" && !loopbackAllowed) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["API_BASE_URL"],
+        message: "Must be an https: URL in production",
       });
     }
     const publicUrl = new URL(env.API_PUBLIC_BASE_URL);

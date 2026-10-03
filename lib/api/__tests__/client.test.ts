@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { apiRequest } from "@/lib/api/client";
-import { parseClientIp } from "@/lib/api/client-ip";
 import { AppError } from "@/lib/api/errors";
 import { server } from "@/tests/fixtures/msw/server";
 
@@ -20,7 +19,7 @@ const companySchema = z.object({ razao_social: z.string() });
 function capture(): { headers?: Headers; body?: string; url?: string } {
   const seen: { headers?: Headers; body?: string; url?: string } = {};
   server.use(
-    http.all(`${API}/probe`, async ({ request }) => {
+    http.all(`${API}/public/probe`, async ({ request }) => {
       seen.headers = request.headers;
       seen.url = request.url;
       seen.body = await request.text();
@@ -36,7 +35,7 @@ function respond(
   headers: Record<string, string> = {},
 ): void {
   server.use(
-    http.get(`${API}/probe`, () =>
+    http.get(`${API}/public/probe`, () =>
       HttpResponse.json(body as Record<string, unknown>, { status, headers }),
     ),
   );
@@ -45,7 +44,7 @@ function respond(
 async function failure(): Promise<AppError> {
   const result = await apiRequest({
     operation: "probe",
-    path: "/probe",
+    path: "/public/probe",
     schema: companySchema,
   });
   if (result.ok) throw new Error("expected a failure");
@@ -70,7 +69,7 @@ describe("apiRequest", () => {
 
     const result = await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       schema: companySchema,
     });
 
@@ -87,11 +86,11 @@ describe("apiRequest", () => {
 
     await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       schema: companySchema,
     });
 
-    expect(seen.url).toBe(`${API}/probe`);
+    expect(seen.url).toBe(`${API}/public/probe`);
     expect(seen.headers?.get("x-kybr-bff-key")).toBe(BFF_KEY);
   });
 
@@ -101,7 +100,7 @@ describe("apiRequest", () => {
 
     await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       schema: companySchema,
     });
 
@@ -114,7 +113,7 @@ describe("apiRequest", () => {
 
     await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       schema: companySchema,
       forwardClientIp: true,
     });
@@ -127,7 +126,7 @@ describe("apiRequest", () => {
 
     await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       schema: companySchema,
       forwardClientIp: true,
     });
@@ -140,7 +139,7 @@ describe("apiRequest", () => {
 
     await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       method: "POST",
       body: { cnpj: "11222333000181" },
       headers: { "Idempotency-Key": "8f2c3a4e-0000-4000-8000-000000000000" },
@@ -156,12 +155,15 @@ describe("apiRequest", () => {
 
   it("parses an empty 204 body as undefined", async () => {
     server.use(
-      http.put(`${API}/probe`, () => new HttpResponse(null, { status: 204 })),
+      http.put(
+        `${API}/public/probe`,
+        () => new HttpResponse(null, { status: 204 }),
+      ),
     );
 
     const result = await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       method: "PUT",
       schema: z.undefined(),
     });
@@ -175,13 +177,13 @@ describe("apiRequest", () => {
 
     await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       schema: companySchema,
       next: { revalidate: 60, tags: ["public-link:loja-exemplo"] },
     });
     await apiRequest({
       operation: "probe",
-      path: "/probe",
+      path: "/public/probe",
       schema: companySchema,
       cache: "no-store",
     });
@@ -244,14 +246,14 @@ describe("apiRequest", () => {
     );
 
     it("maps a network failure to NETWORK", async () => {
-      server.use(http.get(`${API}/probe`, () => HttpResponse.error()));
+      server.use(http.get(`${API}/public/probe`, () => HttpResponse.error()));
 
       expect(await failure()).toMatchObject({ code: "NETWORK" });
     });
 
     it("maps a timeout to TIMEOUT", async () => {
       server.use(
-        http.get(`${API}/probe`, async () => {
+        http.get(`${API}/public/probe`, async () => {
           await delay("infinite");
           return HttpResponse.json({});
         }),
@@ -259,7 +261,7 @@ describe("apiRequest", () => {
 
       const result = await apiRequest({
         operation: "probe",
-        path: "/probe",
+        path: "/public/probe",
         schema: companySchema,
         timeoutMs: 50,
       });
@@ -293,21 +295,60 @@ describe("apiRequest", () => {
   });
 });
 
-describe("parseClientIp", () => {
+describe("apiRequest: F01 guards (BFF-key-bearing requests)", () => {
   it.each([
-    ["203.0.113.7", "203.0.113.7"],
-    ["2001:db8::1", "2001:db8::1"],
-    // A list: the right-most entry is the one the trusted proxy appended.
-    ["198.51.100.1, 203.0.113.7", "203.0.113.7"],
-    [" 203.0.113.7 ", "203.0.113.7"],
-  ])("reads %j as %j", (value, ip) => {
-    expect(parseClientIp(value)).toBe(ip);
+    ["a path outside /public/", "/admin/users"],
+    ["a protocol-relative path to another host", "//evil.test/public/x"],
+    ["traversal out of /public/", "/public/../admin"],
+    ["encoded traversal out of /public/", "/public/%2e%2e/admin"],
+    ["a userinfo host swap", "@evil.test/public/x"],
+    ["an absolute URL", "https://evil.test/public/x"],
+  ])("refuses %s before fetch is called", async (_case, path) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await expect(
+      apiRequest({ operation: "probe", path, schema: companySchema }),
+    ).rejects.toThrow("Refused API path");
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it.each([null, "", "unknown", "203.0.113.7, not-an-ip", "<script>"])(
-    "ignores %j",
-    (value) => {
-      expect(parseClientIp(value)).toBeUndefined();
-    },
-  );
+  it("refuses redirects, so the key never follows a 3xx to another host", async () => {
+    let offOriginHits = 0;
+    server.use(
+      http.get(
+        `${API}/public/probe`,
+        () =>
+          new HttpResponse(null, {
+            status: 302,
+            headers: { Location: "http://evil.test/steal" },
+          }),
+      ),
+      http.get("http://evil.test/steal", () => {
+        offOriginHits += 1;
+        return HttpResponse.json({ razao_social: "x" });
+      }),
+    );
+
+    const result = await apiRequest({
+      operation: "probe",
+      path: "/public/probe",
+      schema: companySchema,
+    });
+
+    expect(result).toMatchObject({ ok: false, error: { code: "NETWORK" } });
+    expect(offOriginHits).toBe(0);
+  });
+
+  it("fetches with redirect: error", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    capture();
+
+    await apiRequest({
+      operation: "probe",
+      path: "/public/probe",
+      schema: companySchema,
+    });
+
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ redirect: "error" });
+  });
 });

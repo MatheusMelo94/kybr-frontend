@@ -38,20 +38,23 @@ Not set up yet. A standalone `Dockerfile` comes with the DevOps project setup. `
 
 Copy `.env.example` to `.env.local` (gitignored). `lib/env.ts` validates every variable with zod, and `pnpm build` and `pnpm start` fail on a missing or invalid one. There are no `NEXT_PUBLIC_*` variables.
 
-| Name                  | Public?          | Purpose                                                                                                                                                 |
-| --------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `API_BASE_URL`        | No               | Kybr API base URL for calls from the Next.js server                                                                                                     |
-| `API_PUBLIC_BASE_URL` | Yes (not secret) | Kybr API base URL the browser uploads documents to (ADR-0004b). Must be `https:` in production; a loopback URL is accepted for local production builds. |
-| `API_BFF_KEY`         | **No, secret**   | Server-to-server key sent as `X-Kybr-BFF-Key`. Required in production, at least 32 characters.                                                          |
-| `CLIENT_IP_HEADER`    | No               | Header the host fills with the real client IP. Default `x-forwarded-for`.                                                                               |
+| Name                      | Public?          | Purpose                                                                                                                                                 |
+| ------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `API_BASE_URL`            | No               | Kybr API base URL for calls from the Next.js server. Must be `https:` in production.                                                                    |
+| `API_ALLOW_LOOPBACK_HTTP` | No               | `true` lets a local or E2E production build use an `http:` loopback `API_BASE_URL` (the mock API). Never set when deployed.                             |
+| `API_PUBLIC_BASE_URL`     | Yes (not secret) | Kybr API base URL the browser uploads documents to (ADR-0004b). Must be `https:` in production; a loopback URL is accepted for local production builds. |
+| `API_BFF_KEY`             | **No, secret**   | Server-to-server key sent as `X-Kybr-BFF-Key`. Required in production, at least 32 characters.                                                          |
+| `CLIENT_IP_HEADER`        | No               | Header the host fills with the real client IP. Required, with no default: it depends on the host.                                                       |
+| `CLIENT_IP_TRUSTED_HOPS`  | No               | For `x-forwarded-for` only: how many trusted proxies append to it. The client IP is that many entries from the right.                                   |
 
 ## Routes
 
 The seller link routes come with tasks T13, T20 and T32. Every page renders per request, because the CSP carries a fresh nonce (`middleware.ts`).
 
-| Path                     | Auth   | Description                                          |
-| ------------------------ | ------ | ---------------------------------------------------- |
-| `/` and any unknown path | Public | "Link não encontrado" (404). The root has no screen. |
+| Path                     | Auth                            | Description                                                                                                       |
+| ------------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `/` and any unknown path | Public                          | "Link não encontrado" (404). The root has no screen.                                                              |
+| `/v/{slug}`              | Public (the slug is the access) | Seller sign-up form. A malformed slug is a 404; an unknown or disabled one shows "Link não encontrado" (noindex). |
 
 ## Commands
 
