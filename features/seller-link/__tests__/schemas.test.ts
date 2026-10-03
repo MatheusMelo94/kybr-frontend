@@ -101,6 +101,79 @@ describe("verifySchema", () => {
   });
 });
 
+describe("verifySchema: F07 bounds (threat model)", () => {
+  it("NFC-normalizes the name", () => {
+    expect(
+      verifySchema.safeParse({ ...valid, responsavel: "Jose\u0301 Silva" }).data
+        ?.responsavel,
+    ).toBe("José Silva");
+  });
+
+  it("accepts letters, spaces, apostrophes, hyphens and periods", () => {
+    expect(
+      verifySchema.safeParse({ ...valid, responsavel: "Ana-Maria D'Ávila Jr." })
+        .data?.responsavel,
+    ).toBe("Ana-Maria D'Ávila Jr.");
+  });
+
+  it("reads a typographic apostrophe (iOS smart punctuation) as '", () => {
+    expect(
+      verifySchema.safeParse({ ...valid, responsavel: "Maria O’Neil" }).data
+        ?.responsavel,
+    ).toBe("Maria O'Neil");
+  });
+
+  it.each([
+    ["markup", "Maria <b>Silva</b>"],
+    ["digits", "Maria Silva 2"],
+    ["a control character", "Maria\u0000 Silva"],
+    ["an emoji", "Maria Silva 😀"],
+    ["more than 120 characters", `Maria ${"a".repeat(120)}`],
+  ])(
+    "rejects a tampered name with %s (the field never sends one)",
+    (_case, responsavel) => {
+      expect(issues(verifySchema.safeParse({ ...valid, responsavel }))).toEqual(
+        ["responsavel:invalid"],
+      );
+    },
+  );
+
+  it("accepts a name of exactly 120 characters", () => {
+    const responsavel = `Maria ${"a".repeat(114)}`;
+
+    expect(verifySchema.safeParse({ ...valid, responsavel }).success).toBe(
+      true,
+    );
+  });
+
+  it.each([
+    ["a control character", "onboarding\u0000"],
+    ["a tab", "a\tb"],
+    ["non-ASCII", "ação"],
+    ["a newline", "a\nb"],
+  ])("drops ref and ext_id with %s, never echoing them", (_case, value) => {
+    const result = verifySchema.safeParse({
+      ...valid,
+      ref: value,
+      ext_id: value,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.ref).toBeUndefined();
+    expect(result.data?.ext_id).toBeUndefined();
+  });
+
+  it("keeps printable ASCII ref and ext_id", () => {
+    expect(
+      verifySchema.safeParse({
+        ...valid,
+        ref: "utm=x&y=1",
+        ext_id: "SELLER-42_a.b~c",
+      }).data,
+    ).toMatchObject({ ref: "utm=x&y=1", ext_id: "SELLER-42_a.b~c" });
+  });
+});
+
 describe("contactEmailSchema", () => {
   it("accepts and trims a valid address", () => {
     expect(

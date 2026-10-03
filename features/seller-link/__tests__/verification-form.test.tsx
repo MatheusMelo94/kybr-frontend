@@ -152,3 +152,103 @@ describe("VerificationForm: CNPJ lookup", () => {
     expect(screen.queryByTestId("company-block")).toBeNull();
   });
 });
+
+function nameInput(): HTMLInputElement {
+  return screen.getByRole("textbox", { name: "Nome completo do responsável" });
+}
+
+function submit(): HTMLElement {
+  return screen.getByRole("button", { name: "Verificar empresa" });
+}
+
+describe("VerificationForm: name field and submit validation", () => {
+  beforeEach(() => {
+    lookup.mockResolvedValue({ ok: false, reason: "not_found" });
+  });
+
+  it("has a labeled name field with autofill, a hint and a 120-character limit", () => {
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    expect(nameInput()).toHaveAttribute("autocomplete", "name");
+    expect(nameInput()).toHaveAttribute("maxlength", "120");
+    expect(nameInput()).toHaveAccessibleDescription(
+      "Nome e sobrenome de quem está fazendo o cadastro.",
+    );
+  });
+
+  it("F07: ignores characters a name can't hold, as typed", async () => {
+    const user = userEvent.setup();
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await user.type(nameInput(), "Ana<3 D’Ávila-Silva.");
+
+    expect(nameInput()).toHaveValue("Ana D'Ávila-Silva.");
+  });
+
+  it.each([
+    ["", "Informe o nome completo do responsável."],
+    ["Maria", "Escreva nome e sobrenome."],
+  ])(
+    "AC 10: submitting the name %j shows its error, linked, with focus on the field",
+    async (name, message) => {
+      const user = userEvent.setup();
+      render(<VerificationForm slug="loja-exemplo" />);
+
+      await user.type(cnpjInput(), "11222333000181");
+      if (name) await user.type(nameInput(), name);
+      await user.click(submit());
+
+      expect(nameInput()).toHaveAttribute("aria-invalid", "true");
+      expect(nameInput()).toHaveAccessibleDescription(
+        `Nome e sobrenome de quem está fazendo o cadastro. ${message}`,
+      );
+      expect(nameInput()).toHaveFocus();
+    },
+  );
+
+  it.each([
+    ["", "Informe o CNPJ da empresa."],
+    ["12ABC", "O CNPJ tem 14 caracteres. Confira se falta algum."],
+  ])(
+    "AC 6: submitting the CNPJ %j shows its error, linked, with focus on the field",
+    async (cnpj, message) => {
+      const user = userEvent.setup();
+      render(<VerificationForm slug="loja-exemplo" />);
+
+      if (cnpj) await user.type(cnpjInput(), cnpj);
+      await user.type(nameInput(), "Maria Exemplo");
+      await user.click(submit());
+
+      expect(cnpjInput()).toHaveAttribute("aria-invalid", "true");
+      expect(cnpjInput()).toHaveAccessibleDescription(
+        `CNPJs novos podem ter letras. ${message}`,
+      );
+      expect(cnpjInput()).toHaveFocus();
+    },
+  );
+
+  it("AC 11: with both fields invalid, both errors show and focus goes to the CNPJ first", async () => {
+    const user = userEvent.setup();
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await user.type(cnpjInput(), "12");
+    await user.type(nameInput(), "Maria");
+    await user.click(submit());
+
+    expect(cnpjInput()).toHaveAttribute("aria-invalid", "true");
+    expect(nameInput()).toHaveAttribute("aria-invalid", "true");
+    expect(cnpjInput()).toHaveFocus();
+  });
+
+  it("clears a field's submit error once it's edited", async () => {
+    const user = userEvent.setup();
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await user.click(submit());
+    expect(nameInput()).toHaveAttribute("aria-invalid", "true");
+
+    await user.type(nameInput(), "M");
+
+    expect(nameInput()).not.toHaveAttribute("aria-invalid");
+  });
+});
