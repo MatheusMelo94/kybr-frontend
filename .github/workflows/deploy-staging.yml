@@ -13,6 +13,13 @@
 # the runner except the Preview env file the check reads and deletes.
 # Actions are pinned to commit SHAs (frontend-security-conventions.md
 # § Supply Chain).
+#
+# Trusted tooling (Security DV-01): every step that holds VERCEL_TOKEN runs
+# code from `main`, checked out at the workspace root: the deploy-tools
+# action, its CLI lockfile and scripts/. The pushed commit is checked out
+# into _deploy/ and is only uploaded to Vercel and built there; nothing in
+# it runs on this runner. A branch can't change what holds the token without
+# going through a merge to main.
 name: Deploy staging
 
 on:
@@ -42,8 +49,16 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out main (trusted deploy tooling)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
+          persist-credentials: false
+
+      - name: Check out the commit to deploy (uploaded, never run here)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: _deploy
           persist-credentials: false
 
       - uses: ./.github/actions/deploy-tools
@@ -69,7 +84,7 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           COMMIT_REF: ${{ github.ref_name }}
         run: |
-          url=$(vercel deploy --yes --archive=tgz --token="$VERCEL_TOKEN" \
+          url=$(vercel deploy --cwd _deploy --yes --archive=tgz --token="$VERCEL_TOKEN" \
             --meta githubCommitSha="$COMMIT_SHA" \
             --meta githubCommitRef="$COMMIT_REF")
           if ! printf '%s' "$url" | grep -qE '^https://[a-z0-9.-]+\.vercel\.app$'; then
