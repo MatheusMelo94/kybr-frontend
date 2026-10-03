@@ -10,12 +10,34 @@ import {
   uniqueKey,
 } from "../fixtures/mock-api.ts";
 
-/** The HTML with the per-request CSP nonce and the token taken out (QA plan Q6). */
+// Q6 (QA plan, confirmed by Security): identical after normalizing exactly
+// two things, the per-request CSP nonce and the token string. Nothing else.
+
+/** The HTML with the per-request CSP nonce and the token taken out. */
 function normalized(html: string, token: string): string {
   return html
     .replaceAll(/nonce="[^"]*"/g, 'nonce=""')
     .replaceAll(/nonce\\?":\\?"[^"\\]*/g, "nonce")
     .replaceAll(token, "TOKEN");
+}
+
+/** Every header but `date`, with the CSP nonce (wherever it appears) and the token normalized (M2-05). */
+function normalizedHeaders(
+  headers: Record<string, string>,
+  token: string,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers)
+      .filter(([name]) => name !== "date")
+      .map(([name, value]) => [
+        name,
+        value
+          // The CSP header's 'nonce-…', and the font preload Link's nonce="…".
+          .replaceAll(/'nonce-[^']*'/g, "'nonce-'")
+          .replaceAll(/nonce="[^"]*"/g, 'nonce=""')
+          .replaceAll(token, "TOKEN"),
+      ]),
+  );
 }
 
 test.describe("case route boundaries @feature-seller-link", () => {
@@ -76,10 +98,29 @@ test.describe("case route boundaries @feature-seller-link", () => {
     );
 
     expect(foreign.status()).toBe(unknown.status());
+    expect(normalizedHeaders(foreign.headers(), CASE_TOKENS.aprovado)).toEqual(
+      normalizedHeaders(unknown.headers(), CASE_TOKENS.unknown),
+    );
     expect(normalized(await foreign.text(), CASE_TOKENS.aprovado)).toBe(
       normalized(await unknown.text(), CASE_TOKENS.unknown),
     );
     expect(await foreign.text()).toContain("Cadastro não encontrado");
+  });
+
+  test("AC 27: two malformed tokens get the same 404, headers and body", async ({
+    request,
+  }) => {
+    const first = await request.get(`/v/${SLUGS.other}/c/curto1`);
+    const second = await request.get(`/v/${SLUGS.other}/c/curto2`);
+
+    expect(first.status()).toBe(404);
+    expect(second.status()).toBe(404);
+    expect(normalizedHeaders(first.headers(), "curto1")).toEqual(
+      normalizedHeaders(second.headers(), "curto2"),
+    );
+    expect(normalized(await first.text(), "curto1")).toBe(
+      normalized(await second.text(), "curto2"),
+    );
   });
 
   test("AC 28: a case-load failure shows caseerror.*, and Tentar de novo recovers", async ({
