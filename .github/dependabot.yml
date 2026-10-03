@@ -40,6 +40,9 @@ updates:
       time: "06:00"
       timezone: America/Sao_Paulo
     open-pull-requests-limit: 2
+    # Security DV-02: matches minimumReleaseAge in its pnpm-workspace.yaml.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore(ci)
     groups:

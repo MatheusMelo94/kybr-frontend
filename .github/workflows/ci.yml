@@ -90,6 +90,24 @@ jobs:
       # (auditConfig.ignoreGhsas), each with a reason and a revisit date.
       - run: pnpm audit --audit-level=high
 
+      # The deploy workflows' CLIs (.github/deploy-tools), outside the app's
+      # lockfile (Security DV-02). Critical blocks; reviewed exceptions are in
+      # .github/deploy-tools/pnpm-workspace.yaml. High and below are reported
+      # in the run summary without blocking: the advisories sit in the CLIs'
+      # local builders, which the workflows don't run.
+      - name: Audit the deploy tools (blocks on critical)
+        run: pnpm --dir .github/deploy-tools audit --audit-level=critical
+
+      - name: Report the deploy tools' advisories (non-blocking)
+        if: always()
+        run: |
+          {
+            echo "### Deploy tools audit (non-blocking below critical)"
+            echo '```'
+            pnpm --dir .github/deploy-tools audit --audit-level=high | tail -n 3 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   container:
     name: Docker fallback (build, health)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
