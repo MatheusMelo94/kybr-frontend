@@ -114,6 +114,7 @@ jobs:
       # Lighthouse writes its settings, extra headers included, into the
       # reports. Redact the bypass secret before anything is uploaded.
       - name: Redact the bypass secret from the Lighthouse reports
+        id: redact
         if: always()
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -130,8 +131,10 @@ jobs:
             exit 1
           fi
 
+      # Only after a successful redaction (Security DV-04): a redaction that
+      # stopped part-way must never upload unredacted reports.
       - name: Upload the Lighthouse reports
-        if: always()
+        if: always() && steps.redact.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lighthouse-preview
