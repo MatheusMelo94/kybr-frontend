@@ -18,12 +18,20 @@ const SLUG = "loja-exemplo";
 const TOKEN = "tokaprovado0000000000000";
 
 let hidden = false;
+let onLine = true;
+
+const BANNER = "Sem conexão. Assim que a internet voltar, continuamos daqui.";
 
 /** Advances fake time and lets the awaited checks settle. */
 async function elapse(ms: number): Promise<void> {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
   });
+}
+
+function setOnLine(value: boolean): void {
+  onLine = value;
+  window.dispatchEvent(new Event(value ? "online" : "offline"));
 }
 
 function setHidden(value: boolean): void {
@@ -41,6 +49,7 @@ function renderSwitch(msUntilTimeout = 10_000): ReturnType<typeof render> {
       verifying={<h1>verificando</h1>}
       analysis={<h1>em análise</h1>}
       analysisAnnouncement="em análise"
+      offlineBanner={BANNER}
     />,
   );
 }
@@ -52,6 +61,7 @@ function renderWatch(): ReturnType<typeof render> {
       slug={SLUG}
       token={TOKEN}
       viewKey="analysis-timeout"
+      offlineBanner={BANNER}
     />,
   );
 }
@@ -59,9 +69,14 @@ function renderWatch(): ReturnType<typeof render> {
 beforeEach(() => {
   vi.useFakeTimers();
   hidden = false;
+  onLine = true;
   Object.defineProperty(document, "hidden", {
     configurable: true,
     get: () => hidden,
+  });
+  Object.defineProperty(navigator, "onLine", {
+    configurable: true,
+    get: () => onLine,
   });
   poll.mockReset();
   refresh.mockReset();
@@ -128,8 +143,8 @@ describe("CaseLiveStatus: status checks (tech-design § 3)", () => {
 
   it("AC 17 (arrival): in watch mode, checks every 10 s and refreshes when the result arrives", async () => {
     poll.mockResolvedValue({ ok: true, viewKey: "analysis-timeout" });
-    const { container } = renderWatch();
-    expect(container).toBeEmptyDOMElement();
+    renderWatch();
+    expect(screen.queryByText(BANNER)).toBeNull();
 
     await elapse(9_999);
     expect(poll).not.toHaveBeenCalled();
@@ -213,5 +228,96 @@ describe("CaseLiveStatus: status checks (tech-design § 3)", () => {
     unmount();
     await elapse(30_000);
     expect(poll).not.toHaveBeenCalled();
+  });
+});
+
+describe("CaseLiveStatus: offline (T27; tech-design § 3 rule 5)", () => {
+  it("AC 29: going offline shows offline.banner as a status and pauses checks", async () => {
+    renderSwitch();
+    await elapse(2_000);
+    expect(poll).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      setOnLine(false);
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent(BANNER);
+    await elapse(30_000);
+    expect(poll).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("AC 29: back online, the banner goes and a check runs at once, with no action from the seller", async () => {
+    renderWatch();
+    await act(async () => {
+      setOnLine(false);
+    });
+
+    await act(async () => {
+      setOnLine(true);
+    });
+
+    expect(screen.queryByText(BANNER)).toBeNull();
+    expect(poll).toHaveBeenCalledTimes(1);
+  });
+
+  it("a check that fails at the network level is the offline state, never a refresh", async () => {
+    poll.mockRejectedValue(new TypeError("Failed to fetch"));
+    renderSwitch();
+
+    await elapse(2_000);
+
+    expect(screen.getByRole("status")).toHaveTextContent(BANNER);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("while the browser still says online, retries every 5 s and hides the banner on the next successful check", async () => {
+    poll
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue({ ok: true, viewKey: "verifying" });
+    renderSwitch();
+
+    await elapse(2_000);
+    expect(screen.getByRole("status")).toHaveTextContent(BANNER);
+
+    await elapse(5_000);
+    expect(poll).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(BANNER)).toBeNull();
+  });
+
+  it("starts offline when the page opens without a connection, and checks nothing", async () => {
+    onLine = false;
+    renderSwitch();
+    await elapse(0);
+
+    expect(screen.getByRole("status")).toHaveTextContent(BANNER);
+    await elapse(10_000);
+    expect(poll).not.toHaveBeenCalled();
+  });
+
+  it("the 10 s switch to em análise still happens while offline", async () => {
+    renderSwitch(3_000);
+    await act(async () => {
+      setOnLine(false);
+    });
+
+    await elapse(3_000);
+
+    expect(
+      screen.getByRole("heading", { name: "em análise" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(BANNER);
+  });
+
+  it("keeps the status region mounted, so the banner is announced when it appears", async () => {
+    renderSwitch();
+    const region = screen.getByRole("status");
+    expect(region).toHaveTextContent("");
+
+    await act(async () => {
+      setOnLine(false);
+    });
+
+    expect(screen.getByRole("status")).toBe(region);
   });
 });

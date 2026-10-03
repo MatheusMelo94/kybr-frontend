@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
+import { LiveRegion } from "@/components/ui/live-region";
 import {
   pollCaseViewAction,
   type PollCaseViewResult,
@@ -18,9 +19,16 @@ const RETRY_AFTER_FAILURE_MS = 5_000;
 /** While a refresh is outstanding, re-render this often (see refreshing below). */
 const REFRESH_NUDGE_MS = 250;
 
+// One literal class string or none, so no cn(): it would pull tailwind-merge
+// (~9 kB gzip) into this route's client chunk (ADR-0003 budget).
+const BANNER_CLASSES =
+  "mb-6 rounded-lg bg-surface-raised p-4 text-body text-ink";
+
 type CaseRef = {
   slug: string;
   token: string;
+  /** offline.banner, from the server (no copy ships to the browser for it). */
+  offlineBanner: string;
 };
 
 type SwitchProps = CaseRef & {
@@ -40,7 +48,7 @@ type SwitchProps = CaseRef & {
 };
 
 type WatchProps = CaseRef & {
-  /** *Em análise* rendered by the server: check every 10 s, render nothing. */
+  /** *Em análise* rendered by the server: check every 10 s; only the banner renders. */
   mode: "watch";
   viewKey: "analysis-timeout" | "analysis-notfound";
 };
@@ -59,8 +67,14 @@ type Props = SwitchProps | WatchProps;
  * - router.refresh() runs only after a successful check returns a different
  *   view, or not-found (rules 2, 7), and checking stops there: the server's
  *   render takes over. A failed check is retried quietly after 5 s (rule 7).
+ * - Offline (rule 5): navigator.onLine false, an `offline` event, or a check
+ *   that rejects at the network level shows offline.banner (role=status) and
+ *   pauses the checks; router.refresh() never runs then, so a failed RSC fetch
+ *   can't turn into a hard navigation. On `online` the banner goes and a check
+ *   runs at once. A rejection while the browser still says online is retried
+ *   every 5 s, and the first successful check hides the banner.
  */
-export function CaseLiveStatus(props: Props): JSX.Element | null {
+export function CaseLiveStatus(props: Props): JSX.Element {
   const { slug, token, mode } = props;
   const router = useRouter();
   const announceViewChange = useAnnounceViewChange();
@@ -75,6 +89,7 @@ export function CaseLiveStatus(props: Props): JSX.Element | null {
   // component (a result view unmounts it; *em análise* remounts it).
   const [refreshing, setRefreshing] = useState(false);
   const [, setNudges] = useState(0);
+  const [offline, setOffline] = useState(false);
   // The view on screen, for comparing check results. A ref: changing it must
   // not restart the check loop.
   const onScreen = useRef<CaseViewKey>(
@@ -98,11 +113,12 @@ export function CaseLiveStatus(props: Props): JSX.Element | null {
     analysisAnnouncement,
   ]);
 
-  // The check loop.
+  // The check loop, with the offline state.
   useEffect(() => {
     if (watchedKey !== undefined) onScreen.current = watchedKey;
     let active = true;
     let inFlight = false;
+    let isOffline = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const cadence = (): number =>
@@ -115,6 +131,11 @@ export function CaseLiveStatus(props: Props): JSX.Element | null {
       timer = setTimeout(() => void check(), ms);
     }
 
+    function goOffline(next: boolean): void {
+      isOffline = next;
+      setOffline(next);
+    }
+
     function refreshTo(viewKey: CaseViewKey | undefined): void {
       active = false;
       if (viewKey !== undefined) onScreen.current = viewKey;
@@ -125,19 +146,27 @@ export function CaseLiveStatus(props: Props): JSX.Element | null {
     async function check(): Promise<void> {
       // Hidden: no reschedule; the visibilitychange listener resumes.
       if (!active || inFlight || document.hidden) return;
+      // No connection: wait for the `online` event.
+      if (!navigator.onLine) {
+        goOffline(true);
+        return;
+      }
       inFlight = true;
       let result: PollCaseViewResult;
       try {
         result = await pollCaseViewAction(slug, token);
       } catch {
-        // The action couldn't be reached. T27 turns this into the offline
-        // state; until then, retry quietly like any failed check.
+        // The action couldn't be reached: the offline state. The browser may
+        // still say online (no `online` event will come), so keep trying.
         inFlight = false;
-        if (active) schedule(RETRY_AFTER_FAILURE_MS);
+        if (!active) return;
+        goOffline(true);
+        if (navigator.onLine) schedule(RETRY_AFTER_FAILURE_MS);
         return;
       }
       inFlight = false;
       if (!active) return;
+      if (isOffline) goOffline(false);
 
       if (!result.ok) {
         if (result.reason === "not_found") refreshTo(undefined);
@@ -150,18 +179,36 @@ export function CaseLiveStatus(props: Props): JSX.Element | null {
       else schedule(cadence());
     }
 
-    function onVisibilityChange(): void {
-      if (document.hidden) return;
+    function checkNow(): void {
       clearTimeout(timer);
       void check();
     }
 
+    function onVisibilityChange(): void {
+      if (!document.hidden) checkNow();
+    }
+
+    function onOffline(): void {
+      clearTimeout(timer);
+      goOffline(true);
+    }
+
+    function onOnline(): void {
+      goOffline(false);
+      checkNow();
+    }
+
     document.addEventListener("visibilitychange", onVisibilityChange);
-    schedule(cadence());
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+    if (navigator.onLine) schedule(cadence());
+    else goOffline(true);
     return () => {
       active = false;
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
     };
   }, [slug, token, watchedKey, router]);
 
@@ -179,6 +226,17 @@ export function CaseLiveStatus(props: Props): JSX.Element | null {
     return () => clearInterval(nudge);
   }, [refreshing]);
 
-  if (mode === "watch") return null;
-  return <>{timedOut ? props.analysis : props.verifying}</>;
+  // Always mounted, so the banner is announced when its text appears.
+  const banner = (
+    <LiveRegion className={offline ? BANNER_CLASSES : ""}>
+      {offline ? props.offlineBanner : ""}
+    </LiveRegion>
+  );
+  if (mode === "watch") return banner;
+  return (
+    <>
+      {banner}
+      {timedOut ? props.analysis : props.verifying}
+    </>
+  );
 }

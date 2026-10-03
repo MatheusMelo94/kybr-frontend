@@ -107,6 +107,7 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
         verifying={<h1>verificando</h1>}
         analysis={<h1>em análise</h1>}
         analysisAnnouncement="em análise"
+        offlineBanner="Sem conexão."
       />,
     );
   }
@@ -152,6 +153,7 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
           verifying={<VerifyingView />}
           analysis={<AnalysisView variant="timeout" />}
           analysisAnnouncement="Sua empresa está em análise"
+          offlineBanner="Sem conexão."
         />
       </CaseViewTransition>,
     );
@@ -169,7 +171,8 @@ describe("CaseLiveStatus: the 10 s switch (tech-design § 3 rule 3)", () => {
         name: "Sua empresa está em análise",
       }),
     ).toHaveFocus();
-    expect(screen.getByRole("status")).toHaveTextContent(
+    // CaseViewTransition's region comes first; the second is the offline banner's.
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent(
       "Sua empresa está em análise",
     );
   });

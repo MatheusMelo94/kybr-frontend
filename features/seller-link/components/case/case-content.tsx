@@ -7,6 +7,7 @@ import { CaseLiveStatus } from "@/features/seller-link/components/case/case-live
 import { PendingView } from "@/features/seller-link/components/case/pending-view";
 import { VerifyingView } from "@/features/seller-link/components/case/verifying-view";
 import { caseAnnouncement } from "@/features/seller-link/case-announcement";
+import { caseCopy } from "@/features/seller-link/copy/case";
 import type { CaseView } from "@/features/seller-link/types";
 import type {
   CaseResult,
@@ -50,6 +51,7 @@ export function CaseContent({
           mode="switch"
           slug={slug}
           token={token}
+          offlineBanner={caseCopy["offline.banner"]}
           msUntilTimeout={view.msUntilTimeout}
           verifying={<VerifyingView />}
           analysis={<AnalysisView variant="timeout" />}
@@ -68,6 +70,7 @@ export function CaseContent({
             mode="watch"
             slug={slug}
             token={token}
+            offlineBanner={caseCopy["offline.banner"]}
             viewKey={view.viewKey}
           />
           <AnalysisView

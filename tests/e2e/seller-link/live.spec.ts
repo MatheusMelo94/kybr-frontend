@@ -76,9 +76,11 @@ test.describe("live status @feature-seller-link", () => {
         name: "Sua empresa está em análise",
       }),
     ).toBeFocused();
-    await expect(page.getByRole("status")).toHaveText(
-      "Sua empresa está em análise",
-    );
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "Sua empresa está em análise" }),
+    ).toHaveCount(1);
     expect(
       await page.evaluate(
         () =>
