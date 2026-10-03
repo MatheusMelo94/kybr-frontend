@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -129,7 +129,7 @@ describe("CaseViewTransition", () => {
     expect(action).toHaveFocus();
   });
 
-  it("the client switch announces em análise and focuses its h1; the server catching up with the same key doesn't re-focus", () => {
+  it("the client switch announces em análise and focuses its h1; the server catching up with that key restores focus to the new h1 without announcing again", () => {
     const { rerender } = render(
       <CaseViewTransition viewKey="verifying" announcement="Consultando…">
         <ClientSwitch />
@@ -145,19 +145,55 @@ describe("CaseViewTransition", () => {
     ).toHaveFocus();
     expect(region()).toHaveTextContent("Sua empresa está em análise");
 
-    // The same children stay mounted, so only CaseViewTransition could move focus.
+    // The server's em análise replaces the client's node (keyed remount), so
+    // the focused element is gone: focus goes back to the h1, silently.
     screen.getByRole("button", { name: "ação" }).focus();
+    rerender(
+      <CaseViewTransition
+        viewKey="analysis-timeout"
+        announcement="Outra frase que não deve ser anunciada"
+      >
+        <View title="Sua empresa está em análise" />
+      </CaseViewTransition>,
+    );
+    nextFrame();
+
+    expect(
+      screen.getByRole("heading", { name: "Sua empresa está em análise" }),
+    ).toHaveFocus();
+    expect(region()).toHaveTextContent("Sua empresa está em análise");
+  });
+
+  it("remounts the view's islands on every server view change, and only then (tech-design § 2, § 3 rule 11)", () => {
+    const mounts = vi.fn();
+    function Island(): JSX.Element {
+      useEffect(() => {
+        mounts();
+      }, []);
+      return <h1 tabIndex={-1}>ilha</h1>;
+    }
+    const { rerender } = render(
+      <CaseViewTransition viewKey="verifying" announcement="Consultando…">
+        <Island />
+      </CaseViewTransition>,
+    );
+
+    rerender(
+      <CaseViewTransition viewKey="verifying" announcement="Consultando…">
+        <Island />
+      </CaseViewTransition>,
+    );
+    expect(mounts).toHaveBeenCalledTimes(1);
+
     rerender(
       <CaseViewTransition
         viewKey="analysis-timeout"
         announcement="Sua empresa está em análise"
       >
-        <ClientSwitch />
+        <Island />
       </CaseViewTransition>,
     );
-    nextFrame();
-
-    expect(screen.getByRole("button", { name: "ação" })).toHaveFocus();
+    expect(mounts).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the region mounted across view changes, so screen readers hear each change", () => {

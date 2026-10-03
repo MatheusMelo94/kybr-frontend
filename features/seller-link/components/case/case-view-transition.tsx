@@ -26,6 +26,10 @@ export function useAnnounceViewChange(): AnnounceViewChange {
 
 type Shown = { viewKey: CaseViewKey; announcement: string };
 
+function focusHeading(container: HTMLElement | null): void {
+  container?.querySelector<HTMLElement>('h1[tabindex="-1"]')?.focus();
+}
+
 type Props = {
   /** The view the server rendered. */
   viewKey: CaseViewKey;
@@ -41,7 +45,7 @@ type Props = {
  * view's announcement in a polite region, one frame later so it's never part
  * of the initial render. The view on screen changes when the server sends a
  * new viewKey or when CaseLiveStatus reports its client switch; a key already
- * on screen never re-focuses.
+ * on screen never re-focuses, except to restore focus that a remount dropped.
  */
 export function CaseViewTransition({
   viewKey,
@@ -69,15 +73,28 @@ export function CaseViewTransition({
   }, []);
 
   useEffect(() => {
-    container.current?.querySelector<HTMLElement>('h1[tabindex="-1"]')?.focus();
+    focusHeading(container.current);
     const frame = requestAnimationFrame(() => setMessage(shown.announcement));
     return () => cancelAnimationFrame(frame);
   }, [shown]);
 
+  // A server view change remounts the view (the keyed wrapper below). When it
+  // brings a key the client switch already showed, the focused h1 was just
+  // replaced: put focus back on the new one, without announcing again.
+  useEffect(() => {
+    const active = document.activeElement;
+    if (active === null || active === document.body)
+      focusHeading(container.current);
+  }, [viewKey]);
+
   return (
     <ViewChangeContext value={announceViewChange}>
       <LiveRegion className="sr-only">{message}</LiveRegion>
-      <div ref={container}>{children}</div>
+      <div ref={container}>
+        {/* Keyed by the server's view, so every view change remounts the
+            view's client islands (tech-design § 2; § 3 rule 11). */}
+        <div key={viewKey}>{children}</div>
+      </div>
     </ViewChangeContext>
   );
 }
