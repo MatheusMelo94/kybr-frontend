@@ -14,12 +14,15 @@ import {
   PUBLIC_LINKS,
   RETRY_AFTER_SECONDS,
   SLOW_LINK_DELAY_MS,
+  FIXED_CASE_CREATED_AT,
   SLUGS,
   UPLOAD_MARKERS,
   buildCompany,
   buildFixedCases,
   buildPublicCase,
+  buildResponsavel,
   caseKindFor,
+  cnpjFor,
   isSlugVariant,
   isValidCnpj,
   maskEmail,
@@ -42,6 +45,8 @@ type Store = {
   cases: Map<string, CaseRecord>;
   idempotency: Map<string, Reply>;
   recoveredLinks: Set<string>;
+  /** tokinstavel-<suffix> tokens that read normally from now on (POST …/cases/:token/recover). */
+  recoveredCases: Set<string>;
   disabledLinks: Set<string>;
   /** The last D3 body per slug, as received (GET /__mock/links/:slug/last-verify). */
   lastVerify: Map<string, JsonBodyType>;
@@ -52,6 +57,7 @@ function createStore(): Store {
     cases: buildFixedCases(),
     idempotency: new Map(),
     recoveredLinks: new Set(),
+    recoveredCases: new Set(),
     disabledLinks: new Set(),
     lastVerify: new Map(),
   };
@@ -72,6 +78,32 @@ export function disableLink(slug: string): void {
 /** S3 → S1: the unstable link starts answering. */
 export function recoverLink(slug: string): void {
   store.recoveredLinks.add(slug);
+}
+
+/**
+ * S12 → a readable case: a per-test tokinstavel-<suffix> token reads as a
+ * settled pending case under `slug` from now on. The fixed S12 token never
+ * recovers.
+ */
+export function recoverCase(slug: string, token: string): void {
+  if (token === CASE_TOKENS.unstable) return;
+  store.recoveredCases.add(token);
+  store.cases.set(token, {
+    slug,
+    kind: "pendente",
+    cnpj: cnpjFor("pendente"),
+    responsavel: buildResponsavel(token),
+    createdAt: Date.parse(FIXED_CASE_CREATED_AT),
+    settled: true,
+    uploads: new Map(),
+  });
+}
+
+/** True while a case read must fail with 500 (S12 and its per-test variants). */
+function isUnstableCase(token: string): boolean {
+  return (
+    token.startsWith(CASE_TOKENS.unstable) && !store.recoveredCases.has(token)
+  );
 }
 
 // --- Responses ----------------------------------------------------------------
@@ -295,7 +327,7 @@ export const sellerLinkHandlers: RequestHandler[] = [
   http.get("*/public/v/:slug/cases/:token", ({ params }) => {
     const slug = String(params.slug);
     const token = String(params.token);
-    if (token === CASE_TOKENS.unstable) return apiError(500, "ERRO_INTERNO");
+    if (isUnstableCase(token)) return apiError(500, "ERRO_INTERNO");
     if (!linkFor(slug)) return apiError(404, "LINK_NAO_ENCONTRADO");
     const record = caseFor(slug, token);
     return record
@@ -420,6 +452,10 @@ export const mockControlHandlers: RequestHandler[] = [
   }),
   http.post("*/__mock/links/:slug/recover", ({ params }) => {
     recoverLink(String(params.slug));
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post("*/__mock/links/:slug/cases/:token/recover", ({ params }) => {
+    recoverCase(String(params.slug), String(params.token));
     return new HttpResponse(null, { status: 204 });
   }),
   http.post("*/__mock/links/:slug/disable", ({ params }) => {

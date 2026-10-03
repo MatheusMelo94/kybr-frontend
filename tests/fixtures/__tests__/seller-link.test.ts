@@ -16,6 +16,7 @@ import {
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 import {
   disableLink,
+  recoverCase,
   recoverLink,
 } from "@/tests/fixtures/msw/handlers/seller-link";
 
@@ -593,6 +594,26 @@ describe("D4 case state", () => {
     );
 
     expectErrorEnvelope(response, body, 404, "CASO_NAO_ENCONTRADO");
+  });
+
+  it("S12: any tokinstavel-<suffix> fails on its own until recovered, then reads as a pending case", async () => {
+    const token = `${CASE_TOKENS.unstable}-a1`;
+    expectErrorEnvelope(
+      (await readCase(token)).response,
+      (await readCase(token)).body,
+      500,
+      "ERRO_INTERNO",
+    );
+
+    recoverCase(SLUGS.ok, token);
+
+    const recovered = await readCase(token);
+    expect(recovered.response.status).toBe(200);
+    expect(recovered.body).toMatchObject({ estado: "pending" });
+    expect((await readCase(`${CASE_TOKENS.unstable}-b2`)).response.status).toBe(
+      500,
+    );
+    expect((await readCase(CASE_TOKENS.unstable)).response.status).toBe(500);
   });
 
   it("S12: 500 when the case read fails", async () => {
