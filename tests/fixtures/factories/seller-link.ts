@@ -30,6 +30,7 @@ export const SLUGS = {
   unstable: "loja-instavel", // S3: 500 until recovered (POST /__mock/links/:slug/recover)
   noAutofill: "loja-sem-autofill", // S19: D2 kill switch, 503 AUTOFILL_DESATIVADO
   slow: "loja-lenta", // D1 answers like S1 after SLOW_LINK_DELAY_MS (skeleton tests)
+  perTest: "loja-teste", // loja-teste-<suffix>: like S1, and disable-able per test
 } as const;
 
 /**

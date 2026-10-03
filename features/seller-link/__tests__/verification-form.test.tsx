@@ -2,14 +2,21 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { lookupCompanyAction } from "@/features/seller-link/actions";
+import {
+  lookupCompanyAction,
+  startVerification,
+} from "@/features/seller-link/actions";
 import { VerificationForm } from "@/features/seller-link/components/verification-form";
 
 vi.mock("@/features/seller-link/actions", () => ({
   lookupCompanyAction: vi.fn(),
+  startVerification: vi.fn(),
 }));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const lookup = vi.mocked(lookupCompanyAction);
+const start = vi.mocked(startVerification);
 const FOUND = {
   ok: true,
   company: {
@@ -34,6 +41,9 @@ function cnpjInput(): HTMLInputElement {
 
 beforeEach(() => {
   lookup.mockReset();
+  start.mockReset();
+  router.push.mockReset();
+  router.refresh.mockReset();
 });
 
 afterEach(() => {
@@ -250,5 +260,186 @@ describe("VerificationForm: name field and submit validation", () => {
     await user.type(nameInput(), "M");
 
     expect(nameInput()).not.toHaveAttribute("aria-invalid");
+  });
+});
+
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const TOKEN = "tokaprovado0000000000000";
+
+async function fillValidForm(
+  user: ReturnType<typeof userEvent.setup>,
+): Promise<void> {
+  await user.type(cnpjInput(), "12abc34501de35");
+  await user.type(nameInput(), "Maria Exemplo");
+}
+
+describe("VerificationForm: submit", () => {
+  beforeEach(() => {
+    lookup.mockResolvedValue({ ok: false, reason: "not_found" });
+  });
+
+  it("AC 12: sends the canonical CNPJ, the name, the passthrough and a UUID key, then opens the case", async () => {
+    const user = userEvent.setup();
+    start.mockResolvedValue({ ok: true, token: TOKEN });
+    render(
+      <VerificationForm
+        slug="loja-exemplo"
+        passthrough={{ ref: "onboarding", ext_id: "SELLER-42" }}
+      />,
+    );
+
+    await fillValidForm(user);
+    await user.click(submit());
+
+    await vi.waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith(`/v/loja-exemplo/c/${TOKEN}`),
+    );
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledWith({
+      slug: "loja-exemplo",
+      idempotencyKey: expect.stringMatching(UUID),
+      cnpj: "12ABC34501DE35",
+      responsavel: "Maria Exemplo",
+      ref: "onboarding",
+      ext_id: "SELLER-42",
+    });
+  });
+
+  it("AC 12: a double tap sends one request, and the button stays busy at its width", async () => {
+    const user = userEvent.setup();
+    const pending = deferred<{ ok: true; token: string }>();
+    start.mockReturnValue(pending.promise);
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await fillValidForm(user);
+    await user.dblClick(submit());
+
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Enviando…" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    await act(async () => pending.resolve({ ok: true, token: TOKEN }));
+  });
+
+  it("AC 13: offline shows the network alert, keeps the values, and retries with the same key", async () => {
+    const user = userEvent.setup();
+    start.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    start.mockResolvedValueOnce({ ok: true, token: TOKEN });
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await fillValidForm(user);
+    await user.click(submit());
+
+    await vi.waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Não conseguimos enviar. Confira sua conexão e tente de novo.",
+      ),
+    );
+    expect(cnpjInput()).toHaveValue("12.ABC.345/01DE-35");
+    expect(nameInput()).toHaveValue("Maria Exemplo");
+
+    await user.click(submit());
+    await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+    const keys = start.mock.calls.map(
+      (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
+    );
+    expect(keys[1]).toBe(keys[0]);
+  });
+
+  it("F17: a changed input gets a new idempotency key", async () => {
+    const user = userEvent.setup();
+    start.mockResolvedValue({ ok: false, reason: "failed" });
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await fillValidForm(user);
+    await user.click(submit());
+    await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+    await user.type(nameInput(), " Silva");
+    await user.click(submit());
+    await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+
+    const keys = start.mock.calls.map(
+      (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
+    );
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  it.each([
+    [
+      "limit_cnpj",
+      "Esse CNPJ já foi verificado várias vezes na última hora. Tente de novo em 9 min.",
+    ],
+    ["limit_generic", "Muitas tentativas seguidas. Tente de novo em 9 min."],
+  ] as const)(
+    "AC 14: %s shows its alert with the minutes from Retry-After",
+    async (reason, message) => {
+      const user = userEvent.setup();
+      start.mockResolvedValue({ ok: false, reason, retryAfterSeconds: 540 });
+      render(<VerificationForm slug="loja-exemplo" />);
+
+      await fillValidForm(user);
+      await user.click(submit());
+
+      await vi.waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent(message),
+      );
+    },
+  );
+
+  it("maps any other failure to the network alert (plan § 1.5)", async () => {
+    const user = userEvent.setup();
+    start.mockResolvedValue({ ok: false, reason: "failed" });
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await fillValidForm(user);
+    await user.click(submit());
+
+    await vi.waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Não conseguimos enviar. Confira sua conexão e tente de novo.",
+      ),
+    );
+  });
+
+  it("AC 14: a link disabled at submit time refreshes the page into Link not found", async () => {
+    const user = userEvent.setup();
+    start.mockResolvedValue({ ok: false, reason: "link_not_found" });
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await fillValidForm(user);
+    await user.click(submit());
+
+    await vi.waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("shows field issues the server found, and focuses the first", async () => {
+    const user = userEvent.setup();
+    start.mockResolvedValue({
+      ok: false,
+      reason: "invalid",
+      fields: { responsavel: "single" },
+    });
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await fillValidForm(user);
+    await user.click(submit());
+
+    await vi.waitFor(() =>
+      expect(nameInput()).toHaveAttribute("aria-invalid", "true"),
+    );
+    expect(nameInput()).toHaveFocus();
+  });
+
+  it("AC 11: sends nothing while a field is invalid", async () => {
+    const user = userEvent.setup();
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await user.type(cnpjInput(), "12ABC");
+    await user.click(submit());
+
+    expect(start).not.toHaveBeenCalled();
   });
 });

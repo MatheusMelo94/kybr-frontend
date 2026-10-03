@@ -13,6 +13,42 @@ export type CnpjIssue = "empty" | "incomplete" | "check_letters" | "invalid";
 export type ResponsavelIssue = "empty" | "single" | "invalid";
 export type EmailIssue = "empty" | "invalid";
 
+const CNPJ_ISSUES: readonly CnpjIssue[] = [
+  "empty",
+  "incomplete",
+  "check_letters",
+  "invalid",
+];
+const RESPONSAVEL_ISSUES: readonly ResponsavelIssue[] = [
+  "empty",
+  "single",
+  "invalid",
+];
+
+/** The first issue per form field, narrowed from the schema's reason codes. */
+export type FieldIssues = {
+  cnpj?: CnpjIssue;
+  responsavel?: ResponsavelIssue;
+};
+
+export function fieldIssues(
+  issues: readonly { path: readonly PropertyKey[]; message: string }[],
+): FieldIssues {
+  const first = <T extends string>(
+    field: string,
+    allowed: readonly T[],
+  ): T | undefined => {
+    const message = issues.find((issue) => issue.path[0] === field)?.message;
+    return allowed.find((reason) => reason === message);
+  };
+  const cnpj = first("cnpj", CNPJ_ISSUES);
+  const responsavel = first("responsavel", RESPONSAVEL_ISSUES);
+  return {
+    ...(cnpj !== undefined && { cnpj }),
+    ...(responsavel !== undefined && { responsavel }),
+  };
+}
+
 /** Threat model F07: a name is at most 120 characters. */
 export const RESPONSAVEL_MAX_LENGTH = 120;
 const PASSTHROUGH_MAX_LENGTH = 256;
@@ -101,6 +137,14 @@ export const verifySchema = z.object({
 });
 
 export type VerifyInput = z.output<typeof verifySchema>;
+
+/** The link's ?ref= and ?ext_id=, for the page to hand to the form. */
+export const passthroughSchema = z.object({
+  ref: passthrough,
+  ext_id: passthrough,
+});
+
+export type Passthrough = z.output<typeof passthroughSchema>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

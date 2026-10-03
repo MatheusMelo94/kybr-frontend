@@ -14,7 +14,10 @@ import {
   type CnpjScenario,
 } from "@/tests/fixtures/factories/seller-link";
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
-import { recoverLink } from "@/tests/fixtures/msw/handlers/seller-link";
+import {
+  disableLink,
+  recoverLink,
+} from "@/tests/fixtures/msw/handlers/seller-link";
 
 // tests/setup.ts runs the MSW server with these handlers for every test file.
 const API = "http://api.kybr.test";
@@ -236,6 +239,27 @@ describe("D1 per-test link variants (parallel-safe E2E keys)", () => {
     expect(body.nome).toEqual(expect.any(String));
     expect(Date.now() - started).toBeGreaterThanOrEqual(
       SLOW_LINK_DELAY_MS - 50,
+    );
+  });
+});
+
+describe("per-test live links (loja-teste-<suffix>) and disabling", () => {
+  it("answers like S1 until disabled, then 404s on D1, D2 and D3", async () => {
+    const slug = `${SLUGS.perTest}-a1`;
+    expect((await call(`/public/v/${slug}`)).response.status).toBe(200);
+
+    disableLink(slug);
+
+    const d1 = await call(`/public/v/${slug}`);
+    expectErrorEnvelope(d1.response, d1.body, 404, "LINK_NAO_ENCONTRADO");
+    const d2 = await call(
+      `/public/v/${slug}/lookup?cnpj=${cnpjFor("aprovado")}`,
+    );
+    expectErrorEnvelope(d2.response, d2.body, 404, "LINK_NAO_ENCONTRADO");
+    const d3 = await verify(cnpjFor("aprovado"), { slug });
+    expectErrorEnvelope(d3.response, d3.body, 404, "LINK_NAO_ENCONTRADO");
+    expect((await call(`/public/v/${SLUGS.perTest}-b2`)).response.status).toBe(
+      200,
     );
   });
 });

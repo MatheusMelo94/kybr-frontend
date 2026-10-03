@@ -42,6 +42,7 @@ type Store = {
   cases: Map<string, CaseRecord>;
   idempotency: Map<string, Reply>;
   recoveredLinks: Set<string>;
+  disabledLinks: Set<string>;
 };
 
 function createStore(): Store {
@@ -49,6 +50,7 @@ function createStore(): Store {
     cases: buildFixedCases(),
     idempotency: new Map(),
     recoveredLinks: new Set(),
+    disabledLinks: new Set(),
   };
 }
 
@@ -57,6 +59,11 @@ let store = createStore();
 /** Back to the starting state: fixed cases only, no uploads, e-mails or idempotency keys. */
 export function resetSellerLinkMock(): void {
   store = createStore();
+}
+
+/** A link disabled mid-journey: D1, D2 and D3 answer 404 LINK_NAO_ENCONTRADO from now on. */
+export function disableLink(slug: string): void {
+  store.disabledLinks.add(slug);
 }
 
 /** S3 → S1: the unstable link starts answering. */
@@ -174,7 +181,9 @@ function isDocumentType(value: unknown): value is DocumentType {
 // --- Handlers -----------------------------------------------------------------
 
 function linkFor(slug: string): PublicLink | undefined {
+  if (store.disabledLinks.has(slug)) return undefined;
   if (isSlugVariant(slug, SLUGS.unstable)) return PUBLIC_LINKS[SLUGS.unstable];
+  if (isSlugVariant(slug, SLUGS.perTest)) return PUBLIC_LINKS[SLUGS.ok];
   if (isSlugVariant(slug, SLUGS.slow)) return PUBLIC_LINKS[SLUGS.ok];
   return PUBLIC_LINKS[slug];
 }
@@ -407,6 +416,10 @@ export const mockControlHandlers: RequestHandler[] = [
   }),
   http.post("*/__mock/links/:slug/recover", ({ params }) => {
     recoverLink(String(params.slug));
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.post("*/__mock/links/:slug/disable", ({ params }) => {
+    disableLink(String(params.slug));
     return new HttpResponse(null, { status: 204 });
   }),
 ];
