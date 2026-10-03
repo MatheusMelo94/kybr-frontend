@@ -36,7 +36,7 @@ export default async function CasePage({
       <CaseContent
         viewKey={view.viewKey}
         publicCase={caseResult.publicCase}
-        marketplace={link.link.nome}
+        link={link.link}
       />
     </div>
   );

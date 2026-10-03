@@ -384,6 +384,23 @@ describe("publicCaseSchema", () => {
       expect(parseMotivo({ codigo: "MEI" })).toEqual({ codigo: "MEI" });
     });
 
+    it("without company data, coerces any reason but GENERICO to GENERICO and logs it (spec v3)", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const parsed = publicCaseSchema.parse({
+        estado: "blocked",
+        criado_em: CREATED,
+        resultado: {
+          responsavel: "Maria Exemplo Silva",
+          variante: "DADOS_NAO_ENCONTRADOS",
+          motivo: { codigo: "MEI" },
+        },
+      });
+
+      expect(parsed.resultado?.motivo).toEqual({ codigo: "GENERICO" });
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(logged(spy)).not.toContain("Maria");
+    });
+
     it.each([
       { codigo: "VEREDITO_NEGATIVO" },
       { codigo: "SITUACAO_IRREGULAR" },

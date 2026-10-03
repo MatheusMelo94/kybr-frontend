@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { JSX } from "react";
 
+import { PRIMARY_ACTION_LINK } from "@/features/seller-link/components/case/action-link-styles";
 import { caseCopy } from "@/features/seller-link/copy/case";
+import { cn } from "@/lib/utils";
 
 // A client leaf only because not-found.tsx gets no params: the slug comes from
 // the URL, which the slug layout already checked against X3.
@@ -15,7 +17,7 @@ export function RestartLink(): JSX.Element {
   return (
     <Link
       href={`/v/${encodeURIComponent(slug)}`}
-      className="mt-3 inline-flex h-12 w-full items-center justify-center rounded-full bg-accent px-6 text-body font-strong text-accent-ink transition-colors duration-(--duration-fast) ease-out-quart hover:bg-accent/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:bg-accent/80 motion-reduce:transition-none"
+      className={cn("mt-3", PRIMARY_ACTION_LINK)}
     >
       {caseCopy["casenotfound.cta"]}
     </Link>

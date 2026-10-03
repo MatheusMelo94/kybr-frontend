@@ -1,17 +1,21 @@
 import type { JSX } from "react";
 
 import { ApprovedView } from "@/features/seller-link/components/case/approved-view";
-import { blockedCopy } from "@/features/seller-link/copy/blocked";
+import { BlockedView } from "@/features/seller-link/components/case/blocked-view";
 import { caseCopy } from "@/features/seller-link/copy/case";
 import { pendingCopy } from "@/features/seller-link/copy/pending";
 import type { CaseViewKey } from "@/features/seller-link/types";
-import type { CaseResult, PublicCase } from "@/lib/api/schemas/public-link";
+import type {
+  CaseResult,
+  PublicCase,
+  PublicLink,
+} from "@/lib/api/schemas/public-link";
 
 type Props = {
   viewKey: CaseViewKey;
   publicCase: PublicCase;
-  /** The workspace name from D1. */
-  marketplace: string;
+  /** The link info from D1: the workspace name and the seller contact. */
+  link: PublicLink;
 };
 
 /**
@@ -25,11 +29,7 @@ function resultOf(publicCase: PublicCase): CaseResult {
 }
 
 /** The case page's view for `viewKey` (plan § 3, case page). */
-export function CaseContent({
-  viewKey,
-  publicCase,
-  marketplace,
-}: Props): JSX.Element {
+export function CaseContent({ viewKey, publicCase, link }: Props): JSX.Element {
   switch (viewKey) {
     case "verifying":
       return (
@@ -44,7 +44,7 @@ export function CaseContent({
       return (
         <ApprovedView
           resultado={resultOf(publicCase)}
-          marketplace={marketplace}
+          marketplace={link.nome}
         />
       );
     case "pending":
@@ -53,7 +53,11 @@ export function CaseContent({
       );
     case "blocked":
       return (
-        <h1 className="text-title font-title">{blockedCopy["blocked.h1"]}</h1>
+        <BlockedView
+          resultado={resultOf(publicCase)}
+          marketplace={link.nome}
+          contact={link.contato_vendedor}
+        />
       );
   }
 }

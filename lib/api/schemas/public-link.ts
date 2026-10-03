@@ -201,7 +201,8 @@ const isoDateTime = z.iso.datetime({ offset: true });
  * The seller-facing `resultado` (spec v3 § Data Dependencies). `razao_social`
  * and `consultado_em` may be absent only with DADOS_NAO_ENCONTRADOS; otherwise
  * a missing one fails the parse (INVALID_RESPONSE). Any CPF left in the name
- * is masked, as on D2 (contract X7).
+ * is masked, as on D2 (contract X7). Without company data, a reason other than
+ * GENERICO is coerced to GENERICO and logged.
  */
 const resultadoSchema = z
   .object({
@@ -225,6 +226,19 @@ const resultadoSchema = z
           message: "Required without DADOS_NAO_ENCONTRADOS",
         });
     }
+  })
+  .transform((resultado) => {
+    // Every reason but GENERICO comes from a check that needs company data,
+    // so without a razao_social only GENERICO can show (spec v3).
+    const { motivo } = resultado;
+    if (
+      resultado.razao_social !== undefined ||
+      motivo === undefined ||
+      motivo.codigo === "GENERICO"
+    )
+      return resultado;
+    logDropped("motivo", [{ path: ["motivo", "codigo"], code: "custom" }]);
+    return { ...resultado, motivo: { codigo: "GENERICO" as const } };
   });
 
 /**
