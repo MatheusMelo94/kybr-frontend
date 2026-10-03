@@ -18,6 +18,7 @@ page_path="${SMOKE_PAGE_PATH:-/v/loja-exemplo}"
 
 fetch() {
   # $1: curl mode flags, $2: path
+  # shellcheck disable=SC2086 # $1 is a space-separated list of curl flags
   if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
     curl --silent --show-error --max-time 30 $1 \
       -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
@@ -38,7 +39,7 @@ health_status=$(fetch "--output /dev/null --write-out %{http_code}" /api/health)
 [ "$health_status" = "200" ] || fail "/api/health answered ${health_status}, not 200"
 
 echo "Smoke: security headers on ${base}${page_path}"
-headers=$(fetch "--dump-header - --output /dev/null" "$page_path" | tr -d '\r' | tr 'A-Z' 'a-z')
+headers=$(fetch "--dump-header - --output /dev/null" "$page_path" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
 
 expect_header() {
   # $1: lower-case "name: value" fragment that must be present
