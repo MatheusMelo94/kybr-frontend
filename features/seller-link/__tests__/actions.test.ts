@@ -6,10 +6,13 @@ import { revalidateTag } from "next/cache";
 
 import {
   lookupCompanyAction,
+  pollCaseViewAction,
   startVerification,
 } from "@/features/seller-link/actions";
+import { disableLink } from "@/tests/fixtures/msw/handlers/seller-link";
 import { server } from "@/tests/fixtures/msw/server";
 import {
+  CASE_TOKENS,
   MEI_CNPJS,
   SLUGS,
   cnpjFor,
@@ -199,12 +202,58 @@ describe("startVerification (D3 write)", () => {
     });
   });
 
-  it("AC 14: a link disabled at submit time is link_not_found, and its cached info is invalidated", async () => {
+  it("AC 14: a link disabled after its info was cached as live is link_not_found, and that cached info is purged", async () => {
+    vi.mocked(revalidateTag).mockClear();
+    // D1 still says live (as the 60 s cache would); D3 says the link is gone.
+    server.use(
+      http.post("http://api.kybr.test/public/v/:slug/verify", () =>
+        HttpResponse.json(
+          { code: "LINK_NAO_ENCONTRADO", message: "x" },
+          { status: 404 },
+        ),
+      ),
+    );
+
+    expect(await startVerification(input)).toEqual({
+      ok: false,
+      reason: "link_not_found",
+    });
+    expect(revalidateTag).toHaveBeenCalledWith(`public-link:${SLUGS.ok}`);
+  });
+
+  it("M2-07: an unknown slug is link_not_found with no purge (nothing cached as live)", async () => {
+    vi.mocked(revalidateTag).mockClear();
+
     expect(await startVerification({ ...input, slug: SLUGS.unknown })).toEqual({
       ok: false,
       reason: "link_not_found",
     });
-    expect(revalidateTag).toHaveBeenCalledWith(`public-link:${SLUGS.unknown}`);
+    expect(revalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("M2-07: no purge when the link info can't be read either", async () => {
+    vi.mocked(revalidateTag).mockClear();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    server.use(
+      http.post("http://api.kybr.test/public/v/:slug/verify", () =>
+        HttpResponse.json(
+          { code: "LINK_NAO_ENCONTRADO", message: "x" },
+          { status: 404 },
+        ),
+      ),
+      http.get("http://api.kybr.test/public/v/:slug", () =>
+        HttpResponse.json(
+          { code: "ERRO_INTERNO", message: "x" },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    expect(await startVerification(input)).toEqual({
+      ok: false,
+      reason: "link_not_found",
+    });
+    expect(revalidateTag).not.toHaveBeenCalled();
   });
 
   it("a malformed slug is link_not_found with no API call", async () => {
@@ -242,6 +291,135 @@ describe("startVerification (D3 write)", () => {
     );
 
     expect(await startVerification(input)).toEqual({
+      ok: false,
+      reason: "failed",
+    });
+  });
+});
+
+describe("pollCaseViewAction (read-only, ADR-0004a)", () => {
+  it.each([
+    [CASE_TOKENS.aprovado, "approved"],
+    [CASE_TOKENS.pendente, "pending"],
+    [CASE_TOKENS.bloqueado, "blocked"],
+    [CASE_TOKENS.processing, "analysis-timeout"],
+    [CASE_TOKENS.semDados, "analysis-notfound"],
+  ])("returns only the view key for %s (%s)", async (token, viewKey) => {
+    expect(await pollCaseViewAction(SLUGS.ok, token)).toEqual({
+      ok: true,
+      viewKey,
+    });
+  });
+
+  it("derives verificando with the same rules as the page, from the server clock", async () => {
+    const created = await fetch(
+      "http://api.kybr.test/public/v/loja-exemplo/verify",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          cnpj: cnpjFor("lento"),
+          responsavel: "Maria Exemplo Silva",
+        }),
+      },
+    );
+    const { token } = (await created.json()) as { token: string };
+
+    expect(await pollCaseViewAction(SLUGS.ok, token)).toEqual({
+      ok: true,
+      viewKey: "verifying",
+    });
+  });
+
+  it("sends the client IP and gives up after 4 s (status checks, plan § 4)", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const seen: Request[] = [];
+    server.events.on("request:start", ({ request }) => {
+      seen.push(request.clone());
+    });
+
+    await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.aprovado);
+
+    expect(timeout).toHaveBeenCalledWith(4_000);
+    expect(seen[0]?.headers.get("x-kybr-client-ip")).toBe("203.0.113.7");
+    server.events.removeAllListeners();
+  });
+
+  it.each([
+    ["an unknown token", SLUGS.ok, CASE_TOKENS.unknown],
+    ["a token from another slug", SLUGS.other, CASE_TOKENS.aprovado],
+  ])(
+    "%s is not_found (the page then shows Case not found)",
+    async (_name, slug, token) => {
+      expect(await pollCaseViewAction(slug, token)).toEqual({
+        ok: false,
+        reason: "not_found",
+      });
+    },
+  );
+
+  it.each([
+    ["a malformed token", SLUGS.ok, "../../x"],
+    ["a non-string slug", 42, CASE_TOKENS.aprovado],
+    ["a missing token", SLUGS.ok, undefined],
+  ])("rejects %s before any API call", async (_name, slug, token) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    expect(await pollCaseViewAction(slug, token)).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("Q3 / M2-07: a link disabled while the case is open is not_found, with no cache purge (the page decides Link not found from D4)", async () => {
+    vi.mocked(revalidateTag).mockClear();
+    disableLink(SLUGS.ok);
+
+    expect(await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.aprovado)).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+    expect(revalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("M2-07: an unknown slug never reaches revalidateTag (no purge, no re-render of the posting route)", async () => {
+    vi.mocked(revalidateTag).mockClear();
+
+    await pollCaseViewAction("loja-aleatoria-x9", CASE_TOKENS.aprovado);
+
+    expect(revalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("an unknown token leaves the link's cached info alone", async () => {
+    vi.mocked(revalidateTag).mockClear();
+
+    await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.unknown);
+
+    expect(revalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("S12: a 5xx is a failed check, never a throw", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.unstable)).toEqual({
+      ok: false,
+      reason: "failed",
+    });
+  });
+
+  it("a response that breaks the schema is a failed check, never a throw", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    server.use(
+      http.get("http://api.kybr.test/public/v/:slug/cases/:token", () =>
+        HttpResponse.json({ estado: "approved" }),
+      ),
+    );
+
+    expect(await pollCaseViewAction(SLUGS.ok, CASE_TOKENS.aprovado)).toEqual({
       ok: false,
       reason: "failed",
     });

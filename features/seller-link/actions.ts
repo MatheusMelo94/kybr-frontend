@@ -3,14 +3,20 @@
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
 
-import type { CompanySummary } from "@/features/seller-link/types";
+import { deriveCaseView } from "@/features/seller-link/case-view";
+import type { CaseViewKey, CompanySummary } from "@/features/seller-link/types";
 import {
   fieldIssues,
   verifySchema,
   type FieldIssues,
 } from "@/features/seller-link/schemas";
-import { isValidSlug } from "@/lib/api/path";
-import { createVerification, lookupCompany } from "@/lib/api/public-link";
+import { isValidSlug, isValidToken } from "@/lib/api/path";
+import {
+  createVerification,
+  getPublicCase,
+  getPublicLink,
+  lookupCompany,
+} from "@/lib/api/public-link";
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 
 // Server Actions are public POST endpoints (frontend-security-conventions.md
@@ -83,6 +89,18 @@ export type StartVerificationResult =
   | { ok: false; reason: "failed" };
 
 /**
+ * Whether D1 says the link is live. It's the page's cached read (60 s), so
+ * for a slug whose form just loaded it costs no API call.
+ */
+async function isCachedAsLive(slug: string): Promise<boolean> {
+  try {
+    return (await getPublicLink(slug)).ok;
+  } catch {
+    return false; // getPublicLink logged it
+  }
+}
+
+/**
  * Starts a verification (contract D3). It re-validates every field with the
  * schema the form uses (the CNPJ through lib/cnpj), never trusts the client's
  * props, and returns a result union. It never throws for an expected failure,
@@ -108,9 +126,11 @@ export async function startVerification(
   if (result.ok) return { ok: true, token: result.token };
   switch (result.reason) {
     case "link_not_found":
-      // The link was disabled after the form loaded. Drop its cached info
-      // (60 s), so the page re-renders as Link not found (AC 14).
-      revalidateTag(`public-link:${slug}`);
+      // The link was disabled after the form loaded. If its info is cached as
+      // live (60 s), drop it, so the page re-renders as Link not found
+      // (AC 14). An unknown slug has nothing stale to purge, so it never
+      // reaches revalidateTag (security finding M2-07).
+      if (await isCachedAsLive(slug)) revalidateTag(`public-link:${slug}`);
       return { ok: false, reason: "link_not_found" };
     case "invalid_field":
       return {
@@ -127,5 +147,52 @@ export async function startVerification(
       };
     case "failed":
       return { ok: false, reason: "failed" };
+  }
+}
+
+const caseArgsSchema = z.object({
+  slug: z.string().refine(isValidSlug),
+  token: z.string().refine(isValidToken),
+});
+
+// Half the page read's 8 s: a late check is simply replaced by the next one
+// (plan § 4).
+const STATUS_CHECK_TIMEOUT_MS = 4_000;
+
+export type PollCaseViewResult =
+  | { ok: true; viewKey: CaseViewKey }
+  | { ok: false; reason: "not_found" | "failed" };
+
+/**
+ * Read-only status check for the case page (ADR-0004a; tech-design § 3 rule
+ * 1): called by CaseLiveStatus on a timer. It returns only the view key,
+ * derived by the same function and clock as the page, never the case itself.
+ * An unknown, foreign or malformed token is `not_found` (the page then
+ * refreshes to Case not found). Any other failure is `failed`, never a throw:
+ * a thrown action reaches the client as a network failure.
+ */
+export async function pollCaseViewAction(
+  slug: unknown,
+  token: unknown,
+): Promise<PollCaseViewResult> {
+  const args = caseArgsSchema.safeParse({ slug, token });
+  if (!args.success) return { ok: false, reason: "not_found" };
+
+  try {
+    const result = await getPublicCase(args.data.slug, args.data.token, {
+      timeoutMs: STATUS_CHECK_TIMEOUT_MS,
+    });
+    // An unknown or disabled link is not_found too. No cache purge here: the
+    // page renders Link not found from D4's answer whatever the cached D1
+    // says, and a purge would let any random slug cost extra backend calls
+    // and a re-render (security finding M2-07).
+    if (!result.ok) return { ok: false, reason: "not_found" };
+    return {
+      ok: true,
+      viewKey: deriveCaseView(result.publicCase, Date.now()).viewKey,
+    };
+  } catch {
+    // getPublicCase already logged it, by shape (5xx, timeout, bad response).
+    return { ok: false, reason: "failed" };
   }
 }

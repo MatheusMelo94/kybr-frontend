@@ -26,6 +26,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/eslintrc": "^3.3.7",
     "@faker-js/faker": "^10.6.0",
     "@mswjs/http-middleware": "^0.10.3",

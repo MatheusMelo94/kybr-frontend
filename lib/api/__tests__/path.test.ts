@@ -50,6 +50,31 @@ describe("apiPaths", () => {
       "Refused API path segment",
     );
   });
+
+  it("builds the D4 path from a valid slug and token", () => {
+    expect(
+      apiPaths.publicCase("loja-exemplo", "tokaprovado0000000000000"),
+    ).toBe("/public/v/loja-exemplo/cases/tokaprovado0000000000000");
+  });
+
+  it.each([
+    "short",
+    "tok/../../00000000000000",
+    "tok%2e%2e0000000000000000",
+    "tokaprovado00000000000?x=1",
+    "tokaprovado00000000000#x",
+    "",
+  ])("throws for the token %j before the D4 path is built", (token) => {
+    expect(() => apiPaths.publicCase("loja-exemplo", token)).toThrow(
+      "Refused API path segment",
+    );
+  });
+
+  it("throws for a malformed slug before the D4 path is built", () => {
+    expect(() =>
+      apiPaths.publicCase("../x", "tokaprovado0000000000000"),
+    ).toThrow("Refused API path segment");
+  });
 });
 
 describe("X3 identifier checks", () => {

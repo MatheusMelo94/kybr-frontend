@@ -38,4 +38,7 @@ export const apiPaths = {
   },
   /** D3: start a verification. */
   verify: (slug: string): string => `/public/v/${slugSegment(slug)}/verify`,
+  /** D4: a case's state and seller-facing result. */
+  publicCase: (slug: string, token: string): string =>
+    `/public/v/${slugSegment(slug)}/cases/${segment("token", token, TOKEN_PATTERN)}`,
 };

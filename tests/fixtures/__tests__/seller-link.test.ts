@@ -2,7 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CASE_PRESETS,
   CASE_TOKENS,
+  DOCUMENT_TYPES,
   ERROR_SENTINEL,
   SLUGS,
   UPLOAD_MARKERS,
@@ -16,8 +18,11 @@ import {
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 import {
   disableLink,
+  mockControlHandlers,
+  recoverCase,
   recoverLink,
 } from "@/tests/fixtures/msw/handlers/seller-link";
+import { server } from "@/tests/fixtures/msw/server";
 
 // tests/setup.ts runs the MSW server with these handlers for every test file.
 const API = "http://api.kybr.test";
@@ -485,6 +490,28 @@ describe("D4 case state", () => {
     });
   });
 
+  it("S5 / S6: regularization URLs are https: on gov.br (contract X4, F14)", async () => {
+    const pending = (await readCase(CASE_TOKENS.pendente)).body as {
+      resultado: { itens: { url_regularizacao?: string }[] };
+    };
+    const blocked = (await readCase(CASE_TOKENS.bloqueado)).body as {
+      resultado: { motivo: { url_regularizacao: string } };
+    };
+    const urls = [
+      ...pending.resultado.itens.flatMap((item) =>
+        item.url_regularizacao === undefined ? [] : [item.url_regularizacao],
+      ),
+      blocked.resultado.motivo.url_regularizacao,
+    ];
+
+    expect(urls.length).toBeGreaterThan(1);
+    for (const url of urls) {
+      const { protocol, hostname } = new URL(url);
+      expect(protocol).toBe("https:");
+      expect(hostname === "gov.br" || hostname.endsWith(".gov.br")).toBe(true);
+    }
+  });
+
   it("S6: blocked, inapta, with an https regularization URL", async () => {
     const { body } = await readCase(CASE_TOKENS.bloqueado);
 
@@ -500,7 +527,7 @@ describe("D4 case state", () => {
     });
   });
 
-  it("S7: verify accepted, processing with the DADOS_NAO_ENCONTRADOS variant right away", async () => {
+  it("S7: verify accepted, processing with the DADOS_NAO_ENCONTRADOS variant right away, with no company data", async () => {
     const token = await createCase("sem-dados");
 
     const { body } = await readCase(token);
@@ -508,6 +535,50 @@ describe("D4 case state", () => {
     expect(body).toMatchObject({
       estado: "processing",
       resultado: { variante: "DADOS_NAO_ENCONTRADOS" },
+    });
+    expect(body.resultado).not.toHaveProperty("razao_social");
+    expect(body.resultado).not.toHaveProperty("consultado_em");
+  });
+
+  it("S7: a document requested by Renata → pending with the item and no company data", async () => {
+    const { body } = await readCase(CASE_TOKENS.semDadosDocumento);
+
+    expect(body).toMatchObject({
+      estado: "pending",
+      resultado: {
+        variante: "DADOS_NAO_ENCONTRADOS",
+        responsavel: expect.any(String),
+        prazo_revisao: expect.any(String),
+        itens: [
+          {
+            codigo: "DOCUMENTO_SOLICITADO",
+            documento_tipo: "CONTRATO_SOCIAL_OU_CCMEI",
+            documentos_enviados: 0,
+          },
+        ],
+      },
+    });
+    expect(body.resultado).not.toHaveProperty("razao_social");
+    expect(body.resultado).not.toHaveProperty("consultado_em");
+  });
+
+  it("S7: the same case approved → approved without razao_social or consultado_em", async () => {
+    const { body } = await readCase(CASE_TOKENS.semDadosAprovado);
+
+    expect(body).toMatchObject({
+      estado: "approved",
+      resultado: { variante: "DADOS_NAO_ENCONTRADOS" },
+    });
+    expect(body.resultado).not.toHaveProperty("razao_social");
+    expect(body.resultado).not.toHaveProperty("consultado_em");
+  });
+
+  it("S10 (held): a fixed case still processing long past the 10 s switch, with no result yet", async () => {
+    const { body } = await readCase(CASE_TOKENS.processing);
+
+    expect(body).toEqual({
+      estado: "processing",
+      criado_em: "2026-10-01T12:00:00.000Z",
     });
   });
 
@@ -536,6 +607,42 @@ describe("D4 case state", () => {
     );
 
     expectErrorEnvelope(response, body, 404, "CASO_NAO_ENCONTRADO");
+  });
+
+  it("S12: any tokinstavel-<suffix> fails on its own until recovered, then reads as a pending case", async () => {
+    const token = `${CASE_TOKENS.unstable}-a1`;
+    expectErrorEnvelope(
+      (await readCase(token)).response,
+      (await readCase(token)).body,
+      500,
+      "ERRO_INTERNO",
+    );
+
+    recoverCase(SLUGS.ok, token);
+
+    const recovered = await readCase(token);
+    expect(recovered.response.status).toBe(200);
+    expect(recovered.body).toMatchObject({ estado: "pending" });
+    expect((await readCase(`${CASE_TOKENS.unstable}-b2`)).response.status).toBe(
+      500,
+    );
+    expect((await readCase(CASE_TOKENS.unstable)).response.status).toBe(500);
+  });
+
+  it("the recover control acts only on tokinstavel-<suffix> tokens, and answers 404 otherwise (review 0013)", async () => {
+    server.use(...mockControlHandlers);
+    const recover = (token: string): Promise<Response> =>
+      fetch(`${API}/__mock/links/${SLUGS.ok}/cases/${token}/recover`, {
+        method: "POST",
+      });
+
+    expect(recoverCase(SLUGS.ok, "tokqualquer0000000000000")).toBe(false);
+    expect((await recover("tokqualquer0000000000000")).status).toBe(404);
+    expect((await readCase("tokqualquer0000000000000")).response.status).toBe(
+      404,
+    );
+    expect((await recover(CASE_TOKENS.unstable)).status).toBe(404);
+    expect((await recover(`${CASE_TOKENS.unstable}-c3`)).status).toBe(204);
   });
 
   it("S12: 500 when the case read fails", async () => {
@@ -813,4 +920,233 @@ describe("mock state", () => {
     });
     expect((body.resultado as Json).email_contato_mascarado).toBeUndefined();
   });
+});
+
+describe("per-test case controls (QA test plan G1–G6)", () => {
+  // The controls are served by the HTTP mock API only; here they join the
+  // Vitest server for this block.
+  function useControls(): void {
+    server.use(...mockControlHandlers);
+  }
+
+  async function control(
+    path: string,
+    init: { method: string; body?: unknown },
+  ): Promise<{ response: Response; body: Json }> {
+    return call(path, {
+      method: init.method,
+      ...(init.body !== undefined && {
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init.body),
+      }),
+    });
+  }
+
+  async function newCase(body: Record<string, unknown> = {}): Promise<string> {
+    const { response, body: created } = await control("/__mock/cases", {
+      method: "POST",
+      body,
+    });
+    expect(response.status).toBe(201);
+    return String(created.token);
+  }
+
+  it("G1/G3: creates a held case with an X3 token, backdated by ageMs, that stays processing", async () => {
+    useControls();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-03T12:00:00Z"));
+
+    const token = await newCase({ ageMs: 9_000 });
+
+    expect(token).toMatch(TOKEN_PATTERN);
+    vi.setSystemTime(new Date("2026-10-03T13:00:00Z"));
+    expect((await readCase(token)).body).toEqual({
+      estado: "processing",
+      criado_em: "2026-10-03T11:59:51.000Z",
+    });
+  });
+
+  it("G1: creates a case on another slug, from a kind, with a given CNPJ and name", async () => {
+    useControls();
+    const token = await newCase({
+      slug: SLUGS.other,
+      kind: "aprovado",
+      ageMs: 60_000,
+      cnpj: MEI_CNPJS.unmasked,
+      responsavel: "Joana Exemplo",
+    });
+
+    expect((await readCase(token, SLUGS.other)).body).toMatchObject({
+      estado: "approved",
+      resultado: {
+        razao_social: "JOAO CARLOS SILVA 12345678909",
+        responsavel: "Joana Exemplo",
+      },
+    });
+    expect((await readCase(token)).response.status).toBe(404);
+  });
+
+  it("G1/G8/G10–G12: serves an explicit estado + resultado verbatim (the presets)", async () => {
+    useControls();
+    const token = await newCase(CASE_PRESETS.approvedSubset);
+
+    expect((await readCase(token)).body).toMatchObject(
+      CASE_PRESETS.approvedSubset,
+    );
+  });
+
+  it("G2: changes a case's state, then deletes it", async () => {
+    useControls();
+    const token = await newCase();
+
+    await control(`/__mock/cases/${token}/state`, {
+      method: "POST",
+      body: { kind: "aprovado" },
+    });
+    expect((await readCase(token)).body.estado).toBe("approved");
+
+    await control(`/__mock/cases/${token}/state`, {
+      method: "POST",
+      body: CASE_PRESETS.blockedNoData,
+    });
+    expect((await readCase(token)).body).toMatchObject(
+      CASE_PRESETS.blockedNoData,
+    );
+
+    await control(`/__mock/cases/${token}`, { method: "DELETE" });
+    expectErrorEnvelope(
+      (await readCase(token)).response,
+      (await readCase(token)).body,
+      404,
+      "CASO_NAO_ENCONTRADO",
+    );
+  });
+
+  it("G4: fails the next n reads with the given status, then reads normally", async () => {
+    useControls();
+    const token = await newCase();
+
+    await control(`/__mock/cases/${token}/fail`, {
+      method: "POST",
+      body: { status: 503, times: 2 },
+    });
+
+    const first = await readCase(token);
+    expectErrorEnvelope(first.response, first.body, 503, "ERRO_INTERNO");
+    expect((await readCase(token)).response.status).toBe(503);
+    expect((await readCase(token)).response.status).toBe(200);
+  });
+
+  it("G5: delays every read of a case", async () => {
+    useControls();
+    const token = await newCase();
+    await control(`/__mock/cases/${token}/delay`, {
+      method: "POST",
+      body: { ms: 300 },
+    });
+
+    const started = Date.now();
+    await readCase(token);
+
+    expect(Date.now() - started).toBeGreaterThanOrEqual(290);
+  });
+
+  it("G6: counts D4 reads per token string, including failed and unknown ones", async () => {
+    useControls();
+    const token = await newCase();
+    await readCase(token);
+    await readCase(token);
+    await readCase(CASE_TOKENS.unknown);
+
+    const reads = async (t: string): Promise<unknown> =>
+      (await control(`/__mock/cases/${t}/reads`, { method: "GET" })).body;
+
+    expect(await reads(token)).toEqual({ reads: 2 });
+    expect(await reads(CASE_TOKENS.unknown)).toEqual({ reads: 1 });
+    expect(await reads("curto")).toEqual({ reads: 0 });
+  });
+
+  it("rejects a body it can't use, without creating anything", async () => {
+    useControls();
+    const { response } = await control("/__mock/cases", {
+      method: "POST",
+      body: { kind: "inexistente" },
+    });
+
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("case presets (QA test plan G8, G10–G12)", () => {
+  it("G8: no-data variants never carry razao_social or consultado_em", () => {
+    for (const preset of [
+      CASE_PRESETS.pendingNoItemsNoData,
+      CASE_PRESETS.approvedNoDataOneRow,
+      CASE_PRESETS.blockedNoData,
+      CASE_PRESETS.blockedNoDataNonGenerico,
+    ]) {
+      expect(preset.resultado).toMatchObject({
+        variante: "DADOS_NAO_ENCONTRADOS",
+      });
+      expect(preset.resultado).not.toHaveProperty("razao_social");
+      expect(preset.resultado).not.toHaveProperty("consultado_em");
+    }
+    expect(CASE_PRESETS.blockedNoDataNonGenerico.resultado.motivo).not.toEqual({
+      codigo: "GENERICO",
+    });
+  });
+
+  it("G10: the pending catalogue has every item code and every documento_tipo", () => {
+    const itens = CASE_PRESETS.pendingCatalogue.resultado.itens;
+    const codes = new Set(itens.map((item) => item.codigo));
+    const tipos = new Set(itens.flatMap((item) => item.documento_tipo ?? []));
+
+    expect(codes).toEqual(
+      new Set([
+        "DOCUMENTO_RESPONSAVEL",
+        "DOCUMENTO_SOLICITADO",
+        "IE_NAO_ENCONTRADA",
+        "IE_SUSPENSA",
+        "SITUACAO_IRREGULAR",
+        "ATIVIDADE_FORA_DA_CATEGORIA",
+        "EMPRESA_RECENTE",
+        "MEI",
+      ]),
+    );
+    expect(tipos).toEqual(new Set(DOCUMENT_TYPES));
+  });
+
+  it("G11: a blocked preset per motivo code, with and without a URL, plus an unknown code", () => {
+    expect(Object.keys(CASE_PRESETS.blocked).sort()).toEqual(
+      [
+        "ATIVIDADE_FORA_DA_CATEGORIA",
+        "DESCONHECIDO",
+        "EMPRESA_RECENTE",
+        "GENERICO",
+        "IE_NAO_ENCONTRADA",
+        "IE_NAO_ENCONTRADA_SEM_URL",
+        "IE_SUSPENSA",
+        "MEI",
+        "RESPONSAVEL_NAO_SOCIO",
+        "SITUACAO_IRREGULAR",
+        "SITUACAO_IRREGULAR_SEM_URL",
+      ].sort(),
+    );
+  });
+
+  it("G12: the approved subset returns two rows, out of spec order", () => {
+    expect(CASE_PRESETS.approvedSubset.resultado.confirmacoes).toEqual([
+      { codigo: "RESPONSAVEL_CONFERE" },
+      { codigo: "SITUACAO_ATIVA" },
+    ]);
+  });
+
+  it.each(["pendingCatalogue", "approvedSubset"] as const)(
+    "every regularization URL in %s is on gov.br",
+    (name) => {
+      const json = JSON.stringify(CASE_PRESETS[name]);
+      for (const [, url] of json.matchAll(/"url_regularizacao":"([^"]+)"/g))
+        expect(new URL(url ?? "").hostname).toMatch(/(^|\.)gov\.br$/);
+    },
+  );
 });

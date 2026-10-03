@@ -4,16 +4,18 @@ import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 
 import { apiRequest } from "./client";
 import type { AppError } from "./errors";
-import { apiPaths, isValidSlug } from "./path";
+import { apiPaths, isValidSlug, isValidToken } from "./path";
 import {
   companyLookupSchema,
+  publicCaseSchema,
   publicLinkSchema,
   verificationSchema,
   type CompanyLookup,
+  type PublicCase,
   type PublicLink,
 } from "./schemas/public-link";
 
-// Data functions for the seller link (contract D1–D3). There's no session: the
+// Data functions for the seller link (contract D1–D4). There's no session: the
 // slug and the token are the access, so every parameter is validated before an
 // API call (plan § 4), and paths come only from lib/api/path.ts (F01).
 
@@ -156,4 +158,40 @@ export async function createVerification(
       logUnexpected("createVerification", result.error);
       return { ok: false, reason: "failed" };
   }
+}
+
+export type PublicCaseResult =
+  | { ok: true; publicCase: PublicCase }
+  | { ok: false; reason: "not_found" | "link_not_found" };
+
+/**
+ * D4. Personal and live: no-store, with the client IP. An unknown token, a
+ * token from another slug and a malformed slug or token are all the same
+ * not-found, so nothing leaks whether a case exists (SEC § Error Responses).
+ * An unknown or disabled link is link_not_found (QA plan Q3). A 5xx or a response that breaks the schema throws, for the case
+ * route's error boundary. Status checks pass a shorter `timeoutMs`.
+ */
+export async function getPublicCase(
+  slug: string,
+  token: string,
+  options: { timeoutMs?: number } = {},
+): Promise<PublicCaseResult> {
+  if (!isValidSlug(slug) || !isValidToken(token))
+    return { ok: false, reason: "not_found" };
+  const result = await apiRequest({
+    operation: "getPublicCase",
+    path: apiPaths.publicCase(slug, token),
+    schema: publicCaseSchema,
+    cache: "no-store",
+    forwardClientIp: true,
+    ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
+  });
+  if (result.ok) return { ok: true, publicCase: result.data };
+  if (result.error.code === "CASO_NAO_ENCONTRADO")
+    return { ok: false, reason: "not_found" };
+  // The link itself is unknown or was disabled: Link not found (Q3).
+  if (result.error.code === "LINK_NAO_ENCONTRADO")
+    return { ok: false, reason: "link_not_found" };
+  logUnexpected("getPublicCase", result.error);
+  throw result.error;
 }
