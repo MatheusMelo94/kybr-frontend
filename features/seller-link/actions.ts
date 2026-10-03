@@ -3,7 +3,7 @@
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
 
-import type { CompanySummary } from "@/features/seller-link/components/company-block";
+import type { CompanySummary } from "@/features/seller-link/types";
 import {
   fieldIssues,
   verifySchema,

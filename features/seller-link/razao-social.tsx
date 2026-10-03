@@ -9,8 +9,12 @@ import { CPF_MASK, maskCpf } from "@/lib/cpf";
 // asterisks, and masked again here as the last backstop. Reused by the company
 // block (T16) and the result views (T21–T23).
 
+type Props = {
+  value: string;
+};
+
 /** The name with each masked CPF aria-hidden and read as "CPF oculto". */
-export function RazaoSocial({ value }: { value: string }): JSX.Element {
+export function RazaoSocial({ value }: Props): JSX.Element {
   const parts = maskCpf(value).split(CPF_MASK);
   if (parts.length === 1) return <>{parts[0]}</>;
   return (

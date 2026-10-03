@@ -19,13 +19,11 @@ import {
   type StartVerificationResult,
 } from "@/features/seller-link/actions";
 import { CnpjField } from "@/features/seller-link/components/cnpj-field";
-import {
-  CompanyBlock,
-  type CompanyBlockState,
-} from "@/features/seller-link/components/company-block";
+import { CompanyBlock } from "@/features/seller-link/components/company-block";
 import { formCopy } from "@/features/seller-link/copy/form";
 import { fill, minutosFromSeconds } from "@/features/seller-link/format";
 import { razaoSocialText } from "@/features/seller-link/razao-social";
+import type { CompanyBlockState } from "@/features/seller-link/types";
 import {
   RESPONSAVEL_MAX_LENGTH,
   fieldIssues,

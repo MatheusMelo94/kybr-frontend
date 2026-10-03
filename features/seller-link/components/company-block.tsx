@@ -4,22 +4,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formCopy } from "@/features/seller-link/copy/form";
 import { fill } from "@/features/seller-link/format";
 import { RazaoSocial } from "@/features/seller-link/razao-social";
+import type { CompanyBlockState } from "@/features/seller-link/types";
 import { cn } from "@/lib/utils";
 
-/** The company block's projection: never a street address (U-E, spec v3). */
-export type CompanySummary = {
-  razaoSocial: string;
-  atividade: string;
-  municipio: string;
-  uf: string;
+type Props = {
+  state: CompanyBlockState;
 };
-
-export type CompanyBlockState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "found"; company: CompanySummary }
-  | { status: "not_found" }
-  | { status: "failed" };
 
 // One minimum height for every state, so a result never shifts the form
 // (design-conventions.md § Screen States Matrix; review M1 v1 finding 0001).
@@ -31,11 +21,7 @@ export type CompanyBlockState =
 const BOX = "min-h-41 sm:min-h-36 rounded-lg bg-surface-raised p-4";
 
 /** The grey autofill block under the CNPJ field (spec AC 7–9). */
-export function CompanyBlock({
-  state,
-}: {
-  state: CompanyBlockState;
-}): JSX.Element | null {
+export function CompanyBlock({ state }: Props): JSX.Element | null {
   switch (state.status) {
     case "idle":
       return null;
