@@ -154,7 +154,8 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "upload.received.one": "Recebido: 1 arquivo",
     "upload.received.many": "Recebido: {n} arquivos",
     "upload.add": "Adicionar página",
-    "upload.error.size": "Passou de 10 MB. Envie um PDF menor ou menos fotos.",
+    "upload.error.size":
+      "Passou do limite de envio. Envie um PDF menor ou menos fotos.",
     "upload.error.type": "Formato não aceito. Envie PDF, JPG ou PNG.",
     "upload.error.mixed":
       "Cada documento aceita um único PDF ou só fotos. Escolha de novo.",
