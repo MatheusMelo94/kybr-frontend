@@ -74,7 +74,10 @@ export function ApprovedView({ resultado, marketplace }: Props): JSX.Element {
         </p>
       </div>
       {confirmations.length > 0 && (
-        <ul className="divide-y divide-line rounded-xl bg-surface-raised px-4">
+        // Outlined, not raised: the success pills keep the contrast the spec
+        // measured on surface (axe: success-ink on its tint over
+        // surface-raised falls under 4.5:1).
+        <ul className="divide-y divide-line rounded-xl border border-line px-4">
           {confirmations.map((confirmation) => (
             <ConfirmationRow
               key={confirmation.codigo}
