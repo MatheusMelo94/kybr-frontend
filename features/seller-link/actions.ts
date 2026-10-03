@@ -14,6 +14,7 @@ import { isValidSlug, isValidToken } from "@/lib/api/path";
 import {
   createVerification,
   getPublicCase,
+  getPublicLink,
   lookupCompany,
 } from "@/lib/api/public-link";
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
@@ -88,6 +89,18 @@ export type StartVerificationResult =
   | { ok: false; reason: "failed" };
 
 /**
+ * Whether D1 says the link is live. It's the page's cached read (60 s), so
+ * for a slug whose form just loaded it costs no API call.
+ */
+async function isCachedAsLive(slug: string): Promise<boolean> {
+  try {
+    return (await getPublicLink(slug)).ok;
+  } catch {
+    return false; // getPublicLink logged it
+  }
+}
+
+/**
  * Starts a verification (contract D3). It re-validates every field with the
  * schema the form uses (the CNPJ through lib/cnpj), never trusts the client's
  * props, and returns a result union. It never throws for an expected failure,
@@ -113,9 +126,11 @@ export async function startVerification(
   if (result.ok) return { ok: true, token: result.token };
   switch (result.reason) {
     case "link_not_found":
-      // The link was disabled after the form loaded. Drop its cached info
-      // (60 s), so the page re-renders as Link not found (AC 14).
-      revalidateTag(`public-link:${slug}`);
+      // The link was disabled after the form loaded. If its info is cached as
+      // live (60 s), drop it, so the page re-renders as Link not found
+      // (AC 14). An unknown slug has nothing stale to purge, so it never
+      // reaches revalidateTag (security finding M2-07).
+      if (await isCachedAsLive(slug)) revalidateTag(`public-link:${slug}`);
       return { ok: false, reason: "link_not_found" };
     case "invalid_field":
       return {

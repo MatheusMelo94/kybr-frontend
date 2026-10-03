@@ -202,12 +202,58 @@ describe("startVerification (D3 write)", () => {
     });
   });
 
-  it("AC 14: a link disabled at submit time is link_not_found, and its cached info is invalidated", async () => {
+  it("AC 14: a link disabled after its info was cached as live is link_not_found, and that cached info is purged", async () => {
+    vi.mocked(revalidateTag).mockClear();
+    // D1 still says live (as the 60 s cache would); D3 says the link is gone.
+    server.use(
+      http.post("http://api.kybr.test/public/v/:slug/verify", () =>
+        HttpResponse.json(
+          { code: "LINK_NAO_ENCONTRADO", message: "x" },
+          { status: 404 },
+        ),
+      ),
+    );
+
+    expect(await startVerification(input)).toEqual({
+      ok: false,
+      reason: "link_not_found",
+    });
+    expect(revalidateTag).toHaveBeenCalledWith(`public-link:${SLUGS.ok}`);
+  });
+
+  it("M2-07: an unknown slug is link_not_found with no purge (nothing cached as live)", async () => {
+    vi.mocked(revalidateTag).mockClear();
+
     expect(await startVerification({ ...input, slug: SLUGS.unknown })).toEqual({
       ok: false,
       reason: "link_not_found",
     });
-    expect(revalidateTag).toHaveBeenCalledWith(`public-link:${SLUGS.unknown}`);
+    expect(revalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("M2-07: no purge when the link info can't be read either", async () => {
+    vi.mocked(revalidateTag).mockClear();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    server.use(
+      http.post("http://api.kybr.test/public/v/:slug/verify", () =>
+        HttpResponse.json(
+          { code: "LINK_NAO_ENCONTRADO", message: "x" },
+          { status: 404 },
+        ),
+      ),
+      http.get("http://api.kybr.test/public/v/:slug", () =>
+        HttpResponse.json(
+          { code: "ERRO_INTERNO", message: "x" },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    expect(await startVerification(input)).toEqual({
+      ok: false,
+      reason: "link_not_found",
+    });
+    expect(revalidateTag).not.toHaveBeenCalled();
   });
 
   it("a malformed slug is link_not_found with no API call", async () => {
