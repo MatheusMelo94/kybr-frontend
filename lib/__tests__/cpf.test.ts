@@ -15,6 +15,15 @@ describe("maskCpf", () => {
     ["JOAO_12345678909", "JOAO_***.***.***-**"],
     ["JOAO 123 456 789 09", "JOAO ***.***.***-**"],
     ["JOAO 123.456.789.09", "JOAO ***.***.***-**"],
+    // Security finding M2-01: dash-only and slash separators, back-to-back
+    // runs, and fullwidth digits.
+    ["JOAO 123-456-789-09", "JOAO ***.***.***-**"],
+    ["JOAO 123456789/09", "JOAO ***.***.***-**"],
+    ["JOAO 123.456.789/09", "JOAO ***.***.***-**"],
+    ["1234567890912345678909", "***.***.***-*****.***.***-**"],
+    ["JOAO 123.456.789-0912345678909", "JOAO ***.***.***-*****.***.***-**"],
+    ["JOAO １２３４５６７８９０９", "JOAO ***.***.***-**"],
+    ["JOAO １２３．４５６．７８９－０９", "JOAO ***.***.***-**"],
   ])("masks the CPF in %j", (text, masked) => {
     expect(maskCpf(text)).toBe(masked);
   });
@@ -27,6 +36,11 @@ describe("maskCpf", () => {
     "LOJA 123456789012",
     "LOJA12345678901234",
     "EMPRESA 12.345.678/0001-95",
+    "EMPRESA 12.345.678/0001-95 LTDA",
+    "TEL (11) 91234-5678",
+    "CEP 01310-100",
+    "Nº 1234 – ﬁlial",
+    "LOJA 123456789012345678901",
   ])(
     "leaves %j alone (already masked, no CPF, or not an 11-digit run)",
     (text) => {
