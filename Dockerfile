@@ -45,6 +45,8 @@ COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 USER app
 EXPOSE 3000
+# 127.0.0.1, not localhost: Alpine's busybox wget takes the first address musl
+# returns for localhost, which is ::1, but HOSTNAME=0.0.0.0 binds IPv4 only.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider "http://localhost:${PORT}/api/health" || exit 1
+  CMD wget --quiet --tries=1 --spider "http://127.0.0.1:${PORT}/api/health" || exit 1
 CMD ["node", "server.js"]
