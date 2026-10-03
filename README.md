@@ -36,11 +36,14 @@ Not set up yet. A standalone `Dockerfile` comes with the DevOps project setup. `
 
 ## Environment variables
 
-None yet. `lib/env.ts` (zod-validated) and `.env.example` come with task T02.
+Copy `.env.example` to `.env.local` (gitignored). `lib/env.ts` validates every variable with zod, and `pnpm build` and `pnpm start` fail on a missing or invalid one. There are no `NEXT_PUBLIC_*` variables.
 
-| Name | Public? | Purpose |
-| ---- | ------- | ------- |
-| —    | —       | —       |
+| Name                  | Public?          | Purpose                                                                                                                                                 |
+| --------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `API_BASE_URL`        | No               | Kybr API base URL for calls from the Next.js server                                                                                                     |
+| `API_PUBLIC_BASE_URL` | Yes (not secret) | Kybr API base URL the browser uploads documents to (ADR-0004b). Must be `https:` in production; a loopback URL is accepted for local production builds. |
+| `API_BFF_KEY`         | **No, secret**   | Server-to-server key sent as `X-Kybr-BFF-Key`. Required in production, at least 32 characters.                                                          |
+| `CLIENT_IP_HEADER`    | No               | Header the host fills with the real client IP. Default `x-forwarded-for`.                                                                               |
 
 ## Routes
 
