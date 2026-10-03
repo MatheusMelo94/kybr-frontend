@@ -43,6 +43,8 @@ type Store = {
   idempotency: Map<string, Reply>;
   recoveredLinks: Set<string>;
   disabledLinks: Set<string>;
+  /** The last D3 body per slug, as received (GET /__mock/links/:slug/last-verify). */
+  lastVerify: Map<string, JsonBodyType>;
 };
 
 function createStore(): Store {
@@ -51,6 +53,7 @@ function createStore(): Store {
     idempotency: new Map(),
     recoveredLinks: new Set(),
     disabledLinks: new Set(),
+    lastVerify: new Map(),
   };
 }
 
@@ -282,6 +285,7 @@ export const sellerLinkHandlers: RequestHandler[] = [
       cnpj?: unknown;
       responsavel?: unknown;
     };
+    store.lastVerify.set(String(params.slug), input as JsonBodyType);
     const result = startVerification(String(params.slug), input);
     if (key !== null) store.idempotency.set(key, result);
     return send(result);
@@ -421,5 +425,13 @@ export const mockControlHandlers: RequestHandler[] = [
   http.post("*/__mock/links/:slug/disable", ({ params }) => {
     disableLink(String(params.slug));
     return new HttpResponse(null, { status: 204 });
+  }),
+  // What D3 received last for this slug: lets E2E assert the URL → page →
+  // form → action → D3 leg (AC 12 ref / ext_id; review M1 v1 finding 0002).
+  http.get("*/__mock/links/:slug/last-verify", ({ params }) => {
+    const body = store.lastVerify.get(String(params.slug));
+    return body === undefined
+      ? new HttpResponse(null, { status: 404 })
+      : HttpResponse.json(body);
   }),
 ];

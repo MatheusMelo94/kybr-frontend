@@ -1,4 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 
 import { cnpjFor } from "../../fixtures/factories/seller-link.ts";
 
@@ -89,6 +94,64 @@ test.describe("submit @feature-seller-link", () => {
         );
       });
     }
+  });
+
+  test.describe("AC 12: ?ref= and ?ext_id= from the link reach D3", () => {
+    function perTestSlug(project: string): string {
+      return `loja-teste-${project}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    async function lastVerifyBody(
+      request: APIRequestContext,
+      slug: string,
+    ): Promise<Record<string, unknown>> {
+      const response = await request.get(
+        `${MOCK_API}/__mock/links/${slug}/last-verify`,
+      );
+      expect(response.status()).toBe(200);
+      return (await response.json()) as Record<string, unknown>;
+    }
+
+    test("both values are sent untouched, next to the canonical CNPJ", async ({
+      page,
+      request,
+    }, testInfo) => {
+      const slug = perTestSlug(testInfo.project.name);
+      await page.goto(`/v/${slug}?ref=onboarding&ext_id=SELLER-42`);
+      await fill(page, "12abc34501de35");
+
+      await page.getByRole("button", { name: "Verificar empresa" }).click();
+      await expect(page).toHaveURL(new RegExp(`/v/${slug}/c/`));
+
+      const body = await lastVerifyBody(request, slug);
+      expect(body).toMatchObject({
+        cnpj: "12ABC34501DE35",
+        responsavel: "Maria Exemplo",
+        ref: "onboarding",
+        ext_id: "SELLER-42",
+      });
+    });
+
+    test("an ext_id over 256 characters or a non-ASCII ref is dropped, not sent", async ({
+      page,
+      request,
+    }, testInfo) => {
+      const slug = perTestSlug(testInfo.project.name);
+      const query = new URLSearchParams({
+        ref: "promoção",
+        ext_id: "X".repeat(257),
+      });
+      await page.goto(`/v/${slug}?${query.toString()}`);
+      await fill(page, cnpjFor("aprovado"));
+
+      await page.getByRole("button", { name: "Verificar empresa" }).click();
+      await expect(page).toHaveURL(new RegExp(`/v/${slug}/c/`));
+
+      const body = await lastVerifyBody(request, slug);
+      expect(body.cnpj).toBe(cnpjFor("aprovado"));
+      expect(body).not.toHaveProperty("ref");
+      expect(body).not.toHaveProperty("ext_id");
+    });
   });
 
   test("AC 14: a link disabled before submit re-renders as Link not found", async ({
