@@ -20,7 +20,7 @@ Context for AI-assisted development in this repo.
 
 **Vercel**, functions in São Paulo (`gru1`), per ADR-0005 (Proposed). Posture: Production.
 
-- **Environments:** Local → the mock API (`pnpm mock:api`). Preview (staging, every pushed branch) → the hosted mock API while the backend is Pre-Contract, later backend staging. Production → `https://api.kybr.com.br` only, never a mock. Cross-wiring is a NO-GO, and `scripts/check-deploy-env.mjs` fails the deploy on it.
+- **Environments:** Local → the mock API (`pnpm mock:api`). Preview (staging, every pushed branch) → a placeholder API URL until backend staging exists (no hosted mock), so Lighthouse runs in CI against the local mock instead. Production → `https://api.kybr.com.br` only, never a mock. Cross-wiring is a NO-GO, and `scripts/check-deploy-env.mjs` fails the deploy on it.
 - **Client IP:** `CLIENT_IP_HEADER=x-vercel-forwarded-for` on Vercel, with no trusted hops. `lib/env-schema.ts` rejects any other header when `VERCEL=1` (threat model F02).
 - **Deploys:** only from GitHub Actions. `ci.yml` calls `deploy-staging.yml` after every check passes. `deploy-prod.yml` is manual and off until `PRODUCTION_ENABLED`; it promotes a staged production build, never a new one. Vercel's Git integration is off.
 - **Headers:** `next.config.ts` and `middleware.ts` are the only source. `vercel.json` sets none.
