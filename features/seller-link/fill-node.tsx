@@ -1,6 +1,6 @@
 import { Fragment, isValidElement, type ReactNode } from "react";
 
-import type { Placeholders } from "@/features/seller-link/format";
+import { endsSentence, type Placeholders } from "@/features/seller-link/format";
 
 /**
  * Fills a copy template's `{placeholder}`s with text or elements, such as
@@ -10,7 +10,8 @@ import type { Placeholders } from "@/features/seller-link/format";
  *
  * A value that already ends with a period ("Ltda.", "S.A.") ends the sentence
  * itself: the template's period right after it is dropped, so there's no
- * "Ltda.." (T23a). The value is never changed.
+ * "Ltda.." (T23a; the same rule as fill(), via endsSentence). The value is
+ * never changed.
  */
 export function fillNode<S extends string>(
   template: S,
@@ -24,8 +25,7 @@ export function fillNode<S extends string>(
     const text =
       previous !== undefined &&
       previous in lookup &&
-      part.startsWith(".") &&
-      trailingText(lookup[previous]).endsWith(".")
+      endsSentence(trailingText(lookup[previous]), part)
         ? part.slice(1)
         : part;
     return (

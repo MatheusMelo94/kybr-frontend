@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  LONG_NAME_CNPJ,
+  LONG_RAZAO_SOCIAL,
   MEI_CNPJS,
   buildCompany,
   cnpjFor,
@@ -32,10 +34,23 @@ test.describe("CNPJ lookup @feature-seller-link", () => {
       `Atividade principal: ${company.cnae.descricao}`,
     );
     await expect(block).toContainText(`${company.municipio}, ${company.uf}`);
+    // One period, even after a name that ends with one (review 0016).
     await expect(page.getByRole("status")).toHaveText(
-      `Empresa encontrada: ${company.razao_social}.`,
+      `Empresa encontrada: ${company.razao_social.replace(/\.?$/, ".")}`,
     );
     expect(actionPosts).toHaveLength(1);
+  });
+
+  test("AC 7 / QA C04 (review 0016): a name ending in Ltda. is announced with one period", async ({
+    page,
+  }) => {
+    await page.goto("/v/loja-exemplo");
+
+    await typeCnpj(page, LONG_NAME_CNPJ);
+
+    await expect(page.getByRole("status")).toHaveText(
+      `Empresa encontrada: ${LONG_RAZAO_SOCIAL}`,
+    );
   });
 
   test("AC 7 (S18): a CPF in the name shows masked even when the API sent it unmasked", async ({
