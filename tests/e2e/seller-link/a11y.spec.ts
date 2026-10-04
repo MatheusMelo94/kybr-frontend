@@ -14,6 +14,7 @@ import {
 } from "../../fixtures/factories/seller-link.ts";
 import { gif, pdf } from "../../fixtures/factories/files.ts";
 import { expectNoAxeViolations } from "../fixtures/axe.ts";
+import { waitForHydration } from "../fixtures/live.ts";
 import {
   MOCK_API,
   createCase,
@@ -154,6 +155,8 @@ const STATES: [string, Open][] = [
     async (page, request) => {
       await page.context().setOffline(false);
       await caseWith(page, request, { ageMs: 11_000 }, ANALYSIS);
+      // The banner's online/offline listeners exist only once hydrated (0029).
+      await waitForHydration(page);
       await page.context().setOffline(true);
       await expect(
         page.getByRole("status").filter({ hasText: /^Sem conexão/ }),
@@ -351,25 +354,34 @@ test.describe("accessibility and breakpoints @feature-seller-link", () => {
     });
   }
 
+  // The axe-heavy sweep (6 axe passes per test) runs one test at a time per
+  // project: in parallel with everything else it ran a renderer out of
+  // memory once under full load (review 0029). Other tests stay parallel.
+  test.describe("axe sweep", () => {
+    test.describe.configure({ mode: "default" });
+
+    for (const [name, open] of STATES) {
+      test(`AC 34 / AC 35: ${name} at 360, 768 and 1280: axe in light and dark, no horizontal scroll, 44 px targets, a focus ring at every Tab stop`, async ({
+        page,
+        request,
+      }) => {
+        for (const width of WIDTHS) {
+          await page.setViewportSize({ width, height: 900 });
+          await open(page, request);
+
+          expect(
+            await horizontalOverflow(page),
+            `${width}px`,
+          ).toBeLessThanOrEqual(0);
+          expect(await smallTargets(page), `${width}px`).toEqual([]);
+          await expectNoAxeViolations(page);
+          expect(await stopsWithoutRing(page), `${width}px`).toEqual([]);
+        }
+      });
+    }
+  });
+
   for (const [name, open] of STATES) {
-    test(`AC 34 / AC 35: ${name} at 360, 768 and 1280: axe in light and dark, no horizontal scroll, 44 px targets, a focus ring at every Tab stop`, async ({
-      page,
-      request,
-    }) => {
-      for (const width of WIDTHS) {
-        await page.setViewportSize({ width, height: 900 });
-        await open(page, request);
-
-        expect(
-          await horizontalOverflow(page),
-          `${width}px`,
-        ).toBeLessThanOrEqual(0);
-        expect(await smallTargets(page), `${width}px`).toEqual([]);
-        await expectNoAxeViolations(page);
-        expect(await stopsWithoutRing(page), `${width}px`).toEqual([]);
-      }
-    });
-
     test(`reflow: ${name} at 320 px, and with text at 200 % at 360, 768 and 1280`, async ({
       page,
       request,

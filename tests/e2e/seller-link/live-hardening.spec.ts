@@ -3,12 +3,20 @@ import {
   test,
   type APIRequestContext,
   type Page,
-  type Request,
   type Route,
 } from "@playwright/test";
 
 import { MEI_CNPJS, SLUGS } from "../../fixtures/factories/seller-link.ts";
-import { installClock, isCheck, pauseClock } from "../fixtures/live.ts";
+import {
+  checksInPage,
+  countChecksInPage,
+  flushTasks,
+  installClock,
+  isCheck,
+  pageTime,
+  pauseClock,
+  waitForHydration,
+} from "../fixtures/live.ts";
 import { createCase, setCaseState } from "../fixtures/mock-api.ts";
 
 // QA-M2-004 (T35): the case-page behaviors QA verified only in its M2
@@ -27,16 +35,16 @@ const BANNER = "Sem conexão. Assim que a internet voltar, continuamos daqui.";
 const h1 = (page: Page, name: string | RegExp) =>
   page.getByRole("heading", { level: 1, name });
 
-type Log = { checks: number; settled: number; rsc: number };
+type Log = { rsc: number };
 
-/** Counts status checks (not the e-mail save, G10), their settling, and the case page's RSC refreshes. */
-function record(page: Page): Log {
-  const log: Log = { checks: 0, settled: 0, rsc: 0 };
-  const settle = (request: Request): void => {
-    if (isCheck(request)) log.settled += 1;
-  };
+/**
+ * Counts status checks in the page (countChecksInPage: exact, no real-time
+ * window; review 0029), and the case page's RSC refreshes here.
+ */
+async function record(page: Page): Promise<Log> {
+  await countChecksInPage(page);
+  const log: Log = { rsc: 0 };
   page.on("request", (request) => {
-    if (isCheck(request)) log.checks += 1;
     // A refresh of the case page itself; the privacy link's prefetch doesn't count.
     if (
       request.method() === "GET" &&
@@ -45,9 +53,23 @@ function record(page: Page): Log {
     )
       log.rsc += 1;
   });
-  page.on("requestfinished", settle);
-  page.on("requestfailed", settle);
   return log;
+}
+
+/** Status checks the page has sent so far. */
+async function sent(page: Page): Promise<number> {
+  return (await checksInPage(page)).sent;
+}
+
+/** Waits for every check in flight to come back, and for the page to act on it. */
+async function settle(page: Page): Promise<void> {
+  await expect
+    .poll(async () => {
+      const { sent: out, settled } = await checksInPage(page);
+      return settled === out;
+    })
+    .toBe(true);
+  await flushTasks(page);
 }
 
 /** Lets a test flip document.hidden and fire visibilitychange. */
@@ -81,55 +103,58 @@ async function setHidden(page: Page, hidden: boolean): Promise<void> {
   );
 }
 
-/** Opens a case under an installed clock, then pauses it just after mount. */
+type Opened = {
+  token: string;
+  log: Log;
+  /** Page times: mount happened between navigation and hydration being seen. */
+  navigatedAt: number;
+  hydratedAt: number;
+  pausedAt: number;
+};
+
+/** Opens a case under an installed clock, then pauses it once hydrated. */
 async function openPaused(
   page: Page,
   request: APIRequestContext,
   input: Parameters<typeof createCase>[1],
   heading: string,
-): Promise<{ token: string; log: Log }> {
+): Promise<Opened> {
   const token = await createCase(request, input);
-  const log = record(page);
+  const log = await record(page);
   const clock = await installClock(page);
+  const navigatedAt = pageTime(clock);
   await page.goto(`/v/${SLUGS.ok}/c/${token}`);
   await expect(h1(page, heading)).toBeVisible();
-  await pauseClock(page, clock);
-  await expect.poll(() => log.settled).toBe(log.checks);
-  return { token, log };
+  await waitForHydration(page);
+  const hydratedAt = pageTime(clock);
+  const pausedAt = await pauseClock(page, clock);
+  await settle(page);
+  return { token, log, navigatedAt, hydratedAt, pausedAt };
 }
 
 /**
- * Advances the paused clock, lets any check it started settle, and returns how
- * many started. A check the run started leaves the page asynchronously, so it
- * returns as soon as one is seen, or after `quiet` ms with none (review 0026).
+ * Advances the paused clock and returns how many checks that started. A
+ * check a timer starts calls fetch during runFor (plus the page's queued
+ * tasks), so the count is exact; then it waits for them to settle (review
+ * 0029: no real-time window).
  */
-async function step(
-  page: Page,
-  log: Log,
-  ms: number,
-  quiet = 2_000,
-): Promise<number> {
-  const before = log.checks;
+async function step(page: Page, ms: number): Promise<number> {
+  const before = await sent(page);
   await page.clock.runFor(ms);
-  await expect
-    .poll(() => log.checks, { timeout: quiet })
-    .toBeGreaterThan(before)
-    .catch(() => {});
-  await expect.poll(() => log.settled, { timeout: 5_000 }).toBe(log.checks);
-  return log.checks - before;
+  await flushTasks(page);
+  const started = (await sent(page)) - before;
+  await settle(page);
+  return started;
 }
 
 /** The next check comes exactly `gap` ms after the last one. */
 async function expectGap(
   page: Page,
-  log: Log,
   gap: number,
   label: string,
 ): Promise<void> {
-  // A short quiet window (twice the old fixed sleep) keeps the 169-gap ladder
-  // fast; the on-time step waits as long as a check takes to show up.
-  expect(await step(page, log, gap - 1, 300), `${label}: early`).toBe(0);
-  expect(await step(page, log, 1), `${label}: on time`).toBe(1);
+  expect(await step(page, gap - 1), `${label}: early`).toBe(0);
+  expect(await step(page, 1), `${label}: on time`).toBe(1);
 }
 
 test.describe("live status hardening (QA-M2-004) @feature-seller-link", () => {
@@ -199,7 +224,7 @@ test.describe("live status hardening (QA-M2-004) @feature-seller-link", () => {
         request,
       }) => {
         test.setTimeout(120_000);
-        const { token, log } = await openPaused(page, request, {}, VERIFYING);
+        const { token } = await openPaused(page, request, {}, VERIFYING);
         const reject = async (route: Route): Promise<void> => {
           if (isCheck(route.request()))
             await route.fulfill({
@@ -211,16 +236,16 @@ test.describe("live status hardening (QA-M2-004) @feature-seller-link", () => {
         };
         await page.route(`**/c/${token}`, reject);
 
-        expect(await step(page, log, 2_000)).toBe(1);
-        await expectGap(page, log, 5_000, "back-off 5 s");
-        await expectGap(page, log, 10_000, "back-off 10 s");
-        await expectGap(page, log, 20_000, "back-off 20 s");
+        expect(await step(page, 2_000)).toBe(1);
+        await expectGap(page, 5_000, "back-off 5 s");
+        await expectGap(page, 10_000, "back-off 10 s");
+        await expectGap(page, 20_000, "back-off 20 s");
         await expect(page.getByText(BANNER)).toHaveCount(0);
         expect(await page.evaluate(() => location.pathname)).toContain(token);
 
         await page.unroute(`**/c/${token}`, reject);
-        await expectGap(page, log, 40_000, "back-off 40 s (answers)");
-        await expectGap(page, log, 10_000, "back to the em análise band");
+        await expectGap(page, 40_000, "back-off 40 s (answers)");
+        await expectGap(page, 10_000, "back to the em análise band");
         await expect(page.getByText(BANNER)).toHaveCount(0);
       });
     }
@@ -230,18 +255,18 @@ test.describe("live status hardening (QA-M2-004) @feature-seller-link", () => {
       request,
     }) => {
       const { log } = await openPaused(page, request, {}, VERIFYING);
-      for (let i = 0; i < 5; i += 1) await step(page, log, 2_000);
+      for (let i = 0; i < 5; i += 1) await step(page, 2_000);
       // em análise carries the e-mail block, a lazy chunk: once it has loaded,
       // React commits the view on a timer, which the paused clock must run.
       // The 10 s check can land on either side of the last step's edge.
       await page.waitForLoadState("networkidle");
-      expect(await step(page, log, 500)).toBeLessThanOrEqual(1);
+      expect(await step(page, 500)).toBeLessThanOrEqual(1);
 
       await expect(h1(page, ANALYSIS)).toBeFocused();
       // Then em análise's 10 s band, not verificando's 2 s cadence.
-      expect(await step(page, log, 8_000), "ladder: early").toBe(0);
-      expect(await step(page, log, 2_000), "ladder: on time").toBe(1);
-      await expectGap(page, log, 10_000, "ladder");
+      expect(await step(page, 8_000), "ladder: early").toBe(0);
+      expect(await step(page, 2_000), "ladder: on time").toBe(1);
+      await expectGap(page, 10_000, "ladder");
       await expect(h1(page, ANALYSIS)).toBeVisible();
       await expect(page.getByText(VERIFYING)).toHaveCount(0);
       expect(log.rsc).toBe(0);
@@ -254,35 +279,42 @@ test.describe("live status hardening (QA-M2-004) @feature-seller-link", () => {
     }) => {
       test.setTimeout(600_000);
       await installVisibility(page);
-      const { token, log } = await openPaused(
+      const { token, navigatedAt, hydratedAt, pausedAt } = await openPaused(
         page,
         request,
         { ageMs: 11_000 },
         ANALYSIS,
       );
 
-      // First check about 10 s after mount, then the bands to the 2 h stop.
-      expect(await step(page, log, 9_700)).toBe(0);
-      expect(await step(page, log, 400)).toBe(1);
+      // First check 10 s after mount, then the bands to the 2 h stop. Mount
+      // was between navigation and hydration being seen (page times), so the
+      // check is due in that window, counted from the measured pause.
+      const earliest = navigatedAt + 10_000 - pausedAt;
+      const latest = hydratedAt + 10_000 - pausedAt;
+      expect(await step(page, earliest - 1), "first check: early").toBe(0);
+      expect(
+        await step(page, latest - earliest + 1),
+        "first check: in its window",
+      ).toBe(1);
       for (let i = 2; i <= 30; i += 1)
-        await expectGap(page, log, 10_000, `10 s #${i}`);
+        await expectGap(page, 10_000, `10 s #${i}`);
       for (let i = 1; i <= 50; i += 1)
-        await expectGap(page, log, 30_000, `30 s #${i}`);
+        await expectGap(page, 30_000, `30 s #${i}`);
       for (let i = 1; i <= 89; i += 1)
-        await expectGap(page, log, 60_000, `60 s #${i}`);
-      expect(log.checks).toBe(169);
+        await expectGap(page, 60_000, `60 s #${i}`);
+      expect(await sent(page)).toBe(169);
 
       // Stopped: an hour of silence, no banner, the view unchanged.
-      expect(await step(page, log, 60 * 60_000)).toBe(0);
+      expect(await step(page, 60 * 60_000)).toBe(0);
       await expect(page.getByText(BANNER)).toHaveCount(0);
       await expect(h1(page, ANALYSIS)).toBeVisible();
 
       // Hidden, then visible: the ladder restarts from its first band.
       await setHidden(page, true);
       await setHidden(page, false);
-      await expect.poll(() => log.checks).toBe(170);
-      await expect.poll(() => log.settled).toBe(170);
-      await expectGap(page, log, 10_000, "restart 10 s");
+      await expect.poll(() => sent(page)).toBe(170);
+      await settle(page);
+      await expectGap(page, 10_000, "restart 10 s");
 
       // The restarted ladder still finds a result (offline/online on the way).
       await setCaseState(request, token, { kind: "aprovado" });
