@@ -3,6 +3,7 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
 import { resetSellerLinkMock } from "./fixtures/msw/handlers/seller-link.ts";
+import { resetPanelMock } from "./fixtures/msw/panel-store.ts";
 import { server } from "./fixtures/msw/server.ts";
 
 // `server-only` is a build-time guard (it throws outside the react-server
@@ -17,6 +18,7 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   resetSellerLinkMock();
+  resetPanelMock();
 });
 
 afterAll(() => {
