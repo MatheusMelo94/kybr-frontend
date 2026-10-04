@@ -12,6 +12,8 @@ const BFF_KEY = "test-only-bff-key-0123456789abcdef";
 const SENTINEL = "MSG-BACKEND-NAO-EXIBIR";
 
 const requestHeaders = vi.hoisted(() => ({ value: new Headers() }));
+const reportMarker = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/monitoring", () => ({ reportMarker }));
 vi.mock("next/headers", () => ({ headers: async () => requestHeaders.value }));
 
 const companySchema = z.object({ razao_social: z.string() });
@@ -337,6 +339,24 @@ describe("apiRequest: F01 guards (BFF-key-bearing requests)", () => {
 
     expect(result).toMatchObject({ ok: false, error: { code: "NETWORK" } });
     expect(offOriginHits).toBe(0);
+    // Finding 0003: told apart from an outage, by shape only.
+    expect(reportMarker).toHaveBeenCalledWith("REDIRECT_REFUSED", {
+      operation: "probe",
+    });
+  });
+
+  it("finding 0003: a dropped connection is NETWORK with no REDIRECT_REFUSED marker", async () => {
+    reportMarker.mockClear();
+    server.use(http.get(`${API}/public/probe`, () => HttpResponse.error()));
+
+    const result = await apiRequest({
+      operation: "probe",
+      path: "/public/probe",
+      schema: companySchema,
+    });
+
+    expect(result).toMatchObject({ ok: false, error: { code: "NETWORK" } });
+    expect(reportMarker).not.toHaveBeenCalled();
   });
 
   it("fetches with redirect: error", async () => {

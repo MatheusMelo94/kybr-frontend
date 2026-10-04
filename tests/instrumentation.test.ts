@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const initMonitoring = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/monitoring", () => ({ initMonitoring }));
+const captureRequestError = vi.hoisted(() => vi.fn());
+vi.mock("@sentry/nextjs", () => ({ captureRequestError }));
+
 // A standalone server serializes next.config.ts, so the build-time env check
 // doesn't re-run at container start. register() runs at boot instead (F09).
 afterEach(() => {
@@ -40,5 +45,48 @@ describe("instrumentation register()", () => {
     expect(String(log.mock.calls[0]?.[0])).toContain("API_BFF_KEY");
     exit.mockRestore();
     log.mockRestore();
+  });
+});
+
+describe("instrumentation: server-side monitoring (T34a)", () => {
+  it("starts monitoring on the Node.js server with SENTRY_DSN, and never on the edge", async () => {
+    vi.stubEnv("SENTRY_DSN", "https://public@o0.ingest.sentry.test/1");
+    vi.stubEnv("NEXT_RUNTIME", "nodejs");
+    const { register } = await import("@/instrumentation");
+
+    await register();
+    expect(initMonitoring).toHaveBeenCalledWith(
+      "https://public@o0.ingest.sentry.test/1",
+    );
+
+    initMonitoring.mockClear();
+    vi.stubEnv("NEXT_RUNTIME", "edge");
+    await register();
+    expect(initMonitoring).not.toHaveBeenCalled();
+  });
+
+  it("forwards request errors to Sentry on the Node.js server only", async () => {
+    vi.stubEnv("NEXT_RUNTIME", "nodejs");
+    const { onRequestError } = await import("@/instrumentation");
+    const args = [
+      new Error("boom"),
+      { path: "/v/x", method: "GET", headers: {} },
+      {
+        routerKind: "App Router",
+        routePath: "/v/[slug]",
+        routeType: "render",
+        renderSource: "react-server-components",
+        revalidateReason: undefined,
+        renderType: "dynamic",
+      },
+    ] as const;
+
+    await onRequestError(...args);
+    expect(captureRequestError).toHaveBeenCalledWith(...args);
+
+    captureRequestError.mockClear();
+    vi.stubEnv("NEXT_RUNTIME", "edge");
+    await onRequestError(...args);
+    expect(captureRequestError).not.toHaveBeenCalled();
   });
 });

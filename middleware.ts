@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { buildContentSecurityPolicy, generateNonce } from "@/lib/csp";
+import {
+  CSP_REPORT_GROUP,
+  CSP_REPORT_PATH,
+  buildContentSecurityPolicy,
+  generateNonce,
+} from "@/lib/csp";
 import { env } from "@/lib/env";
 import { isLoopbackHostname } from "@/lib/safe-url";
 
@@ -22,6 +27,11 @@ export function middleware(request: NextRequest): NextResponse {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("content-security-policy", policy);
+  // The endpoint for the policy's report-to (absolute, as the Reporting API needs).
+  response.headers.set(
+    "reporting-endpoints",
+    `${CSP_REPORT_GROUP}="${new URL(CSP_REPORT_PATH, request.nextUrl.origin).href}"`,
+  );
   return response;
 }
 

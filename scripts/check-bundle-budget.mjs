@@ -129,6 +129,29 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"));
 }
 
+// T34a / ADR-0003: monitoring is server-side only. No page may ship Sentry
+// code to the browser (no browser SDK, no withSentryConfig injection).
+const clientFiles = new Set(
+  Object.values(manifest.pages)
+    .flat()
+    .filter((f) => f.endsWith(".js")),
+);
+const sentryFiles = [...clientFiles].filter((f) =>
+  /@sentry\/|sentry\.io|__SENTRY|Sentry\.init/.test(
+    readFileSync(join(distDir, f), "utf8"),
+  ),
+);
+if (sentryFiles.length > 0) {
+  console.error(
+    `Bundle guard FAILED: Sentry code in client chunks: ${sentryFiles.join(", ")}`,
+  );
+  process.exitCode = 1;
+} else {
+  console.log(
+    `Sentry bytes in client chunks: 0 (${clientFiles.size} files checked).`,
+  );
+}
+
 if (failed) {
   console.error(
     "Bundle guard FAILED: a route is over budget. Fix the bundle (Frontend Engineer) or change the budget by ADR (Frontend Architect).",
