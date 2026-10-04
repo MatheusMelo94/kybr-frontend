@@ -1,6 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LIVE_STATUS_SCHEDULE } from "@/features/seller-link/components/case/case-live-status";
 import {
   REFRESH_NUDGE,
   useCommittedRefresh,
@@ -95,5 +96,11 @@ describe("useCommittedRefresh (tech-design § 3 rule 11 workaround)", () => {
     unmount();
 
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("REFRESH_NUDGE", () => {
+  it("is CaseLiveStatus's rule 11 nudge itself, one source of truth", () => {
+    expect(REFRESH_NUDGE).toBe(LIVE_STATUS_SCHEDULE.nudge);
   });
 });

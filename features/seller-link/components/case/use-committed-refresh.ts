@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-/** The rule 11 workaround's bounds, as in CaseLiveStatus's LIVE_STATUS_SCHEDULE.nudge. */
-export const REFRESH_NUDGE = { everyMs: 250, maxTicks: 40 } as const;
+import { LIVE_STATUS_SCHEDULE } from "@/features/seller-link/components/case/case-live-status";
+
+/** The rule 11 workaround's bounds: CaseLiveStatus's own, one source of truth. */
+export const REFRESH_NUDGE = LIVE_STATUS_SCHEDULE.nudge;
 
 /**
  * router.refresh() for the case page's follow-up leaves (the upload after a
