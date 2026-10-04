@@ -20,6 +20,15 @@ async function saveEmail(page: Page, email: string): Promise<void> {
   await page.getByRole("button", { name: "Salvar e-mail" }).click();
 }
 
+/**
+ * The e-mail block and the upload are lazy chunks (next/dynamic): wait until
+ * they've loaded and hydrated before pressing their buttons, as a seller's
+ * tap before hydration is inert by design.
+ */
+async function leavesHydrated(page: Page): Promise<void> {
+  await page.waitForLoadState("networkidle");
+}
+
 test.describe("e-mail block @feature-seller-link", () => {
   test("AC 17 / AC 24 (em análise): invalid, then saved with the typed address", async ({
     page,
@@ -27,6 +36,7 @@ test.describe("e-mail block @feature-seller-link", () => {
   }) => {
     const token = await createCase(request, { ageMs: 60_000 });
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await leavesHydrated(page);
     await expect(
       page.getByRole("heading", {
         level: 1,
@@ -65,12 +75,14 @@ test.describe("e-mail block @feature-seller-link", () => {
       ageMs: 60_000,
     });
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await leavesHydrated(page);
     await saveEmail(page, EMAIL);
     await expect(
       page.getByText(`E-mail salvo. Vamos avisar em ${EMAIL}.`),
     ).toBeVisible();
 
     await page.reload();
+    await leavesHydrated(page);
     await expect(
       page.getByText(
         "E-mail salvo. Vamos avisar em m•••@empresa-exemplo.test.",
@@ -92,6 +104,7 @@ test.describe("e-mail block @feature-seller-link", () => {
       ageMs: 60_000,
     });
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await leavesHydrated(page);
     await expect(
       page.getByRole("heading", { level: 1, name: "Quase lá" }),
     ).toBeVisible();
@@ -123,6 +136,7 @@ test.describe("e-mail block @feature-seller-link", () => {
       ageMs: 60_000,
     });
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+    await leavesHydrated(page);
     await expect(field(page)).toBeVisible();
 
     await setCaseState(request, token, { kind: "aprovado" });
@@ -149,6 +163,7 @@ test.describe("e-mail block @feature-seller-link", () => {
   }) => {
     for (const token of [CASE_TOKENS.aprovado, CASE_TOKENS.bloqueado]) {
       await page.goto(`/v/${SLUGS.ok}/c/${token}`);
+      await leavesHydrated(page);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.getByText(LABEL)).toHaveCount(0);
     }

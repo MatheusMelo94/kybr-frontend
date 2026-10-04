@@ -15,3 +15,10 @@ export const LazyContactEmailBlock = dynamic(() =>
     (module) => module.ContactEmailBlock,
   ),
 );
+
+/** DocumentUpload (T30), loaded on demand. */
+export const LazyDocumentUpload = dynamic(() =>
+  import("@/features/seller-link/components/case/document-upload").then(
+    (module) => module.DocumentUpload,
+  ),
+);

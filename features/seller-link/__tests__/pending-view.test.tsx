@@ -282,8 +282,10 @@ describe("PendingView (quase lá)", () => {
     const { container } = render(
       <PendingView
         resultado={S5}
-        documentAction={(item) => (
-          <button type="button">{item.documento_tipo}</button>
+        documentAction={(item, titleId) => (
+          <button type="button" aria-describedby={titleId}>
+            {item.documento_tipo}
+          </button>
         )}
         emailBlock={<section aria-label="e-mail" />}
       />,
@@ -293,6 +295,10 @@ describe("PendingView (quase lá)", () => {
     expect(
       within(items()[0] as HTMLElement).getByRole("button"),
     ).toHaveTextContent("RESPONSAVEL");
+    // The action is described by its item's title (T30: AC 21, WCAG 2.5.3).
+    expect(screen.getByRole("button")).toHaveAccessibleDescription(
+      "Maria Exemplo Silva não aparece entre os sócios da empresa",
+    );
     const email = screen.getByRole("region", { name: "e-mail" });
     const deadline = screen.getByText(/^Prazo da análise/);
     expect(

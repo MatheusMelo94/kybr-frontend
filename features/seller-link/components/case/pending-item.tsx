@@ -11,6 +11,8 @@ type Props = {
   item: CaseItem;
   /** The name as the seller typed it, for DOCUMENTO_RESPONSAVEL's title. */
   responsavel: string;
+  /** The title's id, which the item's action uses as its description. */
+  titleId: string;
   /** The item's action slot (the document upload, T30). */
   children?: ReactNode;
 };
@@ -82,12 +84,15 @@ function itemCopy(item: CaseItem, responsavel: string): ItemCopy {
 export function PendingItem({
   item,
   responsavel,
+  titleId,
   children,
 }: Props): JSX.Element {
   const { title, description, regularize } = itemCopy(item, responsavel);
   return (
     <li className="flex flex-col gap-1 py-4">
-      <h2 className="text-body font-strong break-words text-ink">{title}</h2>
+      <h2 id={titleId} className="text-body font-strong break-words text-ink">
+        {title}
+      </h2>
       <p className="text-secondary text-ink-muted">{description}</p>
       {regularize && (
         <ExternalLink

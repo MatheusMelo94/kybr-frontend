@@ -44,4 +44,7 @@ export const apiPaths = {
   /** D5: the seller's contact e-mail for a case. */
   caseContact: (slug: string, token: string): string =>
     `${apiPaths.publicCase(slug, token)}/contact`,
+  /** D6: a case's document upload, which the browser calls (ADR-0004b). */
+  caseDocuments: (slug: string, token: string): string =>
+    `${apiPaths.publicCase(slug, token)}/documents`,
 };

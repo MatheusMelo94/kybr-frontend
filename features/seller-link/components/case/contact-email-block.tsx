@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   startTransition,
   useActionState,
@@ -14,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { LiveRegion } from "@/components/ui/live-region";
 import { TextField } from "@/components/ui/text-field";
+import { useCommittedRefresh } from "@/features/seller-link/components/case/use-committed-refresh";
 import {
   saveContactEmail,
   type SaveContactEmailResult,
@@ -50,7 +50,8 @@ export function ContactEmailBlock({
   token,
   maskedSaved,
 }: Props): JSX.Element {
-  const router = useRouter();
+  // A decided or gone case: the server re-renders without this block (unmount).
+  const refresh = useCommittedRefresh(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<BlockError | undefined>();
   // The address shown as saved: the masked one from D4, or the one typed here.
@@ -60,6 +61,13 @@ export function ContactEmailBlock({
   const change = useRef<HTMLButtonElement>(null);
   // Where focus goes after the next render: never on mount (the h1 owns it).
   const focusNext = useRef<"input" | "change" | null>(null);
+
+  // An address typed before this lazy leaf hydrated lives only in the DOM:
+  // adopt it once, on mount (tech-design R3, as CnpjField does).
+  useEffect(() => {
+    const typed = input.current?.value ?? "";
+    if (typed !== "") setEmail(typed);
+  }, []);
 
   useEffect(() => {
     if (focusNext.current === "input") input.current?.focus();
@@ -93,7 +101,7 @@ export function ContactEmailBlock({
         return null;
       case "CASO_DECIDIDO":
       case "CASO_NAO_ENCONTRADO":
-        router.refresh();
+        refresh();
         return null;
       case "UNAVAILABLE":
         showError("network");
