@@ -1,6 +1,6 @@
 // @vitest-environment node
 import type { ErrorEvent } from "@sentry/nextjs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const sentry = vi.hoisted(() => ({
   init: vi.fn(),
@@ -189,5 +189,73 @@ describe("reportCspViolations", () => {
       }),
     );
     log.mockRestore();
+  });
+
+  // Security M3-01: the collector can't burn the Sentry quota or flood the logs.
+  describe("M3-01: a per-instance budget", () => {
+    const violation = (blocked: string) => ({
+      documentUrl: "https://kybr.test/v/loja-exemplo",
+      blocked,
+      directive: "script-src-elem",
+      disposition: "enforce",
+      expected: false,
+    });
+    let minute = 0;
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // A fresh window for every test: an hour apart.
+      minute += 60;
+      vi.setSystemTime(minute * 60_000);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("sends at most 30 events a minute, then nothing until the next minute", () => {
+      const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      for (let i = 0; i < 10; i++)
+        reportCspViolations(
+          Array.from({ length: 10 }, (_, j) =>
+            violation(`https://evil.test/${i}-${j}.js`),
+          ),
+        );
+      expect(sentry.captureMessage).toHaveBeenCalledTimes(30);
+
+      vi.advanceTimersByTime(60_000);
+      reportCspViolations([violation("https://evil.test/next.js")]);
+      expect(sentry.captureMessage).toHaveBeenCalledTimes(31);
+      log.mockRestore();
+    });
+
+    it("sends the same directive and blocked URI once a minute", () => {
+      const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      reportCspViolations([
+        violation("https://evil.test/a.js"),
+        violation("https://evil.test/a.js"),
+      ]);
+      reportCspViolations([violation("https://evil.test/a.js")]);
+
+      expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+      log.mockRestore();
+    });
+
+    it("logs shape only (no blocked URI), and one line for what the budget drops", () => {
+      const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      reportCspViolations(
+        Array.from({ length: 40 }, (_, i) =>
+          violation(`https://evil.test/${i}.js`),
+        ),
+      );
+
+      expect(log).toHaveBeenCalledTimes(31);
+      expect(JSON.stringify(log.mock.calls)).not.toContain("evil.test");
+      expect(log).toHaveBeenLastCalledWith("[kybr] CSP_VIOLATION_BUDGET", {
+        perMinute: "30",
+      });
+      log.mockRestore();
+    });
   });
 });

@@ -3,13 +3,16 @@ import { scrubUrl } from "./scrub";
 // Parses the bodies the CSP report collector receives (T34a): report-uri's
 // application/csp-report and the Reporting API's application/reports+json.
 // Everything is reduced to five fields, with URLs scrubbed (no case token, no
-// query), before it reaches monitoring.
+// query), the directive and disposition allowlisted and the blocked URI capped
+// (M3-01), before it reaches monitoring.
 
 export type CspViolation = {
   documentUrl: string;
-  /** A scrubbed URL, or a keyword such as "inline", "eval" or "javascript". */
+  /** A scrubbed URL, or a keyword such as "inline", "eval" or "javascript"; at most 256 characters. */
   blocked: string;
+  /** A directive name the policy can report, or "other". */
   directive: string;
+  /** "enforce", "report" or "other". */
   disposition: string;
   /**
    * Finding 0004: a submit before hydration hits the inert `javascript:` form
@@ -21,6 +24,38 @@ export type CspViolation = {
 
 /** At most this many reports are taken from one request. */
 const MAX_REPORTS = 10;
+
+/** Longest blocked URI kept (M3-01): it ends up in a log line and a tag. */
+export const MAX_BLOCKED_LENGTH = 256;
+
+/**
+ * Directive names a browser can report against this policy (lib/csp.ts, plus
+ * the -elem/-attr and fetch directives that fall back to default-src). Any
+ * other value is the reporter's invention and becomes "other" (M3-01).
+ */
+const DIRECTIVES = new Set([
+  "default-src",
+  "script-src",
+  "script-src-elem",
+  "script-src-attr",
+  "style-src",
+  "style-src-elem",
+  "style-src-attr",
+  "img-src",
+  "font-src",
+  "connect-src",
+  "media-src",
+  "manifest-src",
+  "frame-src",
+  "child-src",
+  "worker-src",
+  "frame-ancestors",
+  "base-uri",
+  "form-action",
+  "object-src",
+]);
+
+const DISPOSITIONS = new Set(["enforce", "report"]);
 
 type Raw = Record<string, unknown>;
 
@@ -55,11 +90,12 @@ function violation(
     directive === "form-action" &&
     /^javascript(:|$)/.test(blocked) &&
     isLinkPage(documentUrl);
+  const kept = disposition || "enforce";
   return {
     documentUrl: scrubUrl(documentUrl),
-    blocked: scrubBlocked(blocked),
-    directive,
-    disposition: disposition || "enforce",
+    blocked: scrubBlocked(blocked).slice(0, MAX_BLOCKED_LENGTH),
+    directive: DIRECTIVES.has(directive) ? directive : "other",
+    disposition: DISPOSITIONS.has(kept) ? kept : "other",
     expected,
   };
 }

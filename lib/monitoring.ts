@@ -108,10 +108,42 @@ export function reportMarker(
   });
 }
 
+/** Sentry events the CSP collector may send per minute, per server instance (M3-01). */
+export const CSP_EVENTS_PER_MINUTE = 30;
+const MINUTE = 60_000;
+
+// One instance's CSP window: what it sent this minute, and whether it has
+// said so once the budget ran out. Module state, so it's per instance.
+const cspWindow = { start: 0, sent: new Set<string>(), full: false };
+
+/** True when this violation may be sent now: under budget, and new this minute. */
+function admitCsp(key: string): boolean {
+  const now = Date.now();
+  if (now < cspWindow.start || now - cspWindow.start >= MINUTE) {
+    cspWindow.start = now;
+    cspWindow.sent.clear();
+    cspWindow.full = false;
+  }
+  if (cspWindow.sent.has(key)) return false;
+  if (cspWindow.sent.size >= CSP_EVENTS_PER_MINUTE) {
+    if (!cspWindow.full) {
+      cspWindow.full = true;
+      console.warn("[kybr] CSP_VIOLATION_BUDGET", {
+        perMinute: String(CSP_EVENTS_PER_MINUTE),
+      });
+    }
+    return false;
+  }
+  cspWindow.sent.add(key);
+  return true;
+}
+
 /**
  * CSP violations from the collector (SEC § Logging & Monitoring: CSP reports).
  * A warning each; an expected pre-hydration submit (finding 0004) is info,
- * tagged, so it never pages anyone.
+ * tagged, so it never pages anyone. The collector is public, so each instance
+ * sends at most CSP_EVENTS_PER_MINUTE events a minute, and the same directive
+ * and blocked URI once (M3-01); the log line is shape only.
  */
 export function reportCspViolations(violations: CspViolation[]): void {
   for (const violation of violations) {
@@ -119,10 +151,11 @@ export function reportCspViolations(violations: CspViolation[]): void {
     const blocked = violation.blocked.includes("://")
       ? scrubUrl(violation.blocked)
       : violation.blocked;
+    if (!admitCsp(`${violation.directive} ${blocked}`)) continue;
     const expected = violation.expected ? "pre-hydration-submit" : "no";
     console.warn("[kybr] CSP_VIOLATION", {
       directive: violation.directive,
-      blocked,
+      disposition: violation.disposition,
       expected,
     });
     Sentry.captureMessage("csp-violation", {

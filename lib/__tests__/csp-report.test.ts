@@ -93,4 +93,68 @@ describe("parseCspReports", () => {
     expect(parseCspReports("application/csp-report", "nope")).toEqual([]);
     expect(parseCspReports("text/plain", { "csp-report": {} })).toEqual([]);
   });
+
+  // Security M3-01: nothing an attacker types reaches a tag or a log unbounded.
+  describe("M3-01: attacker-controlled fields are bounded", () => {
+    const report = (fields: Record<string, string>) =>
+      parseCspReports("application/csp-report", {
+        "csp-report": {
+          "document-uri": "https://kybr.test/v/loja-exemplo",
+          "blocked-uri": "https://evil.test/x.js",
+          "effective-directive": "script-src-elem",
+          ...fields,
+        },
+      })[0];
+
+    it.each([
+      "script-src",
+      "script-src-elem",
+      "script-src-attr",
+      "style-src-elem",
+      "style-src-attr",
+      "img-src",
+      "font-src",
+      "connect-src",
+      "frame-src",
+      "worker-src",
+      "frame-ancestors",
+      "base-uri",
+      "form-action",
+      "object-src",
+      "default-src",
+    ])("keeps the directive name %s", (directive) => {
+      expect(report({ "effective-directive": directive })?.directive).toBe(
+        directive,
+      );
+    });
+
+    it("maps any other directive to other", () => {
+      expect(
+        report({ "effective-directive": "script-src-elem; evil=1" })?.directive,
+      ).toBe("other");
+      expect(
+        report({ "effective-directive": "x".repeat(5_000) })?.directive,
+      ).toBe("other");
+      expect(
+        report({ "effective-directive": "SCRIPT-SRC-ELEM" })?.directive,
+      ).toBe("other");
+    });
+
+    it("keeps enforce and report as the disposition, and maps anything else to other", () => {
+      expect(report({ disposition: "enforce" })?.disposition).toBe("enforce");
+      expect(report({ disposition: "report" })?.disposition).toBe("report");
+      expect(report({ disposition: "" })?.disposition).toBe("enforce");
+      expect(report({ disposition: "critical\nfake" })?.disposition).toBe(
+        "other",
+      );
+    });
+
+    it("caps the blocked URI at 256 characters", () => {
+      const long = `https://evil.test/${"a".repeat(1_000)}.js`;
+      expect(report({ "blocked-uri": long })?.blocked).toHaveLength(256);
+      expect(
+        report({ "blocked-uri": "z".repeat(1_000) })?.blocked,
+      ).toHaveLength(256);
+    });
+  });
 });
