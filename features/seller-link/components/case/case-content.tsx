@@ -4,6 +4,7 @@ import { AnalysisView } from "@/features/seller-link/components/case/analysis-vi
 import { ApprovedView } from "@/features/seller-link/components/case/approved-view";
 import { BlockedView } from "@/features/seller-link/components/case/blocked-view";
 import { CaseLiveStatus } from "@/features/seller-link/components/case/case-live-status";
+import { LazyContactEmailBlock } from "@/features/seller-link/components/case/lazy-leaves";
 import { PendingView } from "@/features/seller-link/components/case/pending-view";
 import { VerifyingView } from "@/features/seller-link/components/case/verifying-view";
 import { caseAnnouncement } from "@/features/seller-link/case-announcement";
@@ -43,6 +44,14 @@ export function CaseContent({
   publicCase,
   link,
 }: Props): JSX.Element {
+  // DDR-0001: the e-mail block, on *quase lá* and both *em análise* variants.
+  const emailBlock = (
+    <LazyContactEmailBlock
+      slug={slug}
+      token={token}
+      maskedSaved={publicCase.resultado?.email_contato_mascarado}
+    />
+  );
   switch (view.viewKey) {
     case "verifying":
       // Both nodes render on the server; the client swaps them at 10 s.
@@ -54,7 +63,7 @@ export function CaseContent({
           offlineBanner={caseCopy["offline.banner"]}
           msUntilTimeout={view.msUntilTimeout}
           verifying={<VerifyingView />}
-          analysis={<AnalysisView variant="timeout" />}
+          analysis={<AnalysisView variant="timeout" emailBlock={emailBlock} />}
           analysisAnnouncement={caseAnnouncement(
             "analysis-timeout",
             publicCase,
@@ -77,6 +86,7 @@ export function CaseContent({
             variant={
               view.viewKey === "analysis-timeout" ? "timeout" : "notfound"
             }
+            emailBlock={emailBlock}
           />
         </>
       );
@@ -88,7 +98,9 @@ export function CaseContent({
         />
       );
     case "pending":
-      return <PendingView resultado={resultOf(publicCase)} />;
+      return (
+        <PendingView resultado={resultOf(publicCase)} emailBlock={emailBlock} />
+      );
     case "blocked":
       return (
         <BlockedView

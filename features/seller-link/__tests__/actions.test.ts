@@ -443,19 +443,16 @@ describe("saveContactEmail (D5 write, DDR-0001)", () => {
     ["", "empty"],
     [undefined, "empty"],
     ["maria@", "invalid"],
-  ])(
-    "rejects %j as %s before any API call",
-    async (email, issue) => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch");
+  ])("rejects %j as %s before any API call", async (email, issue) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
 
-      expect(await saveContactEmail(input(email))).toEqual({
-        ok: false,
-        code: "EMAIL_INVALIDO",
-        issue,
-      });
-      expect(fetchSpy).not.toHaveBeenCalled();
-    },
-  );
+    expect(await saveContactEmail(input(email))).toEqual({
+      ok: false,
+      code: "EMAIL_INVALIDO",
+      issue,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 
   it("maps the API's 422 to EMAIL_INVALIDO (invalid)", async () => {
     server.use(
@@ -481,9 +478,10 @@ describe("saveContactEmail (D5 write, DDR-0001)", () => {
   });
 
   it("an unknown or malformed token is CASO_NAO_ENCONTRADO", async () => {
-    expect(
-      await saveContactEmail(input(EMAIL, CASE_TOKENS.unknown)),
-    ).toEqual({ ok: false, code: "CASO_NAO_ENCONTRADO" });
+    expect(await saveContactEmail(input(EMAIL, CASE_TOKENS.unknown))).toEqual({
+      ok: false,
+      code: "CASO_NAO_ENCONTRADO",
+    });
     expect(await saveContactEmail(input(EMAIL, "x"))).toEqual({
       ok: false,
       code: "CASO_NAO_ENCONTRADO",

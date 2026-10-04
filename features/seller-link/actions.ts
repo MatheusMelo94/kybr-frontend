@@ -203,7 +203,10 @@ export async function pollCaseViewAction(
 export type SaveContactEmailResult =
   | { ok: true }
   | { ok: false; code: "EMAIL_INVALIDO"; issue: EmailIssue }
-  | { ok: false; code: "CASO_DECIDIDO" | "CASO_NAO_ENCONTRADO" | "UNAVAILABLE" };
+  | {
+      ok: false;
+      code: "CASO_DECIDIDO" | "CASO_NAO_ENCONTRADO" | "UNAVAILABLE";
+    };
 
 const NOT_FOUND = { ok: false, code: "CASO_NAO_ENCONTRADO" } as const;
 

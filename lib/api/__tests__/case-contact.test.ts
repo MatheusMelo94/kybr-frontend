@@ -68,9 +68,9 @@ describe("saveCaseContact (D5)", () => {
   });
 
   it("maps an unknown token to not_found", async () => {
-    expect(
-      await saveCaseContact(SLUGS.ok, CASE_TOKENS.unknown, EMAIL),
-    ).toEqual({ ok: false, reason: "not_found" });
+    expect(await saveCaseContact(SLUGS.ok, CASE_TOKENS.unknown, EMAIL)).toEqual(
+      { ok: false, reason: "not_found" },
+    );
   });
 
   it("maps a 5xx to failed and logs its shape, never the address", async () => {
@@ -96,9 +96,10 @@ describe("saveCaseContact (D5)", () => {
   it("refuses a malformed slug or token with no API call", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
-    expect(await saveCaseContact("../x", CASE_TOKENS.pendente, EMAIL)).toEqual(
-      { ok: false, reason: "not_found" },
-    );
+    expect(await saveCaseContact("../x", CASE_TOKENS.pendente, EMAIL)).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
     expect(await saveCaseContact(SLUGS.ok, "short", EMAIL)).toEqual({
       ok: false,
       reason: "not_found",
