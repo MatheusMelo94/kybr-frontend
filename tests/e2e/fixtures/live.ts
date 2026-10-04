@@ -1,23 +1,41 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { Page, Request } from "@playwright/test";
 
+import { serverActionId } from "../../fixtures/server-actions.ts";
+
+let checkActionId: string | undefined;
+
 /**
- * A status check is the pollCaseViewAction POST: its body is the two string
- * arguments (slug, token). The e-mail save (saveContactEmail) is a Server
- * Action POST too, with one object argument, so it never counts (QA M3 G10).
+ * pollCaseViewAction's id in the build the specs run against. Read on first
+ * use: Playwright lists the specs before its webServer builds the app.
+ */
+function checkId(): string {
+  checkActionId ??= serverActionId(
+    JSON.parse(
+      readFileSync(
+        join(process.cwd(), ".next/server/server-reference-manifest.json"),
+        "utf8",
+      ),
+    ),
+    "features/seller-link/actions.ts",
+    "pollCaseViewAction",
+  );
+  return checkActionId;
+}
+
+/**
+ * A status check is a pollCaseViewAction POST, recognised by its Server
+ * Action id (review 0019), whatever its arguments. The e-mail save
+ * (saveContactEmail) is a Server Action POST too, with another id, so it never
+ * counts (QA M3 G10).
  */
 export function isCheck(request: Request): boolean {
-  if (request.method() !== "POST" || !request.headers()["next-action"])
-    return false;
-  try {
-    const args: unknown = JSON.parse(request.postData() ?? "");
-    return (
-      Array.isArray(args) &&
-      args.length === 2 &&
-      args.every((arg) => typeof arg === "string")
-    );
-  } catch {
-    return false;
-  }
+  return (
+    request.method() === "POST" &&
+    request.headers()["next-action"] === checkId()
+  );
 }
 
 export type CheckLog = {
