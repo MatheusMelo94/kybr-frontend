@@ -170,6 +170,17 @@ jobs:
             browser: webkit
           - project: firefox-desktop
             browser: firefox
+          # The panel (plan § 2.12; ADR-0008: served on 127.0.0.1 in E2E).
+          - project: panel-desktop
+            browser: chromium
+          - project: panel-firefox
+            browser: firefox
+          - project: panel-768
+            browser: chromium
+          - project: panel-360
+            browser: chromium
+          - project: panel-webkit-360
+            browser: webkit
     env:
       # E2E only: the Playwright webServer runs a production build against the
       # http: mock API on loopback. Never set in a deployed environment
@@ -222,12 +233,13 @@ jobs:
             test-results/
           retention-days: 14
 
-  # ADR-0003 lab budgets (LCP <= 2.0 s, CLS, category scores in
-  # lighthouserc.json), blocking. Measured on a production build against the
+  # ADR-0003/0007 lab budgets for the link and ADR-0010's for the panel
+  # (lighthouserc.json: mobile, the link + /entrar; lighthouserc.panel.json:
+  # desktop, /entrar + /cadastro), blocking. Measured on a production build against the
   # local mock API, as the E2E job runs it, because previews have no API
   # until the backend exists (ADR-0005). No secret is involved.
   lighthouse:
-    name: Lighthouse CI (form and case pages)
+    name: Lighthouse CI (link pages, panel auth pages)
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20

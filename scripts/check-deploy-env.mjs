@@ -16,6 +16,11 @@
 //   back, so a readable value means the toggle was missed (Security DV-03).
 //   Its presence isn't checked: the build fails without it (lib/env-schema.ts).
 // - The plain variables are not Sensitive: CI must read them to check them.
+// - Hosts (ADR-0008 rule 7): Production LINK_HOST=kybr.com.br; PANEL_HOST is
+//   unset (the panel is dark) or app.kybr.com.br in Production. With
+//   PANEL_HOST set (any environment), the legal pages (https:), the terms
+//   version and the Turnstile site key are required; Production refuses
+//   Cloudflare's test keys.
 //
 // It names variables, never their values.
 
@@ -23,6 +28,17 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const VERCEL_CLIENT_IP_HEADER = "x-vercel-forwarded-for";
+const PRODUCTION_LINK_HOST = "kybr.com.br";
+const PRODUCTION_PANEL_HOST = "app.kybr.com.br";
+const PANEL_REQUIRED = [
+  "LEGAL_TERMS_URL",
+  "LEGAL_PRIVACY_URL",
+  "LEGAL_TERMS_VERSION",
+  "TURNSTILE_SITE_KEY",
+];
+const LEGAL_URL_KEYS = ["LEGAL_TERMS_URL", "LEGAL_PRIVACY_URL"];
+// Cloudflare's documented test site keys (always pass / block / interactive).
+const TURNSTILE_TEST_KEY = /^[123]x0{20}[A-Z]{2}$/;
 const API_URL_KEYS = ["API_BASE_URL", "API_PUBLIC_BASE_URL"];
 
 // What `vercel env pull` writes in place of a Sensitive value: vercel@60.1.3
@@ -36,6 +52,10 @@ const PLAIN_KEYS = [
   ...API_URL_KEYS,
   "CLIENT_IP_HEADER",
   "ENABLE_EXPERIMENTAL_COREPACK",
+  "LINK_HOST",
+  "PANEL_HOST",
+  ...PANEL_REQUIRED,
+  "COMMERCIAL_CONTACT_EMAIL",
 ];
 
 /**
@@ -132,10 +152,57 @@ export function checkDeployEnv(env, { target, productionApiOrigin }) {
   if (env.CLIENT_IP_TRUSTED_HOPS !== undefined) {
     problems.push("CLIENT_IP_TRUSTED_HOPS must not be set");
   }
+  problems.push(...hostProblems(env, target, markedSensitive));
   for (const key of Object.keys(env)) {
     if (key.startsWith("NEXT_PUBLIC_")) {
       problems.push(`${key}: no NEXT_PUBLIC_* variable is allowed`);
     }
+  }
+  return problems;
+}
+
+/**
+ * The host and panel rules (ADR-0008 rule 7; plan § 2.10 Env).
+ * @param {Record<string, string | undefined>} env
+ * @param {"preview" | "production"} target
+ * @param {Set<string>} markedSensitive
+ * @returns {string[]}
+ */
+function hostProblems(env, target, markedSensitive) {
+  /** @type {string[]} */
+  const problems = [];
+  const set = (/** @type {string} */ key) =>
+    env[key] !== undefined && env[key] !== "" && !markedSensitive.has(key);
+  if (
+    target === "production" &&
+    env.LINK_HOST !== PRODUCTION_LINK_HOST &&
+    !markedSensitive.has("LINK_HOST")
+  ) {
+    problems.push(`LINK_HOST must be ${PRODUCTION_LINK_HOST} in production`);
+  }
+  if (!set("PANEL_HOST")) return problems;
+  if (target === "production" && env.PANEL_HOST !== PRODUCTION_PANEL_HOST) {
+    problems.push(
+      `PANEL_HOST must be unset or ${PRODUCTION_PANEL_HOST} in production`,
+    );
+  }
+  for (const key of PANEL_REQUIRED) {
+    if (!set(key) && !markedSensitive.has(key))
+      problems.push(`${key} is required when PANEL_HOST is set`);
+  }
+  for (const key of LEGAL_URL_KEYS) {
+    if (!set(key)) continue;
+    const url = toUrl(env[key] ?? "");
+    if (url === undefined || url.protocol !== "https:")
+      problems.push(`${key} must be an https: URL`);
+  }
+  if (
+    target === "production" &&
+    TURNSTILE_TEST_KEY.test(env.TURNSTILE_SITE_KEY ?? "")
+  ) {
+    problems.push(
+      "TURNSTILE_SITE_KEY must not be a Cloudflare test key in production",
+    );
   }
   return problems;
 }

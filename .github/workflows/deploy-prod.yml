@@ -155,9 +155,13 @@ jobs:
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke the staged build (health, security headers)
+      # The staged build's *.vercel.app URL is an unknown host to the app
+      # (ADR-0008 rule 4, P03.1): health answers and every page is a 404.
+      # The page headers are checked on the real domains after promotion.
+      - name: Smoke the staged build (health, unknown-host 404)
         env:
           EXPECT_PROTECTED: "true"
+          EXPECT_UNKNOWN_HOST: "true"
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
         run: sh scripts/check-deploy-headers.sh "$DEPLOY_URL"
@@ -202,9 +206,12 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel promote "$STAGED_URL" --yes --timeout=5m
 
-      - name: Verify production (health, security headers)
+      # PANEL_URL (repository variable) stays unset while the panel is dark
+      # (ADR-0008 rule 7); at release it's https://app.kybr.com.br.
+      - name: Verify production (health, security headers, both hosts)
         env:
           EXPECT_SINGLE_HSTS: "true"
+          PANEL_URL: ${{ vars.PANEL_URL }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: sh scripts/check-deploy-headers.sh "$PRODUCTION_URL"
 

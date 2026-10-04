@@ -296,7 +296,9 @@ describe("check-bundle-budget: layouts count (T55)", () => {
 
     const { status, output } = run(dir);
     // 2 kB of page + 170 kB of layout: over 180 only if the layout counts.
-    expect(output).toMatch(/'\/painel' +│ '\d+\.\d' +│ '180 \(\/painel\/\*\)' +│ 'OVER'/);
+    expect(output).toMatch(
+      /'\/painel' +│ '\d+\.\d' +│ '180 \(\/painel\/\*\)' +│ 'OVER'/,
+    );
     expect(status).toBe(1);
   });
 });
