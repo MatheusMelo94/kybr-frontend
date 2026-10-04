@@ -8,7 +8,7 @@ import {
 } from "@playwright/test";
 
 import { MEI_CNPJS, SLUGS } from "../../fixtures/factories/seller-link.ts";
-import { isCheck } from "../fixtures/live.ts";
+import { installClock, isCheck, pauseClock } from "../fixtures/live.ts";
 import { createCase, setCaseState } from "../fixtures/mock-api.ts";
 
 // QA-M2-004 (T35): the case-page behaviors QA verified only in its M2
@@ -90,19 +90,31 @@ async function openPaused(
 ): Promise<{ token: string; log: Log }> {
   const token = await createCase(request, input);
   const log = record(page);
-  await page.clock.install();
+  const clock = await installClock(page);
   await page.goto(`/v/${SLUGS.ok}/c/${token}`);
   await expect(h1(page, heading)).toBeVisible();
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+  await pauseClock(page, clock);
   await expect.poll(() => log.settled).toBe(log.checks);
   return { token, log };
 }
 
-/** Advances the paused clock, lets any check it started settle, and returns how many started. */
-async function step(page: Page, log: Log, ms: number): Promise<number> {
+/**
+ * Advances the paused clock, lets any check it started settle, and returns how
+ * many started. A check the run started leaves the page asynchronously, so it
+ * returns as soon as one is seen, or after `quiet` ms with none (review 0026).
+ */
+async function step(
+  page: Page,
+  log: Log,
+  ms: number,
+  quiet = 2_000,
+): Promise<number> {
   const before = log.checks;
   await page.clock.runFor(ms);
-  await new Promise((resolve) => setTimeout(resolve, 150));
+  await expect
+    .poll(() => log.checks, { timeout: quiet })
+    .toBeGreaterThan(before)
+    .catch(() => {});
   await expect.poll(() => log.settled, { timeout: 5_000 }).toBe(log.checks);
   return log.checks - before;
 }
@@ -114,7 +126,9 @@ async function expectGap(
   gap: number,
   label: string,
 ): Promise<void> {
-  expect(await step(page, log, gap - 1), `${label}: early`).toBe(0);
+  // A short quiet window (twice the old fixed sleep) keeps the 169-gap ladder
+  // fast; the on-time step waits as long as a check takes to show up.
+  expect(await step(page, log, gap - 1, 300), `${label}: early`).toBe(0);
   expect(await step(page, log, 1), `${label}: on time`).toBe(1);
 }
 

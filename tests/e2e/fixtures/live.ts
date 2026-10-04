@@ -41,6 +41,35 @@ export function recordChecks(page: Page): CheckLog {
   return log;
 }
 
+/** A page clock installed at a start the test set (review 0018). */
+export type TestClock = { start: number; installedAt: number };
+
+/** Installs the page clock at a start the test sets: now, on the test's side. */
+export async function installClock(page: Page): Promise<TestClock> {
+  const start = Date.now();
+  await page.clock.install({ time: start });
+  return { start, installedAt: start };
+}
+
+/**
+ * Pauses the page clock just ahead of where it is (review 0018). The clock
+ * runs in real time from the start the test set, so its time is known here
+ * without a round trip to the page; under load the pause can still land in the
+ * past, so it retries with a wider margin. The first margin stays small:
+ * cadence tests count from the pause with 300 ms of slack.
+ */
+export async function pauseClock(page: Page, clock: TestClock): Promise<void> {
+  for (const margin of [100, 500, 1_000]) {
+    const target = clock.start + (Date.now() - clock.installedAt) + margin;
+    try {
+      await page.clock.pauseAt(target);
+      return;
+    } catch (error) {
+      if (margin === 1_000 || !String(error).includes("past")) throw error;
+    }
+  }
+}
+
 /** Resolves when the page sends its next status check. */
 export function nextCheck(page: Page, timeout = 3_000): Promise<unknown> {
   return page.waitForRequest(isCheck, { timeout });
