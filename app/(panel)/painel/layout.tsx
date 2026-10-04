@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { JSX, ReactNode } from "react";
 
+import { assertPanelHost } from "@/lib/api/panel/host";
+
 import "./panel.css";
 
 // The panel's root segment (ADR-0008): every panel-host path is rewritten
@@ -14,7 +16,11 @@ type Props = {
   children: ReactNode;
 };
 
-export default function PanelLayout({ children }: Props): JSX.Element {
+export default async function PanelLayout({
+  children,
+}: Props): Promise<JSX.Element> {
+  // Middleware isn't a boundary: off the panel host, nothing below renders.
+  await assertPanelHost();
   // `isolate` is the panel's CSS sentinel: the link never uses it, so the
   // bundle guard fails if it reaches a /v/* stylesheet (ADR-0010).
   return <div className="isolate">{children}</div>;
