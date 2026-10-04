@@ -29,6 +29,8 @@ export API_ALLOW_LOOPBACK_HTTP=true
 export API_BFF_KEY=e2e-only-bff-key-for-the-local-mock-api
 export CLIENT_IP_HEADER=x-forwarded-for
 export CLIENT_IP_TRUSTED_HOPS=1
+# The link is served on this host only (ADR-0008).
+export LINK_HOST="localhost:${app_port}"
 export NEXT_TELEMETRY_DISABLED=1
 
 pids=""

@@ -31,6 +31,7 @@ RUN API_BASE_URL=https://api.example.invalid \
     API_BFF_KEY=docker-build-placeholder-not-a-secret \
     CLIENT_IP_HEADER=x-forwarded-for \
     CLIENT_IP_TRUSTED_HOPS=1 \
+    LINK_HOST=kybr.com.br \
     pnpm build
 
 FROM ${NODE_IMAGE} AS runner

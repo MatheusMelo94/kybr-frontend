@@ -48,6 +48,8 @@ export default defineConfig({
         API_BFF_KEY: "e2e-only-bff-key-for-the-local-mock-api",
         CLIENT_IP_HEADER: "x-forwarded-for",
         CLIENT_IP_TRUSTED_HOPS: "1",
+        // The link's host (ADR-0008; required in production builds).
+        LINK_HOST: "localhost:3000",
       },
     },
   ],

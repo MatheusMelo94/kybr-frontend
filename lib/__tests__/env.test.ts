@@ -11,6 +11,7 @@ const production = {
   API_BFF_KEY: SECRET_KEY,
   CLIENT_IP_HEADER: "x-forwarded-for",
   CLIENT_IP_TRUSTED_HOPS: "1",
+  LINK_HOST: "kybr.com.br",
 };
 
 const development = {
@@ -39,6 +40,7 @@ describe("parseServerEnv", () => {
       API_BFF_KEY: SECRET_KEY,
       CLIENT_IP_HEADER: "x-forwarded-for",
       CLIENT_IP_TRUSTED_HOPS: 1,
+      LINK_HOST: "kybr.com.br",
     });
   });
 
@@ -237,6 +239,166 @@ describe("parseServerEnv", () => {
       expect(
         parseServerEnv({ ...production, VERCEL: undefined }).CLIENT_IP_HEADER,
       ).toBe("x-forwarded-for");
+    });
+  });
+
+  describe("panel hosts and config (ADR-0008, T40)", () => {
+    const panel = {
+      ...production,
+      PANEL_HOST: "app.kybr.com.br",
+      LEGAL_TERMS_URL: "https://kybr.com.br/termos",
+      LEGAL_PRIVACY_URL: "https://kybr.com.br/privacidade",
+      LEGAL_TERMS_VERSION: "2026-10-04",
+      TURNSTILE_SITE_KEY: "0x4AAAAAAAexampleKey",
+    };
+
+    it("requires LINK_HOST in production: the link 404s without it", () => {
+      expect(parseError({ ...production, LINK_HOST: undefined })).toContain(
+        "LINK_HOST",
+      );
+    });
+
+    it("lets a Vercel Preview build go without LINK_HOST: its own URLs are link hosts", () => {
+      expect(
+        parseServerEnv({
+          ...production,
+          LINK_HOST: undefined,
+          VERCEL_ENV: "preview",
+          VERCEL_URL: "kybr-abc123.vercel.app",
+        }).LINK_HOST,
+      ).toBeUndefined();
+    });
+
+    it("doesn't require LINK_HOST outside production", () => {
+      expect(parseServerEnv(development).LINK_HOST).toBeUndefined();
+    });
+
+    it.each([
+      ["kybr.com.br", "kybr.com.br"],
+      ["KYBR.com.br", "kybr.com.br"],
+      ["localhost:3000", "localhost:3000"],
+      ["127.0.0.1:3000", "127.0.0.1:3000"],
+    ])("reads LINK_HOST=%s as %s (lowercased, port kept)", (value, host) => {
+      expect(
+        parseServerEnv({ ...production, LINK_HOST: value }).LINK_HOST,
+      ).toBe(host);
+    });
+
+    it.each([
+      "https://kybr.com.br",
+      "kybr.com.br/v",
+      "kybr.com.br:",
+      "kybr.com.br:abc",
+      "user@kybr.com.br",
+      "*.kybr.com.br",
+      "kybr com br",
+    ])("rejects a host that isn't host[:port]: %s", (value) => {
+      expect(parseError({ ...production, LINK_HOST: value })).toContain(
+        "LINK_HOST",
+      );
+      expect(parseError({ ...panel, PANEL_HOST: value })).toContain(
+        "PANEL_HOST",
+      );
+    });
+
+    it("leaves the panel off when PANEL_HOST is unset (the release switch)", () => {
+      const parsed = parseServerEnv(production);
+
+      expect(parsed.PANEL_HOST).toBeUndefined();
+      expect(parsed.LEGAL_TERMS_URL).toBeUndefined();
+      expect(parsed.TURNSTILE_SITE_KEY).toBeUndefined();
+    });
+
+    it("parses a complete panel configuration", () => {
+      expect(
+        parseServerEnv({
+          ...panel,
+          COMMERCIAL_CONTACT_EMAIL: "vendas@kybr.com.br",
+        }),
+      ).toMatchObject({
+        PANEL_HOST: "app.kybr.com.br",
+        LEGAL_TERMS_URL: "https://kybr.com.br/termos",
+        LEGAL_PRIVACY_URL: "https://kybr.com.br/privacidade",
+        LEGAL_TERMS_VERSION: "2026-10-04",
+        TURNSTILE_SITE_KEY: "0x4AAAAAAAexampleKey",
+        COMMERCIAL_CONTACT_EMAIL: "vendas@kybr.com.br",
+      });
+    });
+
+    it.each([
+      "LEGAL_TERMS_URL",
+      "LEGAL_PRIVACY_URL",
+      "LEGAL_TERMS_VERSION",
+      "TURNSTILE_SITE_KEY",
+    ])(
+      "refuses to enable the panel in production without %s (P-U3, U-P2)",
+      (name) => {
+        expect(parseError({ ...panel, [name]: undefined })).toContain(name);
+      },
+    );
+
+    it.each(["LEGAL_TERMS_URL", "LEGAL_PRIVACY_URL"])(
+      "requires an https: %s in production, with loopback allowed like API_PUBLIC_BASE_URL",
+      (name) => {
+        expect(
+          parseError({ ...panel, [name]: "http://kybr.com.br/x" }),
+        ).toContain(name);
+        expect(
+          parseServerEnv({ ...panel, [name]: "http://localhost:3000/x" })[
+            name as "LEGAL_TERMS_URL"
+          ],
+        ).toBe("http://localhost:3000/x");
+        expect(
+          parseError({ ...panel, [name]: "javascript:alert(1)" }),
+        ).toContain(name);
+      },
+    );
+
+    it("rejects a LEGAL_TERMS_VERSION over 32 characters", () => {
+      expect(
+        parseError({ ...panel, LEGAL_TERMS_VERSION: "v".repeat(33) }),
+      ).toContain("LEGAL_TERMS_VERSION");
+    });
+
+    it("rejects a COMMERCIAL_CONTACT_EMAIL that isn't an e-mail", () => {
+      expect(
+        parseError({ ...panel, COMMERCIAL_CONTACT_EMAIL: "vendas" }),
+      ).toContain("COMMERCIAL_CONTACT_EMAIL");
+    });
+
+    it("rejects a TURNSTILE_SITE_KEY with characters a site key never has", () => {
+      expect(
+        parseError({ ...panel, TURNSTILE_SITE_KEY: 'key" onload="x' }),
+      ).toContain("TURNSTILE_SITE_KEY");
+    });
+
+    it("refuses PANEL_HOST equal to LINK_HOST: one host can't serve both", () => {
+      expect(parseError({ ...panel, PANEL_HOST: "kybr.com.br" })).toContain(
+        "PANEL_HOST",
+      );
+    });
+
+    it("reads Vercel's own URLs (VERCEL_ENV, VERCEL_URL, VERCEL_BRANCH_URL)", () => {
+      expect(
+        parseServerEnv({
+          ...production,
+          VERCEL_ENV: "preview",
+          VERCEL_URL: "Kybr-abc123.vercel.app",
+          VERCEL_BRANCH_URL: "kybr-git-feat-x.vercel.app",
+        }),
+      ).toMatchObject({
+        VERCEL_ENV: "preview",
+        VERCEL_URL: "kybr-abc123.vercel.app",
+        VERCEL_BRANCH_URL: "kybr-git-feat-x.vercel.app",
+      });
+    });
+
+    it("has no NEXT_PUBLIC_* panel variable: nothing is inlined into the client", () => {
+      expect(
+        Object.keys(parseServerEnv(panel)).filter((name) =>
+          name.startsWith("NEXT_PUBLIC_"),
+        ),
+      ).toEqual([]);
     });
   });
 
