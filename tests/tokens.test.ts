@@ -26,6 +26,8 @@ const LIGHT_COLORS = {
   "--color-danger": "#d6372f",
   "--color-badge-monitor": "#0066ff",
   "--color-badge-monitor-ink": "#ffffff",
+  // White on --color-danger in both themes (4.72:1): the late Fila badge.
+  "--color-danger-badge-ink": "#ffffff",
 } as const;
 
 const DARK_COLORS: Record<keyof typeof LIGHT_COLORS, string> = {
@@ -49,6 +51,7 @@ const DARK_COLORS: Record<keyof typeof LIGHT_COLORS, string> = {
   "--color-danger": "#d6372f",
   "--color-badge-monitor": "#0066ff",
   "--color-badge-monitor-ink": "#ffffff",
+  "--color-danger-badge-ink": "#ffffff",
 };
 
 /** A dark value: the swap's, or the light one when the theme doesn't change it. */

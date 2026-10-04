@@ -24,7 +24,7 @@ describe("NavCount (AC 11, Q9)", () => {
 
     expect(screen.getByTestId("nav-count")).toHaveClass(
       "bg-danger",
-      "text-badge-monitor-ink",
+      "text-danger-badge-ink",
     );
     expect(
       screen.getByTestId("nav-count").querySelector("svg"),

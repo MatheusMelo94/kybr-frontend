@@ -119,4 +119,22 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     await expect(page.getByRole("menu")).toHaveCount(0);
     await expect(button).toBeFocused();
   });
+
+  test("the first Tab is the skip link, visible on focus; Enter moves to the main content", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("pular", testInfo);
+    await createAccount(request, email);
+    await logIn(page, email);
+    // A fresh load: the document is where the first Tab starts.
+    await page.reload();
+    await page.keyboard.press("Tab");
+
+    const skip = page.getByRole("link", { name: "Pular para o conteúdo" });
+    await expect(skip).toBeFocused();
+    await expect(skip).toBeInViewport();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("main#conteudo")).toBeFocused();
+  });
 });

@@ -3,6 +3,7 @@ import type { JSX, ReactNode } from "react";
 import { AccountMenu } from "@/features/panel-shell/components/account-menu";
 import { LogoutItem } from "@/features/panel-shell/components/logout-item";
 import { PanelNav } from "@/features/panel-shell/components/panel-nav";
+import { SkipLink } from "@/features/panel-shell/components/skip-link";
 import { BfcacheGuard } from "@/features/panel-shell/components/bfcache-guard";
 import { SessionExpiryProvider } from "@/features/panel-shell/components/session-expiry-provider";
 import { LivePlanBlock } from "@/features/panel-shell/components/live-plan-block";
@@ -41,6 +42,7 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
       >
         <ShellStatusPoller />
         <BfcacheGuard />
+        <SkipLink />
         <div className="lg:flex">
           <header className="border-b border-line lg:hidden">
             <TopBar workspaceNome={shell.workspaceNome} />
@@ -73,6 +75,8 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
           {/* max-w-7xl is the page container (design-conventions --container-page: 80rem). */}
           <main
             id="conteudo"
+            // The skip link's target: focusable by script, not by Tab.
+            tabIndex={-1}
             className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8"
           >
             <div className="mx-auto w-full max-w-7xl">{children}</div>

@@ -52,6 +52,7 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "common.new_tab": "(abre em outra aba)",
   },
   shell: {
+    "shell.skip": "Pular para o conteúdo",
     "nav.label": "Navegação do painel",
     "nav.inicio": "Início",
     "nav.fila": "Fila de revisão",

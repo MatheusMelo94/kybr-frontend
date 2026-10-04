@@ -55,7 +55,7 @@ export function NavCount({ abertos, vencidos }: Props): JSX.Element | null {
         aria-hidden="true"
         className={cn(
           "ml-auto inline-flex min-w-6 items-center justify-center gap-1 rounded-full px-2 text-secondary font-strong tabular-nums",
-          late ? "bg-danger text-badge-monitor-ink" : "bg-field text-ink",
+          late ? "bg-danger text-danger-badge-ink" : "bg-field text-ink",
         )}
       >
         {late && <AlertGlyph />}

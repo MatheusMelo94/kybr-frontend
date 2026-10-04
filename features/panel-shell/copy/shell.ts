@@ -3,6 +3,7 @@
 // plurals with plural(). Never edit a string here without the spec changing
 // first (the UX Strategist owns the copy).
 export const shellCopy = {
+  "shell.skip": "Pular para o conteúdo",
   "nav.label": "Navegação do painel",
   "nav.inicio": "Início",
   "nav.fila": "Fila de revisão",
