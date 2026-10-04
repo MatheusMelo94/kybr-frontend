@@ -11,9 +11,18 @@
 //
 // A budgeted route pattern with no built route yet is reported, not failed, so
 // the guard can land before the routes do.
+//
+// ADR-0010 adds, per page, from its client reference manifest
+// (.next/server/app/<entry>_client-reference-manifest.js):
+// - a CSS pass: the gzip size of the stylesheets the page's segments load
+//   (global-error's excluded: it loads only when the root layout fails),
+//   against bundle-budget.json › css.routes;
+// - isolation: no /v/* page may list a panel client module, and no /v/*
+//   stylesheet may carry the panel's sentinel class (css.panelSentinel).
 
-import { readFileSync, readdirSync, appendFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, appendFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { runInNewContext } from "node:vm";
 import { gzipSync } from "node:zlib";
 
 const root = process.cwd();
@@ -49,14 +58,51 @@ function routeOf(entry) {
   return "/" + segments.join("/");
 }
 
-/** "/v/*" matches "/v" and everything below it; anything else matches exactly. */
+/**
+ * "/v/*" matches "/v" and everything below it; "/painel/cadastro*" matches
+ * every route that starts with "/painel/cadastro"; anything else matches
+ * exactly. The first matching pattern wins, in the file's order.
+ */
 function matches(pattern, route) {
   if (pattern.endsWith("/*")) {
     const base = pattern.slice(0, -2);
     return route === base || route.startsWith(base + "/");
   }
+  if (pattern.endsWith("*")) return route.startsWith(pattern.slice(0, -1));
   return route === pattern;
 }
+
+/** The page's client reference manifest, or undefined (not built, or a fixture without one). */
+function referenceManifest(entry) {
+  const file = join(
+    distDir,
+    "server/app",
+    `${entry}_client-reference-manifest.js`,
+  );
+  if (!existsSync(file)) return undefined;
+  const sandbox = {};
+  sandbox.globalThis = sandbox;
+  runInNewContext(readFileSync(file, "utf8"), sandbox);
+  return sandbox.__RSC_MANIFEST?.[entry];
+}
+
+/** The stylesheets a page loads: every segment's, except global-error's. */
+function cssFilesOf(rsc) {
+  const files = new Set();
+  for (const [segment, list] of Object.entries(rsc?.entryCSSFiles ?? {})) {
+    if (segment.endsWith("/global-error")) continue;
+    for (const item of list) if (!item.inlined) files.add(item.path);
+  }
+  return [...files];
+}
+
+// ADR-0010 isolation rule 1: panel code that must never reach a /v/* client bundle.
+const PANEL_MODULE_MARKERS = [
+  "/app/(panel)/",
+  "/features/panel-",
+  "/components/panel/",
+  "/lib/gsap",
+];
 
 const gzipCache = new Map();
 function gzipBytes(file) {
@@ -68,44 +114,113 @@ function gzipBytes(file) {
 }
 
 const routes = new Map();
+const isolationProblems = [];
 for (const [entry, files] of Object.entries(manifest.pages)) {
   const route = routeOf(entry);
   if (route === null) continue;
   const js = [...new Set(files.filter((f) => f.endsWith(".js")))];
-  routes.set(
-    route,
-    js.reduce((sum, f) => sum + gzipBytes(f), 0),
-  );
+  const rsc = referenceManifest(entry);
+  const css = cssFilesOf(rsc);
+  routes.set(route, {
+    js: js.reduce((sum, f) => sum + gzipBytes(f), 0),
+    css:
+      rsc === undefined
+        ? undefined
+        : css.reduce((sum, f) => sum + gzipBytes(f), 0),
+    cssFiles: css,
+  });
+  if (matches("/v/*", route)) {
+    // clientModules is app-wide; a module is on this page only when one of
+    // its chunk files is (paths in `chunks` are URL-encoded).
+    const pageFiles = new Set(js);
+    for (const [clientModule, entry] of Object.entries(
+      rsc?.clientModules ?? {},
+    )) {
+      if (!PANEL_MODULE_MARKERS.some((m) => clientModule.includes(m))) continue;
+      const onPage = (entry.chunks ?? []).some(
+        (chunk) =>
+          chunk.endsWith(".js") && pageFiles.has(decodeURIComponent(chunk)),
+      );
+      if (onPage)
+        isolationProblems.push(
+          `${route} loads panel module ${relative(root, clientModule)}`,
+        );
+    }
+  }
 }
 
-const patterns = Object.entries(config.routes ?? {});
-function budgetFor(route) {
+function budgetIn(patterns, route, fallback) {
   const hit = patterns.find(([pattern]) => matches(pattern, route));
-  return hit
-    ? { kb: hit[1], source: hit[0] }
-    : { kb: config.default, source: "default" };
+  if (hit) return { kb: hit[1], source: hit[0] };
+  return fallback === undefined
+    ? undefined
+    : { kb: fallback, source: "default" };
 }
+const jsPatterns = Object.entries(config.routes ?? {});
+const cssPatterns = Object.entries(config.css?.routes ?? {});
 
 const kb = (bytes) => (bytes / 1000).toFixed(1);
 const rows = [];
+const cssRows = [];
 let failed = false;
+let cssFailed = false;
 for (const route of [...routes.keys()].sort()) {
-  const bytes = routes.get(route);
-  const budget = budgetFor(route);
-  const over = bytes > budget.kb * 1000;
+  const { js, css } = routes.get(route);
+  const budget = budgetIn(jsPatterns, route, config.default);
+  const over = js > budget.kb * 1000;
   failed ||= over;
   rows.push({
     route,
-    size: kb(bytes),
+    size: kb(js),
     budget: `${budget.kb} (${budget.source})`,
     status: over ? "OVER" : "ok",
+  });
+  if (css === undefined) continue;
+  const cssBudget = budgetIn(cssPatterns, route);
+  const cssOver = cssBudget !== undefined && css > cssBudget.kb * 1000;
+  cssFailed ||= cssOver;
+  cssRows.push({
+    route,
+    size: (css / 1000).toFixed(2),
+    budget: cssBudget ? `${cssBudget.kb} (${cssBudget.source})` : "none",
+    status: cssOver ? "OVER" : "ok",
   });
 }
 
 console.log("Bundle guard: First Load JS, gzip kB");
 console.table(rows);
+if (cssRows.length > 0) {
+  console.log("Bundle guard: CSS, gzip kB");
+  console.table(cssRows);
+}
 
-const missing = patterns
+// ADR-0010 isolation rule 2: a class only the panel uses must never compile
+// into a /v/* stylesheet (it would mean the link's @source scans panel files).
+const sentinel = config.css?.panelSentinel;
+if (sentinel) {
+  const pattern = new RegExp(
+    `\\.${sentinel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`,
+  );
+  for (const [route, { cssFiles }] of routes) {
+    if (!matches("/v/*", route)) continue;
+    for (const file of cssFiles) {
+      if (pattern.test(readFileSync(join(distDir, file), "utf8")))
+        isolationProblems.push(
+          `${route} stylesheet ${file} has the panel sentinel .${sentinel}`,
+        );
+    }
+  }
+}
+if (isolationProblems.length > 0) {
+  console.error(
+    `Bundle guard FAILED: /v/* isolation (ADR-0010):\n  ${[...new Set(isolationProblems)].join("\n  ")}`,
+  );
+  process.exitCode = 1;
+} else {
+  console.log("Isolation: no panel module or panel CSS in any /v/* route.");
+}
+
+const missing = jsPatterns
   .map(([pattern]) => pattern)
   .filter((pattern) => ![...routes.keys()].some((r) => matches(pattern, r)));
 for (const pattern of missing) {
@@ -124,6 +239,14 @@ if (process.env.GITHUB_STEP_SUMMARY) {
       (r) => `| \`${r.route}\` | ${r.size} | ${r.budget} | ${r.status} |`,
     ),
     ...missing.map((p) => `| \`${p}\` | — | not built yet | skipped |`),
+    "",
+    "### Bundle guard (CSS, gzip)",
+    "",
+    "| Route | kB | Budget kB | Status |",
+    "|---|---:|---|---|",
+    ...cssRows.map(
+      (r) => `| \`${r.route}\` | ${r.size} | ${r.budget} | ${r.status} |`,
+    ),
     "",
   ];
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"));
@@ -154,6 +277,13 @@ if (sentryFiles.length > 0) {
   console.log(
     `Sentry bytes in client chunks: 0 (${clientFiles.size} files checked).`,
   );
+}
+
+if (cssFailed) {
+  console.error(
+    "Bundle guard FAILED: a route's CSS is over budget (ADR-0010). Fix the stylesheet or its @source list (Frontend Engineer) or change the budget by ADR (Frontend Architect).",
+  );
+  process.exitCode = 1;
 }
 
 if (failed) {

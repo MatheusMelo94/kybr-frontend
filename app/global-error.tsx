@@ -5,7 +5,7 @@ import type { JSX } from "react";
 import { LinkColumn } from "@/features/seller-link/components/link-column";
 import { LoadError } from "@/features/seller-link/components/load-error";
 
-import "./globals.css";
+import "./(link)/link.css";
 
 type Props = {
   error: Error & { digest?: string };

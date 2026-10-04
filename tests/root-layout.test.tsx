@@ -27,7 +27,7 @@ vi.mock("next/font/google", () => ({
 
 function surfaceHex(selectorMarker: string): string | undefined {
   const css = readFileSync(
-    resolve(dirname(fileURLToPath(import.meta.url)), "../app/globals.css"),
+    resolve(dirname(fileURLToPath(import.meta.url)), "../app/tokens.css"),
     "utf8",
   );
   const start = css.indexOf(selectorMarker);

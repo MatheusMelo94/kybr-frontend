@@ -1,0 +1,12 @@
+@import "tailwindcss" source(none);
+@import "../tokens.css";
+
+/* The link's stylesheet (ADR-0010 rule 2): utilities from the link's files
+   only, so panel classes never reach /v/* (the bundle guard checks it). The
+   root layout, not-found.tsx and global-error.tsx render the link's copy. */
+@source ".";
+@source "../../features/seller-link";
+@source "../../components/ui";
+@source "../layout.tsx";
+@source "../not-found.tsx";
+@source "../global-error.tsx";

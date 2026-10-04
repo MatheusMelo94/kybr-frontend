@@ -1,4 +1,7 @@
-@import "tailwindcss";
+/* The design tokens of record, in one partial (ADR-0010 rule 2): the theme,
+   the dark swap and the base layer. Never imported on its own: each surface's
+   entry (app/(link)/link.css, app/(panel)/painel/panel.css) imports Tailwind
+   and then this file, so neither surface compiles the other's utilities. */
 
 /* Dark theme follows the system setting (no toggle, Constitution v2). The
    data-theme attribute on <html> is kept as an override hook (plan § 7). */

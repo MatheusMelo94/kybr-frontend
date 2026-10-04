@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
-// Teach tailwind-merge the brand tokens from app/globals.css. Without this it
+// Teach tailwind-merge the brand tokens from app/tokens.css. Without this it
 // reads text-body as a color (dropping it next to text-ink) and font-title as a
 // font family (dropping font-sans).
 const twMerge = extendTailwindMerge({

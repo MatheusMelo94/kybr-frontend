@@ -63,10 +63,21 @@ const OTHER_TOKENS = {
   "--duration-loop": "1.4s",
 } as const;
 
-const css = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), "../app/globals.css"),
-  "utf8",
-);
+const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "../app");
+const read = (path: string): string =>
+  readFileSync(resolve(appDir, path), "utf8");
+
+// ADR-0010 rule 2: the tokens in one partial, two Tailwind entries.
+const css = read("tokens.css");
+const linkCss = read("(link)/link.css");
+const panelCss = read("(panel)/painel/panel.css");
+
+/** The @source paths an entry scans. */
+function sources(entry: string): string[] {
+  return [...entry.matchAll(/@source\s+"([^"]+)"/g)].map(
+    (match) => match[1] ?? "",
+  );
+}
 
 /** Returns the body of the first `{ … }` block that starts at or after `marker`. */
 function blockAfter(source: string, marker: string): string {
@@ -104,9 +115,54 @@ const darkBySystem = declarations(
 );
 const darkByAttribute = declarations(blockAfter(base, '[data-theme="dark"] {'));
 
-describe("app/globals.css", () => {
-  it("starts with the Tailwind import", () => {
-    expect(css.trimStart().startsWith('@import "tailwindcss";')).toBe(true);
+describe("the per-surface entries (ADR-0010 rule 2)", () => {
+  it.each([
+    ["link", linkCss],
+    ["panel", panelCss],
+  ])(
+    "the %s entry imports Tailwind with no automatic sources, then the tokens",
+    (_, entry) => {
+      const imports = [...entry.matchAll(/^@import\s+"([^"]+)"[^;]*;/gm)].map(
+        (match) => match[0],
+      );
+      expect(imports).toEqual([
+        '@import "tailwindcss" source(none);',
+        expect.stringMatching(/^@import "(\.\.\/)+tokens\.css";$/),
+      ]);
+    },
+  );
+
+  it("the link entry scans only the link's files", () => {
+    expect(sources(linkCss).sort()).toEqual(
+      [
+        ".",
+        "../../features/seller-link",
+        "../../components/ui",
+        "../layout.tsx",
+        "../not-found.tsx",
+        "../global-error.tsx",
+      ].sort(),
+    );
+  });
+
+  it("the panel entry scans only the panel's files", () => {
+    expect(sources(panelCss).sort()).toEqual(
+      [
+        ".",
+        "../../../features/panel-*",
+        "../../../components/ui",
+        "../../../components/panel",
+        "../../layout.tsx",
+      ].sort(),
+    );
+  });
+});
+
+describe("app/tokens.css", () => {
+  it("is a partial: no Tailwind import, no sources, no utilities", () => {
+    expect(css).not.toMatch(/@import\s+"tailwindcss/);
+    expect(css).not.toContain("@source");
+    expect(css).not.toContain("@utility");
   });
 
   it.each(["--color-*", "--radius-*", "--shadow-*", "--font-*"])(

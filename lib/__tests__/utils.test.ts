@@ -19,7 +19,7 @@ describe("cn", () => {
     );
   });
 
-  describe("with the brand tokens (app/globals.css)", () => {
+  describe("with the brand tokens (app/tokens.css)", () => {
     it("treats text-body/-secondary/-title as font sizes, not colors", () => {
       expect(cn("text-body", "text-ink")).toBe("text-body text-ink");
       expect(cn("text-secondary text-ink-muted", "text-title")).toBe(
