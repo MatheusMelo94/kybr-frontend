@@ -23,6 +23,19 @@ describe("fillNode", () => {
     );
   });
 
+  it("review 0027: reads a leaf's value only from <RazaoSocial>, not from any element with a string value", () => {
+    const { container } = render(
+      <p>
+        {fillNode("Empresa: {razao_social}.", {
+          razao_social: <data value="Exemplo Ltda.">Exemplo ME</data>,
+        })}
+        {fillNode(" Valor: {v}.", { v: <input readOnly value="S.A." /> })}
+      </p>,
+    );
+
+    expect(container.textContent).toBe("Empresa: Exemplo ME. Valor: .");
+  });
+
   it("fills the same placeholder twice", () => {
     const { container } = render(
       <p>{fillNode("{a} e {a}", { a: <em>x</em> })}</p>,

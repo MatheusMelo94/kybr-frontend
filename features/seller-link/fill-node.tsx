@@ -1,6 +1,7 @@
 import { Fragment, isValidElement, type ReactNode } from "react";
 
 import { endsSentence, type Placeholders } from "@/features/seller-link/format";
+import { RazaoSocial } from "@/features/seller-link/razao-social";
 
 /**
  * Fills a copy template's `{placeholder}`s with text or elements, such as
@@ -39,8 +40,8 @@ export function fillNode<S extends string>(
 
 /**
  * The text a node ends with: a string itself, the last child of an element or
- * array, or a leaf element's `value` prop (how <RazaoSocial value> carries its
- * text; masking a CPF never changes the name's last character).
+ * array, or <RazaoSocial>'s `value` (masking a CPF never changes the name's
+ * last character). No other element's `value` is read (review 0027).
  */
 function trailingText(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return `${node}`;
@@ -54,7 +55,7 @@ function trailingText(node: ReactNode): string {
   if (isValidElement<{ children?: ReactNode; value?: unknown }>(node)) {
     const { children, value } = node.props;
     if (children !== undefined) return trailingText(children);
-    if (typeof value === "string") return value;
+    if (node.type === RazaoSocial && typeof value === "string") return value;
   }
   return "";
 }
