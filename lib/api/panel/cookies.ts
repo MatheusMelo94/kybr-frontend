@@ -4,6 +4,10 @@ import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
 import { env } from "@/lib/env";
+import {
+  panelCookieNames,
+  type PanelCookieNames,
+} from "@/lib/panel-cookie-names";
 import { isLoopbackHostname } from "@/lib/safe-url";
 
 // The panel's cookies (ADR-0009 rules 3 and 10; P02, P19). Written only by

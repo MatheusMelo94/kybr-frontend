@@ -5,6 +5,7 @@ import {
   classifyHost,
   hostConfigFromEnv,
   isProtectedPanelPath,
+  usesTurnstile,
   type HostConfig,
 } from "@/lib/panel-hosts";
 
@@ -109,4 +110,20 @@ describe("isProtectedPanelPath (ADR-0009 rule 6)", () => {
       ].sort(),
     );
   });
+});
+
+describe("usesTurnstile (ADR-0009 rule 13, P03.4)", () => {
+  it.each(["/entrar", "/cadastro", "/cadastro/confirmar", "/senha/esqueci"])(
+    "%s renders Turnstile",
+    (path) => {
+      expect(usesTurnstile(path)).toBe(true);
+    },
+  );
+
+  it.each(["/senha/nova", "/fila", "/", "/comecar", "/entrar/x"])(
+    "%s doesn't",
+    (path) => {
+      expect(usesTurnstile(path)).toBe(false);
+    },
+  );
 });

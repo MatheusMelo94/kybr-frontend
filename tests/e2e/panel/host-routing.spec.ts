@@ -8,6 +8,9 @@ import { expect, test } from "@playwright/test";
 const LINK = "http://localhost:3000";
 const PANEL_404 = "Página não encontrada";
 const LINK_404 = "Link não encontrado";
+// Protected panel paths need a session cookie's presence to get past
+// middleware (T47); these routes don't read it yet.
+const SESSION_COOKIE = "kybr_session=presenca-somente-0123456789";
 
 type RawResponse = {
   status: number;
@@ -28,7 +31,7 @@ function rawGet(
         port: 3000,
         path,
         method: "GET",
-        headers: { ...headers, host },
+        headers: { cookie: SESSION_COOKIE, ...headers, host },
       },
       (res) => {
         let body = "";
@@ -51,6 +54,11 @@ function rawGet(
 }
 
 test.describe("host routing @feature-ops-panel @panel-access", () => {
+  test.beforeEach(async ({ context }) => {
+    const [name = "", value = ""] = SESSION_COOKIE.split("=");
+    await context.addCookies([{ name, value, url: "http://127.0.0.1:3000" }]);
+  });
+
   test("the panel host serves the panel at / and at unknown paths", async ({
     page,
   }) => {

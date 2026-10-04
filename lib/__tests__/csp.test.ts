@@ -86,3 +86,39 @@ describe("generateNonce", () => {
     expect(second).not.toBe(first);
   });
 });
+
+describe("buildContentSecurityPolicy: the panel (ADR-0008 rule 9, P03.4)", () => {
+  const panel = {
+    nonce: "abc123",
+    isDev: false,
+    upgradeInsecureRequests: true,
+  };
+
+  function directive(policy: string, name: string): string | undefined {
+    return policy
+      .split("; ")
+      .find((part) => part === name || part.startsWith(`${name} `));
+  }
+
+  it("allows connect-src 'self' only: the panel browser never calls the API", () => {
+    const policy = buildContentSecurityPolicy(panel);
+
+    expect(directive(policy, "connect-src")).toBe("connect-src 'self'");
+    expect(policy).not.toContain("challenges.cloudflare.com");
+    expect(directive(policy, "frame-src")).toBeUndefined();
+  });
+
+  it("adds Turnstile's origin to script-src and frame-src only when asked", () => {
+    const policy = buildContentSecurityPolicy({ ...panel, turnstile: true });
+
+    expect(directive(policy, "script-src")).toBe(
+      "script-src 'self' 'nonce-abc123' 'strict-dynamic' https://challenges.cloudflare.com",
+    );
+    expect(directive(policy, "frame-src")).toBe(
+      "frame-src https://challenges.cloudflare.com",
+    );
+    expect(directive(policy, "connect-src")).toBe("connect-src 'self'");
+    expect(directive(policy, "frame-ancestors")).toBe("frame-ancestors 'none'");
+    expect(directive(policy, "form-action")).toBe("form-action 'self'");
+  });
+});

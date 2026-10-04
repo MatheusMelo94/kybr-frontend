@@ -58,3 +58,13 @@ export const PUBLIC_PANEL_PATHS: ReadonlySet<string> = new Set([
 export function isProtectedPanelPath(path: string): boolean {
   return !PUBLIC_PANEL_PATHS.has(path);
 }
+
+/** The auth pages that render Cloudflare Turnstile (ADR-0009 rule 13): its origin is allowed there only. */
+export function usesTurnstile(path: string): boolean {
+  return (
+    path === "/entrar" ||
+    path === "/cadastro" ||
+    path === "/cadastro/confirmar" ||
+    path === "/senha/esqueci"
+  );
+}
