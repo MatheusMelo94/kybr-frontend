@@ -6,6 +6,7 @@ import { caseAnnouncement } from "@/features/seller-link/case-announcement";
 import { CaseContent } from "@/features/seller-link/components/case/case-content";
 import { CaseViewTransition } from "@/features/seller-link/components/case/case-view-transition";
 import { LinkNotFound } from "@/features/seller-link/components/link-not-found";
+import { PrivacyFooter } from "@/features/seller-link/components/privacy-footer";
 import { StepIndicator } from "@/features/seller-link/components/step-indicator";
 import { deriveCaseView } from "@/features/seller-link/case-view";
 import { formCopy } from "@/features/seller-link/copy/form";
@@ -53,6 +54,7 @@ export default async function CasePage({
           link={link.link}
         />
       </CaseViewTransition>
+      <PrivacyFooter slug={slug} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { CaseLiveStatus } from "@/features/seller-link/components/case/case-live
 import {
   LazyContactEmailBlock,
   LazyDocumentUpload,
+  PreloadAnalysisLeaves,
 } from "@/features/seller-link/components/case/lazy-leaves";
 import { PendingView } from "@/features/seller-link/components/case/pending-view";
 import { VerifyingView } from "@/features/seller-link/components/case/verifying-view";
@@ -72,19 +73,24 @@ export function CaseContent({
     case "verifying":
       // Both nodes render on the server; the client swaps them at 10 s.
       return (
-        <CaseLiveStatus
-          mode="switch"
-          slug={slug}
-          token={token}
-          offlineBanner={caseCopy["offline.banner"]}
-          msUntilTimeout={view.msUntilTimeout}
-          verifying={<VerifyingView />}
-          analysis={<AnalysisView variant="timeout" emailBlock={emailBlock} />}
-          analysisAnnouncement={caseAnnouncement(
-            "analysis-timeout",
-            publicCase,
-          )}
-        />
+        <>
+          <PreloadAnalysisLeaves />
+          <CaseLiveStatus
+            mode="switch"
+            slug={slug}
+            token={token}
+            offlineBanner={caseCopy["offline.banner"]}
+            msUntilTimeout={view.msUntilTimeout}
+            verifying={<VerifyingView />}
+            analysis={
+              <AnalysisView variant="timeout" emailBlock={emailBlock} />
+            }
+            analysisAnnouncement={caseAnnouncement(
+              "analysis-timeout",
+              publicCase,
+            )}
+          />
+        </>
       );
     case "analysis-timeout":
     case "analysis-notfound":

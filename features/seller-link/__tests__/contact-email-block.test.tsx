@@ -101,7 +101,11 @@ describe("ContactEmailBlock (DDR-0001)", () => {
     );
     expect(status.closest('[role="status"]')).not.toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.getByRole("button", { name: "Trocar e-mail" })).toHaveFocus();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Trocar e-mail" }),
+      ).toHaveFocus(),
+    );
   });
 
   it("AC 24: Trocar e-mail reopens the field and focuses it", async () => {

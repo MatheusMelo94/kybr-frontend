@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect } from "react";
 
 // The case page's follow-up leaves, split out of the route's First Load JS
 // (ADR-0003 budget watch; tasks.md "the first lever"). They render only on
@@ -22,3 +23,17 @@ export const LazyDocumentUpload = dynamic(() =>
     (module) => module.DocumentUpload,
   ),
 );
+
+/**
+ * Rendered on *verificando*: fetches the e-mail block's chunk while the page
+ * is still online. The 10 s switch shows *em análise* (with the block) on the
+ * client even when the connection is gone (spec AC 29), and a chunk that
+ * can't load would keep that view from rendering. Renders nothing.
+ */
+export function PreloadAnalysisLeaves(): null {
+  useEffect(() => {
+    // Same module as LazyContactEmailBlock's import, so the same chunk.
+    void import("@/features/seller-link/components/case/contact-email-block");
+  }, []);
+  return null;
+}
