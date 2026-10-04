@@ -7,10 +7,16 @@ import {
   PANEL_PASSWORD,
   TURNSTILE_TOKENS,
 } from "@/tests/fixtures/factories/panel";
-import { issueTicket, panelStore } from "@/tests/fixtures/msw/panel-store";
+import {
+  issueTicket,
+  openSession,
+  panelStore,
+  sessionAccount,
+} from "@/tests/fixtures/msw/panel-store";
 
 const state = vi.hoisted(() => ({
   headers: new Headers(),
+  token: undefined as string | undefined,
   pending: null as null | {
     ticket: string;
     nome: string;
@@ -24,6 +30,7 @@ const cookies = vi.hoisted(() => ({
   setSignupCookie: vi.fn(),
   deleteSignupCookie: vi.fn(),
   readSignupCookie: vi.fn(async () => state.pending),
+  readSessionToken: vi.fn(async () => state.token),
 }));
 vi.mock("next/headers", () => ({ headers: async () => state.headers }));
 vi.mock("next/navigation", () => ({
@@ -52,6 +59,7 @@ beforeEach(() => {
     "x-forwarded-for": "203.0.113.9",
   });
   state.pending = null;
+  state.token = undefined;
   vi.clearAllMocks();
 });
 
@@ -62,6 +70,16 @@ describe("confirmEmailAction (D-A2, ADR-0009 rule 10)", () => {
       "NEXT_NOT_FOUND",
     );
     expect(panelStore().calls).toEqual([]);
+  });
+
+  it("hands the API the session this browser held, so a confirmation revokes it (M4-06)", async () => {
+    const previous = openSession(PANEL_EMAILS.renata).id;
+    state.token = previous;
+    pendingFor(PANEL_EMAILS.pendente);
+    const { codigo } = panelStore().outbox.get(PANEL_EMAILS.pendente) ?? {};
+
+    expect((await confirmEmailAction({ codigo })).ok).toBe(true);
+    expect(sessionAccount(previous)).toBeUndefined();
   });
 
   it("with the right code: the session cookie, the sign-up cookie deleted, /comecar", async () => {

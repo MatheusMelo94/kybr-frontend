@@ -7,14 +7,22 @@ import {
   PANEL_PASSWORD,
   TURNSTILE_TOKENS,
 } from "@/tests/fixtures/factories/panel";
-import { panelStore } from "@/tests/fixtures/msw/panel-store";
+import {
+  openSession,
+  panelStore,
+  sessionAccount,
+} from "@/tests/fixtures/msw/panel-store";
 import { server } from "@/tests/fixtures/msw/server";
 
-const state = vi.hoisted(() => ({ headers: new Headers() }));
+const state = vi.hoisted(() => ({
+  headers: new Headers(),
+  token: undefined as string | undefined,
+}));
 const cookies = vi.hoisted(() => ({
   setSessionCookie: vi.fn(),
   setSignupCookie: vi.fn(),
   deleteSignupCookie: vi.fn(),
+  readSessionToken: vi.fn(async () => state.token),
 }));
 vi.mock("next/headers", () => ({ headers: async () => state.headers }));
 vi.mock("next/navigation", () => ({
@@ -32,6 +40,7 @@ beforeEach(() => {
     host: "app.kybr.test",
     "x-forwarded-for": "203.0.113.9",
   });
+  state.token = undefined;
   vi.clearAllMocks();
 });
 
@@ -82,6 +91,21 @@ describe("loginAction (D-A4, ADR-0009)", () => {
 
     await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD });
     expect(cookies.deleteSignupCookie).toHaveBeenCalledOnce();
+  });
+
+  it("hands the API the session this browser held, so a success revokes it (M4-06)", async () => {
+    const previous = openSession(PANEL_EMAILS.renata).id;
+    state.token = previous;
+
+    expect(
+      await login({ email: PANEL_EMAILS.renata, senha: "senha-errada-000" }),
+    ).toEqual({ ok: false, code: "CREDENCIAIS_INVALIDAS" });
+    expect(sessionAccount(previous)).toBeDefined();
+
+    expect(
+      (await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD })).ok,
+    ).toBe(true);
+    expect(sessionAccount(previous)).toBeUndefined();
   });
 
   it("maps wrong credentials to CREDENCIAIS_INVALIDAS, setting no cookie", async () => {

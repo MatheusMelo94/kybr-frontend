@@ -109,7 +109,7 @@ const signup = http.post("*/v1/auth/signup", async ({ request }) => {
 });
 
 const confirm = http.post("*/v1/auth/confirm", async ({ request }) => {
-  const { body, refused } = await incoming(request);
+  const { body, token, refused } = await incoming(request);
   if (refused) return refused;
   const store = panelStore();
   const ticket = store.tickets.get(str(body.signup_ticket));
@@ -128,6 +128,8 @@ const confirm = http.post("*/v1/auth/confirm", async ({ request }) => {
   if (!account) return apiError(400, "CODIGO_EXPIRADO");
   account.confirmado = true;
   store.tickets.delete(str(body.signup_ticket));
+  // Like login (G9, P02.5): the id this browser presented stops working.
+  if (token !== undefined) expireSession(token);
   return ok({ sessao: openSession(account.email) });
 });
 

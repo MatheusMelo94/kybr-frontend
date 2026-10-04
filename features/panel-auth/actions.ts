@@ -65,6 +65,16 @@ export type LoginResult =
   | { ok: false; code: "EMAIL_NAO_CONFIRMADO"; next: string }
   | CommonFailure;
 
+/**
+ * The session id this browser already holds, as a bearer header the API
+ * revokes when it issues a new one (P02.5, M4-06). A plain header, not
+ * panelRequest's sessionToken: these calls' own 401s keep their codes.
+ */
+async function presentedSession(): Promise<Record<string, string>> {
+  const token = await readSessionToken();
+  return token === undefined ? {} : { authorization: `Bearer ${token}` };
+}
+
 /** D-A4: logs in, rotates the session cookie and returns the safe next path. */
 export async function loginAction(input: unknown): Promise<LoginResult> {
   await assertPanelHost();
@@ -77,6 +87,7 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
     path: apiPaths.panel.login(),
     method: "POST",
     body: { email, senha, ...(turnstile !== undefined && { turnstile }) },
+    headers: await presentedSession(),
     schema: sessaoSchema,
     forwardClientIp: true,
   });
@@ -226,6 +237,7 @@ export async function confirmEmailAction(
     path: apiPaths.panel.confirm(),
     method: "POST",
     body: { signup_ticket: pending.ticket, codigo: parsed.data.codigo },
+    headers: await presentedSession(),
     schema: sessaoSchema,
     forwardClientIp: true,
   });
