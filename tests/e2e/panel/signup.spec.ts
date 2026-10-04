@@ -4,7 +4,9 @@ import { expectNoAxeViolations } from "../fixtures/axe.ts";
 import {
   PANEL_URL,
   callsFor,
+  createAccount,
   horizontalOverflow,
+  logIn,
   seed,
   signupsFor,
   uniqueEmail,
@@ -45,6 +47,17 @@ async function submit(page: Page): Promise<void> {
 const formAlert = (page: Page) => page.getByRole("main").getByRole("alert");
 
 test.describe("/cadastro @feature-ops-panel @panel-access @panel-phone", () => {
+  test("Q10: a valid session on /cadastro goes home, like /entrar", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("ja-logada-cadastro", testInfo);
+    await createAccount(request, email);
+    await logIn(page, email);
+    await page.goto("/cadastro");
+    await expect(page).toHaveURL(/\/fila$/);
+  });
+
   test("AC 1: four labeled fields, the terms with two new-tab links, Criar conta, Já tem conta; no horizontal scroll at 320; axe clean", async ({
     page,
   }) => {

@@ -32,6 +32,21 @@ async function requestLink(page: Page, email: string): Promise<string> {
 }
 
 test.describe("password reset @feature-ops-panel @panel-access", () => {
+  test("Q10: with a valid session, /senha/esqueci and /senha/nova still render", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("ja-logada-senha", testInfo);
+    await createAccount(request, email);
+    await logIn(page, email);
+    for (const path of ["/senha/esqueci", "/senha/nova"]) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    }
+  });
+
   test("AC 6: /senha/esqueci says the same for an existing and an unknown address, behind Turnstile", async ({
     page,
     request,
