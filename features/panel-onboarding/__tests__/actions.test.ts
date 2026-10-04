@@ -1,8 +1,10 @@
 // @vitest-environment node
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CATEGORIES, PANEL_EMAILS } from "@/tests/fixtures/factories/panel";
 import { openSession, panelStore } from "@/tests/fixtures/msw/panel-store";
+import { server } from "@/tests/fixtures/msw/server";
 
 const state = vi.hoisted(() => ({
   headers: new Headers(),
@@ -14,6 +16,9 @@ vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
+  }),
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT ${url}`);
   }),
 }));
 vi.mock("@/lib/api/panel/cookies", () => ({
@@ -59,17 +64,31 @@ describe("saveOnboardingAction (D-W3)", () => {
     expect(revalidatePath).toHaveBeenCalledWith(panelPath("/"), "layout");
   });
 
-  it("without a session cookie: SESSAO_EXPIRADA, no API call", async () => {
+  it("without a session cookie: requireSession() redirects to /entrar, no API call", async () => {
     state.token = undefined;
-    expect(await saveOnboardingAction(VALID)).toEqual({
-      ok: false,
-      code: "SESSAO_EXPIRADA",
-    });
+    await expect(saveOnboardingAction(VALID)).rejects.toThrow(
+      "NEXT_REDIRECT /entrar?motivo=sessao",
+    );
     expect(panelStore().calls).toEqual([]);
   });
 
-  it("a revoked session: SESSAO_EXPIRADA", async () => {
+  it("a session /me rejects: the same redirect, and no PUT", async () => {
     panelStore().sessions.clear();
+    await expect(saveOnboardingAction(VALID)).rejects.toThrow(
+      "NEXT_REDIRECT /entrar?motivo=sessao",
+    );
+    expect(panelStore().calls.map((call) => call.method)).toEqual(["GET"]);
+  });
+
+  it("a 401 on the PUT after requireSession() passed: SESSAO_EXPIRADA", async () => {
+    server.use(
+      http.put("*/v1/workspace", () =>
+        HttpResponse.json(
+          { code: "SESSAO_EXPIRADA", message: "m" },
+          { status: 401 },
+        ),
+      ),
+    );
     expect(await saveOnboardingAction(VALID)).toEqual({
       ok: false,
       code: "SESSAO_EXPIRADA",

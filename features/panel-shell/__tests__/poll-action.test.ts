@@ -19,6 +19,9 @@ vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT ${url}`);
+  }),
 }));
 vi.mock("@/lib/api/panel/cookies", () => ({
   readSessionToken: async () => state.token,
@@ -51,21 +54,30 @@ describe("pollShellStatusAction (ADR-0011 rule 3, AC 11)", () => {
     expect(JSON.stringify(result)).not.toContain(PANEL_EMAILS.renata);
   });
 
-  it("maps a 401 to SESSAO_EXPIRADA", async () => {
+  it("a session the API rejects: requireSession() redirects to /entrar (ADR-0011 note)", async () => {
+    state.headers.set("x-kybr-panel-path", "/fila");
     panelStore().sessions.clear();
-    expect(await pollShellStatusAction()).toEqual({
-      ok: false,
-      code: "SESSAO_EXPIRADA",
-    });
+    await expect(pollShellStatusAction()).rejects.toThrow(
+      "NEXT_REDIRECT /entrar?motivo=sessao&volta=%2Ffila",
+    );
   });
 
-  it("no cookie: SESSAO_EXPIRADA with no API call", async () => {
+  it("no cookie: the same redirect, with no API call", async () => {
     state.token = undefined;
-    expect(await pollShellStatusAction()).toEqual({
-      ok: false,
-      code: "SESSAO_EXPIRADA",
-    });
+    await expect(pollShellStatusAction()).rejects.toThrow(
+      "NEXT_REDIRECT /entrar?motivo=sessao",
+    );
     expect(panelStore().calls).toEqual([]);
+  });
+
+  it("reads its projection from one GET /v1/me that carries X-Kybr-Poll: 1", async () => {
+    const seen: (string | null)[] = [];
+    server.events.on("request:start", ({ request }) => {
+      seen.push(request.headers.get("x-kybr-poll"));
+    });
+    await pollShellStatusAction();
+    server.events.removeAllListeners("request:start");
+    expect(seen).toEqual(["1"]);
   });
 
   it("any other failure is FAILED (the leaf hides the counts)", async () => {

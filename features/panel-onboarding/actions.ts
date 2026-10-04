@@ -8,10 +8,9 @@ import {
   onboardingIssues,
   type OnboardingField,
 } from "@/features/panel-onboarding/validation";
-import { panelRequest } from "@/lib/api/panel/client";
-import { sessionToken } from "@/lib/api/panel/session";
-import { apiPaths } from "@/lib/api/path";
-import { workspaceSchema } from "@/lib/api/schemas/panel/workspace";
+import { assertPanelHost } from "@/lib/api/panel/host";
+import { requireSession } from "@/lib/api/panel/session";
+import { saveOnboarding } from "@/lib/api/panel/workspace";
 import { panelPath } from "@/lib/panel-paths";
 
 export type OnboardingResult =
@@ -36,27 +35,21 @@ function fieldsOf(input: unknown): OnboardingField[] {
 }
 
 /**
- * D-W3: saves the seller contact and category (onboarding step 1). The
- * session check is the host check plus the cookie; a 401 comes back as
- * SESSAO_EXPIRADA for the client to send Renata to /entrar (ADR-0009 rule 7).
+ * D-W3: saves the seller contact and category (onboarding step 1), in
+ * ADR-0011's order: host, zod, requireSession() (no session → /entrar),
+ * then the API. A 401 after that comes back as SESSAO_EXPIRADA for the
+ * client to send Renata to /entrar (ADR-0009 rule 7).
  */
 export async function saveOnboardingAction(
   input: unknown,
 ): Promise<OnboardingResult> {
-  const token = await sessionToken();
+  await assertPanelHost();
   const parsed = onboardingSchema.safeParse(input);
   if (!parsed.success)
     return { ok: false, code: "INVALID", fields: fieldsOf(input) };
-  if (token === undefined) return { ok: false, code: "SESSAO_EXPIRADA" };
+  await requireSession();
 
-  const result = await panelRequest({
-    operation: "workspace-onboarding",
-    path: apiPaths.panel.workspace(),
-    method: "PUT",
-    body: parsed.data,
-    schema: workspaceSchema,
-    sessionToken: token,
-  });
+  const result = await saveOnboarding(parsed.data);
   if (result.ok) {
     // The shell and the onboarding gate read /me: refresh the whole panel.
     revalidatePath(panelPath("/"), "layout");

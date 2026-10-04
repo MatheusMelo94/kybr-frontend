@@ -2,11 +2,13 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
+import type { ApiResult } from "@/lib/api/client";
 import { panelRequest } from "@/lib/api/panel/client";
 import { sessionExpiredUrl, sessionToken } from "@/lib/api/panel/session";
 import { apiPaths } from "@/lib/api/path";
 import {
   categoriesSchema,
+  workspaceSchema,
   type Category,
 } from "@/lib/api/schemas/panel/workspace";
 
@@ -30,4 +32,23 @@ export async function getCategories(): Promise<Category[]> {
   if (result.error.code === "SESSAO_EXPIRADA")
     redirect(await sessionExpiredUrl());
   throw result.error;
+}
+
+/**
+ * D-W3: saves the onboarding step (a body the action zod-parsed), for an
+ * action that already passed requireSession(). A 401 here (the session ended
+ * in between) comes back as SESSAO_EXPIRADA (ADR-0011 note, rule 3).
+ */
+export async function saveOnboarding(
+  body: object,
+): Promise<ApiResult<unknown>> {
+  const token = await sessionToken();
+  return panelRequest({
+    operation: "workspace-onboarding",
+    path: apiPaths.panel.workspace(),
+    method: "PUT",
+    body,
+    schema: workspaceSchema,
+    ...(token !== undefined && { sessionToken: token }),
+  });
 }

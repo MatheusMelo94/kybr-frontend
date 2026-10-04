@@ -30,6 +30,9 @@ vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT ${url}`);
+  }),
 }));
 vi.mock("@/lib/api/panel/cookies", () => cookies);
 vi.mock("@/lib/monitoring", () => ({ reportMarker }));
@@ -82,7 +85,8 @@ describe("the panel's shape-only markers (T61, P16)", () => {
     panelStore().sessions.clear();
     state.token = id;
 
-    await pollShellStatusAction();
+    // requireSession() then redirects to /entrar (ADR-0011 note).
+    await expect(pollShellStatusAction()).rejects.toThrow("NEXT_REDIRECT");
 
     expect(markers()).toEqual([
       ["SESSION_REJECTED", { operation: "shell-status" }],
