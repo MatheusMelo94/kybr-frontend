@@ -134,9 +134,8 @@ describe("BlockedView (não aprovado)", () => {
   it.each([
     [
       { codigo: "RESPONSAVEL_NAO_SOCIO" },
-      // The spec string ends with "{razao_social}.", so a name ending in
-      // "Ltda." shows ".." (flagged for the UX Strategist; copy is verbatim).
-      "Maria Exemplo Silva não aparece entre os sócios da empresa Comercial Exemplo Ltda..",
+      // The name's own period ends the sentence (T23a): no "Ltda..".
+      "Maria Exemplo Silva não aparece entre os sócios da empresa Comercial Exemplo Ltda.",
     ],
     [
       { codigo: "EMPRESA_RECENTE" },

@@ -60,7 +60,7 @@ describe("PendingView (quase lá)", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Encontramos a empresa Comercial Exemplo Ltda.. Falta pouco para liberar seu cadastro:",
+        "Encontramos a empresa Comercial Exemplo Ltda. Falta pouco para liberar seu cadastro:",
       ),
     ).toBeInTheDocument();
     expect(items().map((item) => item.textContent)).toEqual([
