@@ -127,4 +127,11 @@
     background-color: var(--color-surface);
     color: var(--color-ink);
   }
+
+  /* A heading focused by script (tabindex=-1: on load and on every view
+     change) gets the controls' token ring, never the UA outline (QA-M2-002, Q7;
+     FA § Accessibility). */
+  h1[tabindex="-1"]:focus-visible {
+    @apply outline-2 outline-offset-2 outline-focus;
+  }
 }
