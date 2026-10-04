@@ -12,6 +12,16 @@ const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 export async function expectNoAxeViolations(page: Page): Promise<void> {
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
+    // Controls cross-fade their colors (transition-colors, --duration-fast)
+    // when the scheme flips: measure the settled colors, not a mid-fade frame.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => animation instanceof CSSTransition)
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+    );
     const { violations } = await new AxeBuilder({ page })
       .withTags(WCAG_TAGS)
       .analyze();

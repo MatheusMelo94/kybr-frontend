@@ -63,6 +63,29 @@ test.describe("case route boundaries @feature-seller-link", () => {
     await expectNoAxeViolations(page);
   });
 
+  for (const path of ["c", "c/"]) {
+    test(`QA-M2-003 / Q8: /v/{slug}/${path} with no token is Case not found (404) with Começar de novo, never Link not found`, async ({
+      page,
+    }) => {
+      const response = await page.goto(`/v/${SLUGS.ok}/${path}`);
+
+      expect(response?.status()).toBe(404);
+      expect(response?.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+      await expect(
+        page.getByRole("heading", {
+          level: 1,
+          name: "Cadastro não encontrado",
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: "Começar de novo" }),
+      ).toHaveAttribute("href", `/v/${SLUGS.ok}`);
+      await expect(
+        page.getByText(/Este link de cadastro não existe/),
+      ).toHaveCount(0);
+    });
+  }
+
   test("AC 27: an unknown token is Case not found, never indexed; Começar de novo opens the empty form", async ({
     page,
   }) => {

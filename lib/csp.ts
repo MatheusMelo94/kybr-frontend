@@ -1,3 +1,8 @@
+/** The same-origin CSP report collector (app/api/csp-report/route.ts). */
+export const CSP_REPORT_PATH = "/api/csp-report";
+/** The Reporting-Endpoints group the policy's report-to names. */
+export const CSP_REPORT_GROUP = "csp";
+
 type CspOptions = {
   /** Fresh per request (generateNonce). */
   nonce: string;
@@ -35,6 +40,11 @@ export function buildContentSecurityPolicy({
     ["form-action", "'self'"],
     ["object-src", "'none'"],
     ...(upgradeInsecureRequests ? [["upgrade-insecure-requests"]] : []),
+    // Violations go to the same-origin collector (T34a). report-to names the
+    // Reporting-Endpoints group middleware.ts sets; report-uri covers browsers
+    // without the Reporting API.
+    ["report-uri", CSP_REPORT_PATH],
+    ["report-to", CSP_REPORT_GROUP],
   ];
   return directives.map((directive) => directive.join(" ")).join("; ");
 }

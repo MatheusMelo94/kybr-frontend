@@ -9,6 +9,43 @@ import {
 } from "@/features/seller-link/format";
 import { formCopy } from "@/features/seller-link/copy/form";
 import { privacyCopy } from "@/features/seller-link/copy/privacy";
+import { blockedCopy } from "@/features/seller-link/copy/blocked";
+import { resultsCopy } from "@/features/seller-link/copy/results";
+
+// Review 0016 (QA-M2-001): a value that ends with a period ends the sentence.
+describe("fill: one period after a value that ends with one", () => {
+  it("form.lookup.found with a name ending in Ltda. reads Ltda., not Ltda..", () => {
+    expect(
+      fill(formCopy["form.lookup.found"], {
+        razao_social: "Comercial Exemplo de Peças Ltda.",
+      }),
+    ).toBe("Empresa encontrada: Comercial Exemplo de Peças Ltda.");
+  });
+
+  it.each([
+    [
+      resultsCopy["approved.next"],
+      "Pode fechar esta página e voltar para o cadastro na plataforma Loja Exemplo S.A.",
+    ],
+    [
+      blockedCopy["blocked.reason.GENERICO"],
+      "Para saber como seguir, fale com Loja Exemplo S.A.",
+    ],
+    [
+      privacyCopy["privacy.rights"],
+      "Para ver, corrigir ou apagar seus dados, fale com Loja Exemplo S.A.",
+    ],
+  ])("a {marketplace}. template: %s", (template, filled) => {
+    expect(fill(template, { marketplace: "Loja Exemplo S.A." })).toBe(filled);
+  });
+
+  it("keeps the template's period after a value without one, and a value's period before other text", () => {
+    expect(
+      fill(formCopy["form.lookup.found"], { razao_social: "Exemplo ME" }),
+    ).toBe("Empresa encontrada: Exemplo ME.");
+    expect(fill("{a} e {b}.", { a: "S.A.", b: "Ltda" })).toBe("S.A. e Ltda.");
+  });
+});
 
 describe("fill", () => {
   it("replaces every placeholder, including repeats", () => {

@@ -6,6 +6,8 @@ import {
   CASE_TOKENS,
   DOCUMENT_TYPES,
   ERROR_SENTINEL,
+  REJECTED_EMAIL,
+  REJECTED_RESPONSAVEL,
   SLUGS,
   UPLOAD_MARKERS,
   cnpjCheckDigits,
@@ -408,6 +410,15 @@ describe("D3 start a verification", () => {
   it("422 RESPONSAVEL_INVALIDO with field for a single-word name", async () => {
     const { response, body } = await verify(cnpjFor("aprovado"), {
       responsavel: "Maria",
+    });
+
+    expectErrorEnvelope(response, body, 422, "RESPONSAVEL_INVALIDO");
+    expect(body.field).toBe("responsavel");
+  });
+
+  it("422 RESPONSAVEL_INVALIDO for the schema-valid name the backend rejects (T17b, AC 10)", async () => {
+    const { response, body } = await verify(cnpjFor("aprovado"), {
+      responsavel: REJECTED_RESPONSAVEL,
     });
 
     expectErrorEnvelope(response, body, 422, "RESPONSAVEL_INVALIDO");
@@ -869,6 +880,7 @@ describe("D6 document upload", () => {
 
   it.each([
     [UPLOAD_MARKERS.tooLarge, 413, "ARQUIVO_GRANDE"],
+    [UPLOAD_MARKERS.fileLimit, 413, "LIMITE_ARQUIVOS"],
     [UPLOAD_MARKERS.badFormat, 415, "FORMATO_INVALIDO"],
     [UPLOAD_MARKERS.decided, 409, "CASO_DECIDIDO"],
     [UPLOAD_MARKERS.rateLimited, 429, "LIMITE_TENTATIVAS"],
@@ -884,6 +896,31 @@ describe("D6 document upload", () => {
       expectErrorEnvelope(response, body, status, code);
     },
   );
+
+  it("F05: past 30 files across the case's documents, 413 LIMITE_ARQUIVOS", async () => {
+    const photos = (count: number) =>
+      Array.from(
+        { length: count },
+        (_, index) =>
+          new File(
+            [new Uint8Array([0xff, 0xd8, 0xff, 0xe0])],
+            `p${index}.jpg`,
+            {
+              type: "image/jpeg",
+            },
+          ),
+      );
+    const first = await upload(CASE_TOKENS.pendente, "RESPONSAVEL", photos(30));
+    expect(first.response.status).toBe(201);
+
+    const { response, body } = await upload(
+      CASE_TOKENS.pendente,
+      "RESPONSAVEL",
+      photos(1),
+    );
+
+    expectErrorEnvelope(response, body, 413, "LIMITE_ARQUIVOS");
+  });
 
   it("S13: the network-drop marker fails at the network level", async () => {
     await expect(
@@ -1149,4 +1186,234 @@ describe("case presets (QA test plan G8, G10–G12)", () => {
         expect(new URL(url ?? "").hostname).toMatch(/(^|\.)gov\.br$/);
     },
   );
+});
+
+describe("M3 mock controls (QA M3 test plan G3, G5, G6)", () => {
+  function jpegBytes(size: number): Uint8Array<ArrayBuffer> {
+    const bytes = new Uint8Array(size);
+    bytes.set([0xff, 0xd8, 0xff]);
+    return bytes;
+  }
+
+  function useControls(): void {
+    server.use(...mockControlHandlers);
+  }
+
+  async function control(
+    path: string,
+    init: { method: string; body?: unknown },
+  ): Promise<{ response: Response; body: Json }> {
+    return call(path, {
+      method: init.method,
+      ...(init.body !== undefined && {
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init.body),
+      }),
+    });
+  }
+
+  async function newCase(body: Record<string, unknown> = {}): Promise<string> {
+    const { response, body: created } = await control("/__mock/cases", {
+      method: "POST",
+      body,
+    });
+    expect(response.status).toBe(201);
+    return String(created.token);
+  }
+
+  function saveEmail(
+    token: string,
+    email: string,
+  ): Promise<{ response: Response; body: Json }> {
+    return call(`/public/v/${SLUGS.ok}/cases/${token}/contact`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  it("G3: the reserved address always answers 422 EMAIL_INVALIDO", async () => {
+    const { response, body } = await saveEmail(
+      CASE_TOKENS.pendente,
+      REJECTED_EMAIL,
+    );
+
+    expectErrorEnvelope(response, body, 422, "EMAIL_INVALIDO");
+    expect(body.field).toBe("email");
+  });
+
+  it("G3: fails the next n D5 saves with a status, delays them, and logs them", async () => {
+    useControls();
+    const token = await newCase({ kind: "pendente", ageMs: 60_000 });
+    await control(`/__mock/cases/${token}/contact/fail`, {
+      method: "POST",
+      body: { status: 500, times: 1 },
+    });
+    await control(`/__mock/cases/${token}/contact/delay`, {
+      method: "POST",
+      body: { ms: 200 },
+    });
+
+    const started = Date.now();
+    const failed = await saveEmail(token, "maria@empresa-exemplo.test");
+    expect(Date.now() - started).toBeGreaterThanOrEqual(190);
+    expectErrorEnvelope(failed.response, failed.body, 500, "ERRO_INTERNO");
+    expect(
+      (await saveEmail(token, " maria@empresa-exemplo.test ")).response.status,
+    ).toBe(204);
+
+    expect(
+      (await control(`/__mock/cases/${token}/contact`, { method: "GET" })).body,
+    ).toEqual({
+      requests: 2,
+      last: { email: " maria@empresa-exemplo.test " },
+    });
+  });
+
+  it("G5: an override case shows a saved e-mail masked and counts uploads on its document items", async () => {
+    useControls();
+    const token = await newCase(CASE_PRESETS.pendingCatalogue);
+
+    expect(
+      (await saveEmail(token, "maria@empresa-exemplo.test")).response.status,
+    ).toBe(204);
+    const form = new FormData();
+    form.set("tipo", "RESPONSAVEL");
+    form.append(
+      "arquivos",
+      new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], "a.pdf", {
+        type: "application/pdf",
+      }),
+    );
+    await call(`/public/v/${SLUGS.ok}/cases/${token}/documents`, {
+      method: "POST",
+      body: form,
+    });
+
+    const resultado = (await readCase(token)).body.resultado as {
+      email_contato_mascarado?: string;
+      itens: { documento_tipo?: string; documentos_enviados?: number }[];
+    };
+    expect(resultado.email_contato_mascarado).toBe("m•••@empresa-exemplo.test");
+    expect(
+      resultado.itens.find((item) => item.documento_tipo === "RESPONSAVEL")
+        ?.documentos_enviados,
+    ).toBe(1);
+    expect(
+      resultado.itens.find((item) => item.documento_tipo === "PROCURACAO")
+        ?.documentos_enviados,
+    ).toBe(0);
+  });
+
+  // Review 0028: a preset's counts and the uploads are one source.
+  describe("G5 + G6: a preset's documentos_enviados are files already received", () => {
+    function presetWith(
+      responsavel: number,
+      other = 0,
+    ): Record<string, unknown> {
+      return {
+        estado: "pending",
+        resultado: {
+          ...CASE_PRESETS.pendingCatalogue.resultado,
+          itens: [
+            {
+              codigo: "DOCUMENTO_RESPONSAVEL",
+              documento_tipo: "RESPONSAVEL",
+              documentos_enviados: responsavel,
+            },
+            {
+              codigo: "DOCUMENTO_SOLICITADO",
+              documento_tipo: "PROCURACAO",
+              documentos_enviados: other,
+            },
+          ],
+        },
+      };
+    }
+
+    function photos(count: number): FormData {
+      const form = new FormData();
+      form.set("tipo", "RESPONSAVEL");
+      for (let i = 0; i < count; i += 1)
+        form.append(
+          "arquivos",
+          new File([jpegBytes(1_000)], `p${i}.jpg`, { type: "image/jpeg" }),
+        );
+      return form;
+    }
+
+    it("an upload adds to the preset's count instead of replacing it", async () => {
+      useControls();
+      const token = await newCase(presetWith(2));
+
+      const { body } = await call(
+        `/public/v/${SLUGS.ok}/cases/${token}/documents`,
+        { method: "POST", body: photos(1) },
+      );
+
+      expect(body.documentos_enviados).toBe(3);
+      const resultado = (await readCase(token)).body.resultado as {
+        itens: { documento_tipo?: string; documentos_enviados?: number }[];
+      };
+      expect(
+        resultado.itens.find((item) => item.documento_tipo === "RESPONSAVEL")
+          ?.documentos_enviados,
+      ).toBe(3);
+    });
+
+    it("the 30-file cap counts the preset's files", async () => {
+      useControls();
+      const token = await newCase(presetWith(20, 9));
+
+      const { response, body } = await call(
+        `/public/v/${SLUGS.ok}/cases/${token}/documents`,
+        { method: "POST", body: photos(2) },
+      );
+
+      expectErrorEnvelope(response, body, 413, "LIMITE_ARQUIVOS");
+    });
+  });
+
+  it("G6: starts a case with files already received, which the upload rules then count", async () => {
+    useControls();
+    const token = await newCase({
+      kind: "pendente",
+      ageMs: 60_000,
+      uploads: {
+        RESPONSAVEL: { files: 2, bytes: 9_500_000, format: "photos" },
+      },
+    });
+
+    const resultado = (await readCase(token)).body.resultado as {
+      itens: { documento_tipo?: string; documentos_enviados?: number }[];
+    };
+    expect(
+      resultado.itens.find((item) => item.documento_tipo === "RESPONSAVEL")
+        ?.documentos_enviados,
+    ).toBe(2);
+
+    const form = new FormData();
+    form.set("tipo", "RESPONSAVEL");
+    form.append(
+      "arquivos",
+      new File([jpegBytes(1_000_000)], "b.jpg", {
+        type: "image/jpeg",
+      }),
+    );
+    const { response, body } = await call(
+      `/public/v/${SLUGS.ok}/cases/${token}/documents`,
+      { method: "POST", body: form },
+    );
+    expectErrorEnvelope(response, body, 413, "ARQUIVO_GRANDE");
+  });
+
+  it("G6: rejects a bad uploads seed", async () => {
+    useControls();
+    const { response } = await control("/__mock/cases", {
+      method: "POST",
+      body: { uploads: { NAO_EXISTE: { files: 1, bytes: 1, format: "pdf" } } },
+    });
+
+    expect(response.status).toBe(400);
+  });
 });

@@ -3,6 +3,7 @@ import "server-only";
 import type { z } from "zod";
 
 import { env } from "@/lib/env";
+import { reportMarker } from "@/lib/monitoring";
 
 import { getClientIp } from "./client-ip";
 import { AppError, appErrorFromResponse } from "./errors";
@@ -48,6 +49,18 @@ function publicApiUrl(path: string): URL {
   return url;
 }
 
+/**
+ * True when fetch refused a 3xx (redirect: "error"). Undici rejects with a
+ * TypeError whose cause reads "unexpected redirect"; a socket failure has
+ * another cause (finding 0003).
+ */
+function isRefusedRedirect(error: unknown): boolean {
+  if (!(error instanceof TypeError)) return false;
+  const { cause } = error as { cause?: unknown };
+  const reason = cause instanceof Error ? cause.message : String(cause);
+  return reason === "unexpected redirect";
+}
+
 /** A failure before a full response arrived: the timeout's abort, or the network. */
 function transportError(error: unknown): AppError {
   const aborted =
@@ -90,6 +103,11 @@ export async function apiRequest<T>(
       ...(request.next !== undefined && { next: request.next }),
     });
   } catch (error) {
+    // A refused redirect may be an attempt to make the key follow a 3xx, or
+    // an API misconfiguration: alert on any, apart from outages. The seller
+    // still sees the network copy (finding 0003).
+    if (isRefusedRedirect(error))
+      reportMarker("REDIRECT_REFUSED", { operation: request.operation });
     return { ok: false, error: transportError(error) };
   }
   if (!response.ok)

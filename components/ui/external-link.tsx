@@ -26,7 +26,7 @@ export function ExternalLink({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "inline-flex min-h-11 items-center text-ink underline underline-offset-4",
+        "inline-flex min-h-11 items-center text-ink underline underline-offset-4 hover:decoration-2",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
         className,
       )}

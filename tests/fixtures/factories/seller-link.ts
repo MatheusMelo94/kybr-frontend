@@ -63,6 +63,7 @@ export const CASE_TOKENS = {
 /** Put one of these in an uploaded file's name to force that D6 outcome (S13). */
 export const UPLOAD_MARKERS = {
   tooLarge: "__413__",
+  fileLimit: "__413files__", // LIMITE_ARQUIVOS (F05), without sending 31 files
   badFormat: "__415__",
   decided: "__409__",
   rateLimited: "__429__",
@@ -84,6 +85,8 @@ export const SLOW_RESULT_AFTER_MS = 14_000;
 export const FIXED_CASE_CREATED_AT = "2026-10-01T12:00:00.000Z";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+/** Per-case file cap across every document (F05; contract D6 LIMITE_ARQUIVOS). */
+export const MAX_FILES_PER_CASE = 30;
 
 export const DOCUMENT_TYPES = [
   "CONTRATO_SOCIAL_OU_CCMEI",
@@ -248,6 +251,15 @@ export function buildCompany(cnpj: string): Company {
   };
 }
 
+/**
+ * A schema-valid name (two words) that D3 rejects with 422
+ * RESPONSAVEL_INVALIDO (T17b, AC 10 backend case): the client can't catch it.
+ */
+export const REJECTED_RESPONSAVEL = "Nome Recusado";
+
+/** An address D5 always rejects with 422 EMAIL_INVALIDO (QA M3 plan G3, EM05). */
+export const REJECTED_EMAIL = "rejeitado@empresa-exemplo.test";
+
 /** A synthetic full name for fixed-token cases. */
 export function buildResponsavel(key: string): string {
   return fakerFor(`person:${key}`).person.fullName();
@@ -327,12 +339,44 @@ function pendingItems(record: CaseRecord): Record<string, unknown>[] {
   ];
 }
 
+/**
+ * An override's resultado plus what the case received since (QA M3 plan G5):
+ * a saved e-mail, masked, unless the override sets one; and each document
+ * item's documentos_enviados from the uploads of its documento_tipo.
+ */
+function withWrites(
+  record: CaseRecord,
+  resultado: Record<string, unknown>,
+): Record<string, unknown> {
+  const itens = Array.isArray(resultado.itens)
+    ? (resultado.itens as Record<string, unknown>[]).map((item) => {
+        const upload = record.uploads.get(item.documento_tipo as DocumentType);
+        return upload === undefined
+          ? item
+          : { ...item, documentos_enviados: upload.files };
+      })
+    : undefined;
+  return {
+    ...(record.emailMasked !== undefined && {
+      email_contato_mascarado: record.emailMasked,
+    }),
+    ...resultado,
+    ...(itens !== undefined && { itens }),
+  };
+}
+
 /** D4 body for a case at `now`. */
 export function buildPublicCase(record: CaseRecord, now: number): PublicCase {
   const criado_em = new Date(record.createdAt).toISOString();
   if (record.override !== undefined) {
     const { estado, resultado } = record.override;
-    return { estado, criado_em, ...(resultado !== undefined && { resultado }) };
+    return {
+      estado,
+      criado_em,
+      ...(resultado !== undefined && {
+        resultado: withWrites(record, resultado),
+      }),
+    };
   }
   const shared = {
     responsavel: record.responsavel,

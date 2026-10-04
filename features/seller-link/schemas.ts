@@ -9,7 +9,7 @@ import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 // the spec key, e.g. cnpj + "check_letters" → form.cnpj.error.check_letters.
 
 export type CnpjIssue = "empty" | "incomplete" | "check_letters" | "invalid";
-/** `invalid` only comes from a tampered request: the name field filters as typed (F07). */
+/** `invalid`: a filled-in name the backend rejects (D3, AC 10), or a tampered request (F07). */
 export type ResponsavelIssue = "empty" | "single" | "invalid";
 export type EmailIssue = "empty" | "invalid";
 
@@ -178,6 +178,10 @@ export const passthroughSchema = z.object({
 export type Passthrough = z.output<typeof passthroughSchema>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** RFC 5321's path limit (Security M3-05). */
+const EMAIL_MAX = 254;
+/** Control and format characters (NUL, bidi overrides, zero-width): never in an address (M3-05). */
+const INVISIBLE = /[\p{Cc}\p{Cf}]/u;
 
 export const contactEmailSchema = z.object({
   email: z
@@ -190,7 +194,9 @@ export const contactEmailSchema = z.object({
         const reason: EmailIssue | undefined =
           value === ""
             ? "empty"
-            : EMAIL_PATTERN.test(value)
+            : value.length <= EMAIL_MAX &&
+                EMAIL_PATTERN.test(value) &&
+                !INVISIBLE.test(value)
               ? undefined
               : "invalid";
         if (reason)

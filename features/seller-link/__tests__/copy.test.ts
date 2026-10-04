@@ -9,7 +9,6 @@ import { emailCopy } from "@/features/seller-link/copy/email";
 import { blockedCopy } from "@/features/seller-link/copy/blocked";
 import { privacyCopy } from "@/features/seller-link/copy/privacy";
 import { sharedCopy } from "@/features/seller-link/copy/shared";
-import { MARKETPLACE_FALLBACK } from "@/features/seller-link/copy/privacy";
 
 const MODULES = {
   form: formCopy,
@@ -54,6 +53,9 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "form.name.hint": "Nome e sobrenome de quem está fazendo o cadastro.",
     "form.name.error.empty": "Informe o nome completo do responsável.",
     "form.name.error.single": "Escreva nome e sobrenome.",
+    // Spec v2 amendment (M1 review, owner-approved), shipped by T17b.
+    "form.name.error.invalid":
+      "Não conseguimos usar esse nome. Escreva o nome completo como está no documento.",
     "form.submit": "Verificar empresa",
     "form.submit.busy": "Enviando…",
     "form.submit.error.network":
@@ -203,6 +205,8 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "privacy.who.h2": "Quem é responsável",
     "privacy.who":
       "{marketplace} decide como seus dados são usados neste cadastro (controladora). A Kybr faz a verificação em nome de {marketplace} (operadora).",
+    "privacy.who.fallback":
+      "Quem decide como seus dados são usados neste cadastro é a plataforma onde você está se cadastrando (controladora). A Kybr faz a verificação em nome dela (operadora).",
     "privacy.what.h2": "O que usamos",
     "privacy.what":
       "O CNPJ e o nome do responsável que você informa; os dados públicos da empresa na Receita Federal, no Simples Nacional e no SINTEGRA; o seu e-mail, só quando pedimos para avisar você; e os documentos que você enviar.",
@@ -212,9 +216,13 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "privacy.time.h2": "Por quanto tempo",
     "privacy.time":
       "Documentos e e-mail são apagados 12 meses depois da decisão sobre o cadastro. O registro da verificação fica guardado enquanto {marketplace} usar o serviço.",
+    "privacy.time.fallback":
+      "Documentos e e-mail são apagados 12 meses depois da decisão sobre o cadastro. O registro da verificação fica guardado enquanto a plataforma usar o serviço.",
     "privacy.rights.h2": "Seus direitos",
     "privacy.rights":
       "Para ver, corrigir ou apagar seus dados, fale com {marketplace}.",
+    "privacy.rights.fallback":
+      "Para ver, corrigir ou apagar seus dados, fale com a plataforma onde você está se cadastrando.",
     "privacy.contact": "Falar com {marketplace}",
     "privacy.back": "Voltar ao cadastro",
   },
@@ -299,7 +307,19 @@ describe("copy deck", () => {
     expect(used.filter((name) => !PLACEHOLDERS.has(name ?? ""))).toEqual([]);
   });
 
-  it("names the marketplace 'a plataforma' when the link info fails (privacy partial state)", () => {
-    expect(MARKETPLACE_FALLBACK).toBe("a plataforma");
+  it("AC 31 (v3): every privacy fallback starts with a capital letter and names no marketplace", () => {
+    const fallbacks = Object.entries(privacyCopy).filter(([key]) =>
+      key.endsWith(".fallback"),
+    );
+
+    expect(fallbacks.map(([key]) => key)).toEqual([
+      "privacy.who.fallback",
+      "privacy.time.fallback",
+      "privacy.rights.fallback",
+    ]);
+    for (const [, text] of fallbacks) {
+      expect(text).toMatch(/^\p{Lu}/u);
+      expect(text).not.toContain("{marketplace}");
+    }
   });
 });

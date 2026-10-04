@@ -1,0 +1,39 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { useEffect } from "react";
+
+// The case page's follow-up leaves, split out of the route's First Load JS
+// (ADR-0003 budget watch; tasks.md "the first lever"). They render only on
+// *quase lá* and *em análise*, below the result heading, so their chunks load
+// after the page shell. A Server Component can't code-split a client import,
+// hence this small client module. Server-rendered as usual (ssr stays on), so
+// there's no layout shift while a chunk loads.
+
+/** ContactEmailBlock (T29), loaded on demand. */
+export const LazyContactEmailBlock = dynamic(() =>
+  import("@/features/seller-link/components/case/contact-email-block").then(
+    (module) => module.ContactEmailBlock,
+  ),
+);
+
+/** DocumentUpload (T30), loaded on demand. */
+export const LazyDocumentUpload = dynamic(() =>
+  import("@/features/seller-link/components/case/document-upload").then(
+    (module) => module.DocumentUpload,
+  ),
+);
+
+/**
+ * Rendered on *verificando*: fetches the e-mail block's chunk while the page
+ * is still online. The 10 s switch shows *em análise* (with the block) on the
+ * client even when the connection is gone (spec AC 29), and a chunk that
+ * can't load would keep that view from rendering. Renders nothing.
+ */
+export function PreloadAnalysisLeaves(): null {
+  useEffect(() => {
+    // Same module as LazyContactEmailBlock's import, so the same chunk.
+    void import("@/features/seller-link/components/case/contact-email-block");
+  }, []);
+  return null;
+}

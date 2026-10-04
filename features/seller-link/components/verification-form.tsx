@@ -36,12 +36,12 @@ import {
 
 type Lookup = CompanyBlockState & { cnpj?: string };
 
-// `invalid` comes only from a tampered request (the field filters as typed),
-// so it reuses the empty copy rather than needing a new string (F07).
+// `invalid` is a filled-in name the backend rejects (D3 RESPONSAVEL_INVALIDO,
+// AC 10), or a tampered request (F07): never the empty copy.
 const NAME_ERROR_COPY: Record<ResponsavelIssue, string> = {
   empty: formCopy["form.name.error.empty"],
   single: formCopy["form.name.error.single"],
-  invalid: formCopy["form.name.error.empty"],
+  invalid: formCopy["form.name.error.invalid"],
 };
 
 type SubmitPayload = {

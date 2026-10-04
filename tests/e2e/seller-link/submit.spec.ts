@@ -5,7 +5,11 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { cnpjFor } from "../../fixtures/factories/seller-link.ts";
+import {
+  cnpjFor,
+  ERROR_SENTINEL,
+  REJECTED_RESPONSAVEL,
+} from "../../fixtures/factories/seller-link.ts";
 
 const MOCK_API = "http://localhost:4010"; // playwright.config.ts
 const CASE_URL = /\/v\/loja-exemplo\/c\/[A-Za-z0-9_-]{22,64}$/;
@@ -24,6 +28,32 @@ async function fill(
 }
 
 test.describe("submit @feature-seller-link", () => {
+  test("AC 10 (backend case): a name the API rejects shows form.name.error.invalid on the name, focused, values kept, no backend message", async ({
+    page,
+  }) => {
+    await page.goto("/v/loja-exemplo");
+    await fill(page, cnpjFor("aprovado"), REJECTED_RESPONSAVEL);
+    await expect(page.getByTestId("company-block")).not.toHaveAttribute(
+      "aria-busy",
+    );
+
+    await page.getByRole("button", { name: "Verificar empresa" }).click();
+
+    const name = page.getByRole("textbox", {
+      name: "Nome completo do responsável",
+    });
+    await expect(name).toHaveAccessibleDescription(
+      /Não conseguimos usar esse nome\. Escreva o nome completo como está no documento\./,
+    );
+    await expect(name).toBeFocused();
+    await expect(name).toHaveValue(REJECTED_RESPONSAVEL);
+    await expect(page).toHaveURL(/\/v\/loja-exemplo$/);
+    await expect(
+      page.getByText("Informe o nome completo do responsável."),
+    ).toHaveCount(0);
+    await expect(page.getByText(ERROR_SENTINEL)).toHaveCount(0);
+  });
+
   test("AC 12 / AC 39: an alphanumeric CNPJ submits once, even on a double tap, and opens the case", async ({
     page,
   }) => {

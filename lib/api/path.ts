@@ -41,4 +41,10 @@ export const apiPaths = {
   /** D4: a case's state and seller-facing result. */
   publicCase: (slug: string, token: string): string =>
     `/public/v/${slugSegment(slug)}/cases/${segment("token", token, TOKEN_PATTERN)}`,
+  /** D5: the seller's contact e-mail for a case. */
+  caseContact: (slug: string, token: string): string =>
+    `${apiPaths.publicCase(slug, token)}/contact`,
+  /** D6: a case's document upload, which the browser calls (ADR-0004b). */
+  caseDocuments: (slug: string, token: string): string =>
+    `${apiPaths.publicCase(slug, token)}/documents`,
 };

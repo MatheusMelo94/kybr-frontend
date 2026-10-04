@@ -1,5 +1,7 @@
 import "server-only";
 
+import { z } from "zod";
+
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 
 import { apiRequest } from "./client";
@@ -15,7 +17,7 @@ import {
   type PublicLink,
 } from "./schemas/public-link";
 
-// Data functions for the seller link (contract D1–D4). There's no session: the
+// Data functions for the seller link (contract D1–D5). There's no session: the
 // slug and the token are the access, so every parameter is validated before an
 // API call (plan § 4), and paths come only from lib/api/path.ts (F01).
 
@@ -194,4 +196,45 @@ export async function getPublicCase(
     return { ok: false, reason: "link_not_found" };
   logUnexpected("getPublicCase", result.error);
   throw result.error;
+}
+
+export type CaseContactResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid_email" | "decided" | "not_found" | "failed" };
+
+/**
+ * D5 (DDR-0001). A write: the Server Action validates the address first.
+ * Personal and per request: no-store, with the client IP. The address is
+ * never logged; failures log their shape and request id only.
+ */
+export async function saveCaseContact(
+  slug: string,
+  token: string,
+  email: string,
+): Promise<CaseContactResult> {
+  if (!isValidSlug(slug) || !isValidToken(token))
+    return { ok: false, reason: "not_found" };
+  const result = await apiRequest({
+    operation: "saveCaseContact",
+    path: apiPaths.caseContact(slug, token),
+    method: "PUT",
+    body: { email },
+    schema: z.undefined(), // 204, no body
+    cache: "no-store",
+    forwardClientIp: true,
+  });
+  if (result.ok) return { ok: true };
+  switch (result.error.code) {
+    case "EMAIL_INVALIDO":
+      return { ok: false, reason: "invalid_email" };
+    // F06a: the case was decided while the page was open.
+    case "CASO_DECIDIDO":
+      return { ok: false, reason: "decided" };
+    case "CASO_NAO_ENCONTRADO":
+    case "LINK_NAO_ENCONTRADO":
+      return { ok: false, reason: "not_found" };
+    default:
+      logUnexpected("saveCaseContact", result.error);
+      return { ok: false, reason: "failed" };
+  }
 }

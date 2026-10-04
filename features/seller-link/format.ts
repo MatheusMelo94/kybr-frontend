@@ -10,14 +10,31 @@ export type Placeholders<S extends string> =
     ? Key | Placeholders<Rest>
     : never;
 
-/** Fills every `{placeholder}` in a copy template. The compiler requires each one. */
+/**
+ * True when the template's text after a value starts with the period the
+ * value already ends with ("Ltda.", "S.A."): that period is dropped, so the
+ * sentence never reads "Ltda.." (T23a, review 0016). The value never changes.
+ */
+export function endsSentence(value: string, after: string): boolean {
+  return after.startsWith(".") && value.endsWith(".");
+}
+
+/**
+ * Fills every `{placeholder}` in a copy template. The compiler requires each
+ * one. A value that ends with a period ends the sentence (endsSentence).
+ */
 export function fill<S extends string>(
   template: S,
   values: Record<Placeholders<S>, string | number>,
 ): string {
   const lookup = values as Record<string, string | number>;
-  return template.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
-    name in lookup ? String(lookup[name]) : placeholder,
+  return template.replace(
+    /\{(\w+)\}(\.?)/g,
+    (placeholder, name: string, period: string) => {
+      if (!(name in lookup)) return placeholder;
+      const value = String(lookup[name]);
+      return endsSentence(value, period) ? value : value + period;
+    },
   );
 }
 

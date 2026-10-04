@@ -3,7 +3,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { SLUGS } from "../../fixtures/factories/seller-link.ts";
 import { expectNoAxeViolations } from "../fixtures/axe.ts";
 import { createCase, setCaseState } from "../fixtures/mock-api.ts";
-import { isSameDocument, markDocument, nextCheck } from "../fixtures/live.ts";
+import {
+  isCheck,
+  isSameDocument,
+  markDocument,
+  nextCheck,
+} from "../fixtures/live.ts";
 
 const BANNER = "Sem conexão. Assim que a internet voltar, continuamos daqui.";
 
@@ -91,13 +96,24 @@ test.describe("offline @feature-seller-link", () => {
         await route.abort("internetdisconnected");
       else await route.continue();
     };
+    // Wait for the next check to fail, not a fixed window (review 0018).
+    const dropped = page.waitForEvent("requestfailed", {
+      predicate: isCheck,
+      timeout: 15_000,
+    });
     await page.route(`**/v/${SLUGS.ok}/c/${token}`, dropChecks);
+    await dropped;
 
-    await expect(banner(page)).toBeVisible({ timeout: 4_000 });
+    await expect(banner(page)).toBeVisible();
     expect(await isSameDocument(page)).toBe(true);
 
+    const answered = page.waitForEvent("requestfinished", {
+      predicate: isCheck,
+      timeout: 15_000,
+    });
     await page.unroute(`**/v/${SLUGS.ok}/c/${token}`, dropChecks);
-    await expect(page.getByText(BANNER)).toHaveCount(0, { timeout: 4_000 });
+    await answered;
+    await expect(page.getByText(BANNER)).toHaveCount(0);
     expect(await isSameDocument(page)).toBe(true);
   });
 });

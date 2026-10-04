@@ -25,7 +25,26 @@ describe("buildContentSecurityPolicy", () => {
         "form-action 'self'",
         "object-src 'none'",
         "upgrade-insecure-requests",
+        "report-uri /api/csp-report",
+        "report-to csp",
       ].join("; "),
+    );
+  });
+
+  it("T34a / finding 0004: adds only the report directives; every enforcing directive is unchanged", () => {
+    const policy = buildContentSecurityPolicy({
+      ...base,
+      isDev: false,
+      upgradeInsecureRequests: true,
+    });
+    const enforcing = policy
+      .split("; ")
+      .filter((part) => !part.startsWith("report-"));
+
+    // The policy of record before T34a (M2), verbatim: never relaxed to
+    // silence reports.
+    expect(enforcing.join("; ")).toBe(
+      "default-src 'self'; script-src 'self' 'nonce-abc123' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.kybr.com.br; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests",
     );
   });
 

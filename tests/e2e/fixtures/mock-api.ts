@@ -17,6 +17,10 @@ export type CaseInput = {
   resultado?: Record<string, unknown>;
   cnpj?: string;
   responsavel?: string;
+  /** M3 G6: files already received, per documento_tipo. */
+  uploads?: Partial<
+    Record<string, { files: number; bytes: number; format: "pdf" | "photos" }>
+  >;
 };
 
 /** A slug, a token suffix or any key that only this test (and project) uses. */
@@ -94,4 +98,41 @@ export async function disableLink(
   slug: string,
 ): Promise<void> {
   await request.post(`${MOCK_API}/__mock/links/${slug}/disable`);
+}
+
+/** M3 G3: the next `times` D5 saves of this case answer `status`. */
+export async function failContactSaves(
+  request: APIRequestContext,
+  token: string,
+  status: number,
+  times = 1,
+): Promise<void> {
+  await request.post(`${MOCK_API}/__mock/cases/${token}/contact/fail`, {
+    data: { status, times },
+  });
+}
+
+/** M3 G3: every D5 save of this case waits `ms`. */
+export async function delayContactSaves(
+  request: APIRequestContext,
+  token: string,
+  ms: number,
+): Promise<void> {
+  await request.post(`${MOCK_API}/__mock/cases/${token}/contact/delay`, {
+    data: { ms },
+  });
+}
+
+/** M3 G3: how many D5 saves this case got, and the last body as sent. */
+export async function contactLog(
+  request: APIRequestContext,
+  token: string,
+): Promise<{ requests: number; last: { email?: string } | null }> {
+  const response = await request.get(
+    `${MOCK_API}/__mock/cases/${token}/contact`,
+  );
+  return (await response.json()) as {
+    requests: number;
+    last: { email?: string } | null;
+  };
 }

@@ -16,6 +16,8 @@ type Props = {
   hint?: string;
   /** Field error copy. Sets aria-invalid and joins the description after the hint. */
   error?: string;
+  /** Ids of other messages that describe the field (e.g. a form-level error), after the hint and error. */
+  describedBy?: string | undefined;
   type?: "text" | "email";
   inputMode?: "text" | "numeric" | "email";
   autoComplete?: string;
@@ -41,6 +43,7 @@ export function TextField({
   name,
   hint,
   error,
+  describedBy: extraDescribedBy,
   type = "text",
   inputMode,
   autoComplete,
@@ -61,7 +64,7 @@ export function TextField({
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = [hint && hintId, error && errorId]
+  const describedBy = [hint && hintId, error && errorId, extraDescribedBy]
     .filter(Boolean)
     .join(" ");
 
@@ -92,6 +95,8 @@ export function TextField({
         aria-describedby={describedBy || undefined}
         className={cn(
           "h-12 w-full rounded-lg border border-field-line bg-field px-4 text-base text-ink",
+          // hover: applies to fine pointers only (Tailwind 4: @media (hover: hover)).
+          "hover:border-ink-muted",
           "placeholder:text-ink-muted",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           "aria-invalid:border-danger-ink",

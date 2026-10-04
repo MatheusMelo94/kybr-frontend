@@ -113,6 +113,26 @@ describe("parseServerEnv", () => {
     },
   );
 
+  it("T34a / QA G12: SENTRY_DSN is optional in every build, production included", () => {
+    expect(parseServerEnv(production).SENTRY_DSN).toBeUndefined();
+    expect(
+      parseServerEnv({
+        ...production,
+        SENTRY_DSN: "https://public@o0.ingest.sentry.test/1",
+      }).SENTRY_DSN,
+    ).toBe("https://public@o0.ingest.sentry.test/1");
+  });
+
+  it("T34a: rejects a SENTRY_DSN that isn't an https: URL, without echoing it", () => {
+    const message = parseError({
+      ...production,
+      SENTRY_DSN: "http://secret-public-key@sentry.test/1",
+    });
+
+    expect(message).toContain("SENTRY_DSN");
+    expect(message).not.toContain("secret-public-key");
+  });
+
   it("requires API_BFF_KEY in production", () => {
     expect(parseError({ ...production, API_BFF_KEY: undefined })).toContain(
       "API_BFF_KEY",

@@ -5,23 +5,27 @@ type Props = {
   children?: ReactNode;
   /** "polite" waits for the reader to pause; "alert" interrupts (errors that need action). */
   politeness?: "polite" | "alert";
+  /** Lets a control name the message in its aria-describedby. */
+  id?: string;
   className?: string;
 };
 
 export function LiveRegion({
   children,
   politeness = "polite",
+  id,
   className,
 }: Props): JSX.Element {
   if (politeness === "alert") {
     return (
-      <div role="alert" className={className}>
+      <div id={id} role="alert" className={className}>
         {children}
       </div>
     );
   }
   return (
     <div
+      id={id}
       role="status"
       aria-live="polite"
       aria-atomic="true"

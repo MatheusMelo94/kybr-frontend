@@ -156,4 +156,16 @@ describe("app/globals.css", () => {
     expect(variant).toContain("@media (prefers-color-scheme: dark)");
     expect(variant).toContain(':not([data-theme="light"])');
   });
+
+  it("T33: the indeterminate bar animates transform only, on --duration-loop, forever (ADR-0003: CSS only)", () => {
+    expect(theme.get("--animate-indeterminate")?.replace(/\s+/g, " ")).toBe(
+      "indeterminate var(--duration-loop) var(--ease-in-out-quart) infinite",
+    );
+    const keyframes = blockAfter(css, "@keyframes indeterminate {");
+    const properties = [...keyframes.matchAll(/([a-z-]+)\s*:/g)].map(
+      (match) => match[1],
+    );
+    expect(properties.length).toBeGreaterThan(0);
+    expect(new Set(properties)).toEqual(new Set(["transform"]));
+  });
 });

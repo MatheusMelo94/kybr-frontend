@@ -18,8 +18,11 @@ import type {
 
 type Props = {
   resultado: CaseResult;
-  /** The action slot of each document item (DocumentUpload, T30). */
-  documentAction?: (item: DocumentItem) => ReactNode;
+  /**
+   * The action slot of each document item (DocumentUpload, T30), with the id
+   * of the item's title for its description.
+   */
+  documentAction?: (item: DocumentItem, titleId: string) => ReactNode;
   /** The contact e-mail block (ContactEmailBlock, T29), after the items. */
   emailBlock?: ReactNode;
 };
@@ -77,8 +80,14 @@ export function PendingView({
         <ul className="divide-y divide-line rounded-xl bg-surface-raised px-4">
           {itens.map((item, index) => (
             // Items have no id and a code can repeat: the position is the identity.
-            <PendingItem key={index} item={item} responsavel={responsavel}>
-              {isDocumentItem(item) && documentAction?.(item)}
+            <PendingItem
+              key={index}
+              item={item}
+              responsavel={responsavel}
+              titleId={`pending-item-${index}`}
+            >
+              {isDocumentItem(item) &&
+                documentAction?.(item, `pending-item-${index}`)}
             </PendingItem>
           ))}
         </ul>

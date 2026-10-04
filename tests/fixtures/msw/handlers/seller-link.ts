@@ -10,8 +10,11 @@ import {
   CASE_TOKENS,
   DOCUMENT_TYPES,
   ERROR_SENTINEL,
+  MAX_FILES_PER_CASE,
   MAX_UPLOAD_BYTES,
   PUBLIC_LINKS,
+  REJECTED_EMAIL,
+  REJECTED_RESPONSAVEL,
   RETRY_AFTER_SECONDS,
   SLOW_LINK_DELAY_MS,
   FIXED_CASE_CREATED_AT,
@@ -33,6 +36,7 @@ import {
   type DocumentType,
   type PublicCase,
   type PublicLink,
+  type UploadState,
 } from "../../factories/seller-link.ts";
 
 // Pre-Contract handlers for D1–D6 (contract-request.md). One set serves Vitest
@@ -59,6 +63,12 @@ type Store = {
   caseReads: Map<string, number>;
   /** The last D3 body per slug, as received (GET /__mock/links/:slug/last-verify). */
   lastVerify: Map<string, JsonBodyType>;
+  /** D5 saves to fail next, per token (POST /__mock/cases/:token/contact/fail; M3 G3). */
+  contactFailures: Map<string, { status: number; times: number }>;
+  /** D5 latency per token (POST …/contact/delay; M3 G3). */
+  contactDelays: Map<string, number>;
+  /** D5 requests per token and the last body, as received (GET …/contact; M3 G3). */
+  contactLog: Map<string, { requests: number; last: JsonBodyType }>;
 };
 
 function createStore(): Store {
@@ -72,6 +82,9 @@ function createStore(): Store {
     caseDelays: new Map(),
     caseReads: new Map(),
     lastVerify: new Map(),
+    contactFailures: new Map(),
+    contactDelays: new Map(),
+    contactLog: new Map(),
   };
 }
 
@@ -147,6 +160,8 @@ export type MockCaseInput = {
   resultado?: Record<string, unknown>;
   cnpj?: string;
   responsavel?: string;
+  /** Files already received per documento_tipo (QA M3 plan G6). */
+  uploads?: Record<string, unknown>;
 };
 
 function isCaseKind(value: unknown): value is CaseKind {
@@ -171,11 +186,57 @@ function overrideFrom(input: {
   return { estado: input.estado, ...(resultado && { resultado }) };
 }
 
+/** The uploads seed in a body (M3 G6); throws for a bad tipo or shape. */
+function uploadsFrom(
+  input: Record<string, unknown> = {},
+): Map<DocumentType, UploadState> {
+  const uploads = new Map<DocumentType, UploadState>();
+  for (const [tipo, value] of Object.entries(input)) {
+    const { files, bytes, format } = (value ?? {}) as Record<string, unknown>;
+    if (
+      !isDocumentType(tipo) ||
+      typeof files !== "number" ||
+      typeof bytes !== "number" ||
+      (format !== "pdf" && format !== "photos")
+    )
+      throw new Error("bad uploads");
+    uploads.set(tipo, { files, bytes, format });
+  }
+  return uploads;
+}
+
+/**
+ * An override's document items with documentos_enviados > 0, as files
+ * already received (review 0028), so its counts and the upload rules (the
+ * 30-file cap, PDF-xor-photos) share one source. An explicit G6 seed wins;
+ * the format isn't known, so it's photos (more can be added).
+ */
+function seedUploads(
+  uploads: Map<DocumentType, UploadState>,
+  override: CaseOverride | undefined,
+): Map<DocumentType, UploadState> {
+  const itens = override?.resultado?.itens;
+  if (!Array.isArray(itens)) return uploads;
+  for (const item of itens as Record<string, unknown>[]) {
+    const tipo = item.documento_tipo;
+    const files = item.documentos_enviados;
+    if (
+      isDocumentType(tipo) &&
+      typeof files === "number" &&
+      files > 0 &&
+      !uploads.has(tipo)
+    )
+      uploads.set(tipo, { files, bytes: 0, format: "photos" });
+  }
+  return uploads;
+}
+
 /** G1: a new case with a fresh X3 token. */
 export function createMockCase(input: MockCaseInput = {}): string {
   if (input.kind !== undefined && !isCaseKind(input.kind))
     throw new Error("bad kind");
   const override = overrideFrom(input);
+  const uploads = seedUploads(uploadsFrom(input.uploads), override);
   const token = Buffer.from(
     crypto.getRandomValues(new Uint8Array(18)),
   ).toString("base64url");
@@ -186,7 +247,7 @@ export function createMockCase(input: MockCaseInput = {}): string {
     responsavel: input.responsavel ?? buildResponsavel(token),
     createdAt: Date.now() - (input.ageMs ?? 0),
     settled: false,
-    uploads: new Map(),
+    uploads,
     ...(override && { override }),
   });
   return token;
@@ -228,6 +289,20 @@ export function failCaseReads(
 /** G5: every D4 read of this token waits `ms`. */
 export function delayCaseReads(token: string, ms: number): void {
   store.caseDelays.set(token, ms);
+}
+
+/** M3 G3: the next `times` D5 saves answer `status`. */
+export function failContactSaves(
+  token: string,
+  status: number,
+  times: number,
+): void {
+  store.contactFailures.set(token, { status, times });
+}
+
+/** M3 G3: every D5 save of this token waits `ms`. */
+export function delayContactSaves(token: string, ms: number): void {
+  store.contactDelays.set(token, ms);
 }
 
 /** G6: how many D4 reads this token string got. */
@@ -377,7 +452,10 @@ function startVerification(
   if (!isValidCnpj(cnpj)) {
     return errorReply(422, "CNPJ_INVALIDO", { field: "cnpj" });
   }
-  if (responsavel.split(/\s+/).filter(Boolean).length < 2) {
+  if (
+    responsavel.split(/\s+/).filter(Boolean).length < 2 ||
+    responsavel === REJECTED_RESPONSAVEL
+  ) {
     return errorReply(422, "RESPONSAVEL_INVALIDO", { field: "responsavel" });
   }
   const scenario = scenarioForCnpj(cnpj);
@@ -483,15 +561,34 @@ export const sellerLinkHandlers: RequestHandler[] = [
   http.put(
     "*/public/v/:slug/cases/:token/contact",
     async ({ params, request }) => {
-      const record = caseFor(String(params.slug), String(params.token));
-      if (!record) return apiError(404, "CASO_NAO_ENCONTRADO");
+      const token = String(params.token);
       const input = (await request.json().catch(() => ({}))) as {
         email?: unknown;
       };
+      store.contactLog.set(token, {
+        requests: (store.contactLog.get(token)?.requests ?? 0) + 1,
+        last: input as JsonBodyType,
+      });
+      const latency = store.contactDelays.get(token);
+      if (latency !== undefined) await delay(latency);
+      const failure = store.contactFailures.get(token);
+      if (failure !== undefined && failure.times > 0) {
+        failure.times -= 1;
+        return apiError(failure.status, "ERRO_INTERNO");
+      }
+      const record = caseFor(String(params.slug), token);
+      if (!record) return apiError(404, "CASO_NAO_ENCONTRADO");
       const email = typeof input.email === "string" ? input.email.trim() : "";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+        email === REJECTED_EMAIL
+      ) {
         return apiError(422, "EMAIL_INVALIDO", { field: "email" });
       }
+      // F06a: no change once the case is decided.
+      const { estado } = buildPublicCase(record, Date.now());
+      if (estado === "approved" || estado === "blocked")
+        return apiError(409, "CASO_DECIDIDO");
       record.emailMasked = maskEmail(email);
       return noContent();
     },
@@ -544,6 +641,8 @@ export const sellerLinkHandlers: RequestHandler[] = [
       ) {
         return apiError(409, "CASO_DECIDIDO", { headers });
       }
+      if (names.includes(UPLOAD_MARKERS.fileLimit))
+        return apiError(413, "LIMITE_ARQUIVOS", { headers });
       if (names.includes(UPLOAD_MARKERS.tooLarge))
         return apiError(413, "ARQUIVO_GRANDE", { headers });
       if (
@@ -569,6 +668,13 @@ export const sellerLinkHandlers: RequestHandler[] = [
       ) {
         return apiError(415, "FORMATO_INVALIDO", { headers });
       }
+
+      const caseFiles = [...record.uploads.values()].reduce(
+        (total, upload) => total + upload.files,
+        0,
+      );
+      if (caseFiles + files.length > MAX_FILES_PER_CASE)
+        return apiError(413, "LIMITE_ARQUIVOS", { headers });
 
       const bytes =
         (previous?.bytes ?? 0) +
@@ -650,6 +756,42 @@ export const mockControlHandlers: RequestHandler[] = [
     );
     return new HttpResponse(null, { status: 204 });
   }),
+  http.post(
+    "*/__mock/cases/:token/contact/fail",
+    async ({ params, request }) => {
+      const body = (await request.json().catch(() => ({}))) as {
+        status?: unknown;
+        times?: unknown;
+      };
+      failContactSaves(
+        String(params.token),
+        typeof body.status === "number" ? body.status : 500,
+        typeof body.times === "number" ? body.times : 1,
+      );
+      return new HttpResponse(null, { status: 204 });
+    },
+  ),
+  http.post(
+    "*/__mock/cases/:token/contact/delay",
+    async ({ params, request }) => {
+      const body = (await request.json().catch(() => ({}))) as {
+        ms?: unknown;
+      };
+      delayContactSaves(
+        String(params.token),
+        typeof body.ms === "number" ? body.ms : 0,
+      );
+      return new HttpResponse(null, { status: 204 });
+    },
+  ),
+  http.get("*/__mock/cases/:token/contact", ({ params }) =>
+    HttpResponse.json(
+      store.contactLog.get(String(params.token)) ?? {
+        requests: 0,
+        last: null,
+      },
+    ),
+  ),
   http.get("*/__mock/cases/:token/reads", ({ params }) =>
     HttpResponse.json({ reads: caseReadCount(String(params.token)) }),
   ),

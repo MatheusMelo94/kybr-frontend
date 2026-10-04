@@ -6,8 +6,10 @@ import { z } from "zod";
 import { deriveCaseView } from "@/features/seller-link/case-view";
 import type { CaseViewKey, CompanySummary } from "@/features/seller-link/types";
 import {
+  contactEmailSchema,
   fieldIssues,
   verifySchema,
+  type EmailIssue,
   type FieldIssues,
 } from "@/features/seller-link/schemas";
 import { isValidSlug, isValidToken } from "@/lib/api/path";
@@ -16,6 +18,7 @@ import {
   getPublicCase,
   getPublicLink,
   lookupCompany,
+  saveCaseContact,
 } from "@/lib/api/public-link";
 import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 
@@ -195,4 +198,51 @@ export async function pollCaseViewAction(
     // getPublicCase already logged it, by shape (5xx, timeout, bad response).
     return { ok: false, reason: "failed" };
   }
+}
+
+export type SaveContactEmailResult =
+  | { ok: true }
+  | { ok: false; code: "EMAIL_INVALIDO"; issue: EmailIssue }
+  | {
+      ok: false;
+      code: "CASO_DECIDIDO" | "CASO_NAO_ENCONTRADO" | "UNAVAILABLE";
+    };
+
+const NOT_FOUND = { ok: false, code: "CASO_NAO_ENCONTRADO" } as const;
+
+/**
+ * Saves the seller's contact e-mail (contract D5; DDR-0001), from the e-mail
+ * block on *quase lá* and *em análise*. The address is validated with the
+ * schema the block uses before any API call, and never logged. A case decided
+ * while the page was open is CASO_DECIDIDO (F06a): the block then refreshes to
+ * the decided result.
+ */
+export async function saveContactEmail(
+  input: unknown,
+): Promise<SaveContactEmailResult> {
+  const envelope = caseArgsSchema.safeParse(input);
+  if (!envelope.success) return NOT_FOUND;
+  const fields = contactEmailSchema.safeParse(input);
+  if (!fields.success) {
+    const issue = fieldIssue(fields.error.issues);
+    return { ok: false, code: "EMAIL_INVALIDO", issue };
+  }
+
+  const { slug, token } = envelope.data;
+  const result = await saveCaseContact(slug, token, fields.data.email);
+  if (result.ok) return { ok: true };
+  switch (result.reason) {
+    case "invalid_email":
+      return { ok: false, code: "EMAIL_INVALIDO", issue: "invalid" };
+    case "decided":
+      return { ok: false, code: "CASO_DECIDIDO" };
+    case "not_found":
+      return NOT_FOUND;
+    case "failed":
+      return { ok: false, code: "UNAVAILABLE" };
+  }
+}
+
+function fieldIssue(issues: readonly { message: string }[]): EmailIssue {
+  return issues[0]?.message === "empty" ? "empty" : "invalid";
 }

@@ -51,6 +51,9 @@ const serverEnvSchema = z
       .transform(Number)
       .pipe(z.number().int().min(1).max(10))
       .optional(),
+    // Server-side error monitoring (T34a, threat model F10). Optional in every
+    // build, production included (QA G12): unset, nothing is sent anywhere.
+    SENTRY_DSN: z.url({ protocol: /^https$/ }).optional(),
     // Set to "1" by Vercel itself at build and run time.
     VERCEL: z.string().optional(),
   })

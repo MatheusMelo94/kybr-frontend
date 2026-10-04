@@ -11,8 +11,10 @@ import {
   uniqueKey,
 } from "../fixtures/mock-api.ts";
 import {
+  installClock,
   isSameDocument,
   markDocument,
+  pauseClock,
   recordChecks,
 } from "../fixtures/live.ts";
 
@@ -106,12 +108,11 @@ test.describe("live status @feature-seller-link", () => {
     // not timed (QA plan § Making timing deterministic; review 0012).
     const token = await createCase(request, { responsavel: "Maria Exemplo" });
     const checks = recordChecks(page);
-    await page.clock.install();
+    const clock = await installClock(page);
 
     await page.goto(`/v/${SLUGS.ok}/c/${token}`);
     await expect(h1(page, VERIFYING)).toBeVisible();
-    // Slightly ahead: pauseAt refuses a time that has already passed.
-    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+    await pauseClock(page, clock);
     // A check already in flight must come back first: its next one is
     // scheduled from the clock at that moment.
     await expect.poll(() => checks.settled.length).toBe(checks.sent.length);

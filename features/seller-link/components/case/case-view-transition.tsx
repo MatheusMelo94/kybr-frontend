@@ -35,6 +35,8 @@ type Props = {
   viewKey: CaseViewKey;
   /** What the polite region says for it (caseAnnouncement, on the server). */
   announcement: string;
+  /** The step indicator: it fills in on a view change, never on first paint (review 0022). */
+  step?: ReactNode;
   children: ReactNode;
 };
 
@@ -50,17 +52,22 @@ type Props = {
 export function CaseViewTransition({
   viewKey,
   announcement,
+  step,
   children,
 }: Props): JSX.Element {
   const container = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<Shown>({ viewKey, announcement });
   const [serverKey, setServerKey] = useState(viewKey);
+  // Only a view change fades in: the page's first view never animates (no
+  // entrance reveals, spec § Motion Intent).
+  const [changed, setChanged] = useState(false);
   const [message, setMessage] = useState("");
 
   // A new key from the server replaces the view on screen, unless the client
   // switch already showed it (adjusting state while rendering, per React).
   if (viewKey !== serverKey) {
     setServerKey(viewKey);
+    setChanged(true);
     if (viewKey !== shown.viewKey) setShown({ viewKey, announcement });
   }
 
@@ -89,11 +96,25 @@ export function CaseViewTransition({
 
   return (
     <ViewChangeContext value={announceViewChange}>
+      {step !== undefined && (
+        <div data-changed={changed || undefined}>{step}</div>
+      )}
       <LiveRegion className="sr-only">{message}</LiveRegion>
       <div ref={container}>
         {/* Keyed by the server's view, so every view change remounts the
-            view's client islands (tech-design § 2; § 3 rule 11). */}
-        <div key={viewKey}>{children}</div>
+            view's client islands (tech-design § 2; § 3 rule 11), and the new
+            view crossfades in: opacity only, instant under reduced motion
+            (T33; one literal class string, no cn(), for the budget). */}
+        <div
+          key={viewKey}
+          className={
+            changed
+              ? "transition-opacity duration-(--duration-base) ease-out-quart motion-reduce:transition-none starting:opacity-0"
+              : undefined
+          }
+        >
+          {children}
+        </div>
       </div>
     </ViewChangeContext>
   );

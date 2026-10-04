@@ -24,6 +24,36 @@ function directive(policy: string, name: string): string | undefined {
 }
 
 test.describe("security headers @feature-seller-link", () => {
+  test("T34a: the CSP reports to the same-origin collector, with Reporting-Endpoints", async ({
+    request,
+  }) => {
+    const response = await request.get("/v/loja-exemplo");
+    const policy = csp(response);
+
+    expect(directive(policy, "report-uri")).toBe("/api/csp-report");
+    expect(directive(policy, "report-to")).toBe("csp");
+    expect(response.headers()["reporting-endpoints"]).toBe(
+      'csp="http://localhost:3000/api/csp-report"',
+    );
+  });
+
+  test("T34a: the collector takes a report and answers 204", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/csp-report", {
+      headers: { "content-type": "application/csp-report" },
+      data: JSON.stringify({
+        "csp-report": {
+          "document-uri": "http://localhost:3000/v/loja-exemplo",
+          "blocked-uri": "javascript",
+          "effective-directive": "form-action",
+        },
+      }),
+    });
+
+    expect(response.status()).toBe(204);
+  });
+
   test("every response carries the default security headers", async ({
     request,
   }) => {
