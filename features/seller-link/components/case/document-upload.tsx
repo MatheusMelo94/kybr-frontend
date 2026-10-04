@@ -101,6 +101,8 @@ export function DocumentUpload({
         method: "POST",
         body,
         credentials: "omit",
+        // The page path carries the case token: never send it (M3-09).
+        referrerPolicy: "no-referrer",
       });
     } catch {
       setRetry(files);

@@ -115,6 +115,8 @@ describe("DocumentUpload: happy path (T30, AC 21)", () => {
     expect(url).toBe(UPLOAD_URL);
     expect(init?.method).toBe("POST");
     expect(init?.credentials).toBe("omit");
+    // Security M3-09: no Referer, whatever the page's Referrer-Policy becomes.
+    expect(init?.referrerPolicy).toBe("no-referrer");
     const body = init?.body as FormData;
     expect(body.get("tipo")).toBe("RESPONSAVEL");
     expect(body.getAll("arquivos")).toHaveLength(1);
