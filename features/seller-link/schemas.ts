@@ -178,6 +178,10 @@ export const passthroughSchema = z.object({
 export type Passthrough = z.output<typeof passthroughSchema>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** RFC 5321's path limit (Security M3-05). */
+const EMAIL_MAX = 254;
+/** Control and format characters (NUL, bidi overrides, zero-width): never in an address (M3-05). */
+const INVISIBLE = /[\p{Cc}\p{Cf}]/u;
 
 export const contactEmailSchema = z.object({
   email: z
@@ -190,7 +194,9 @@ export const contactEmailSchema = z.object({
         const reason: EmailIssue | undefined =
           value === ""
             ? "empty"
-            : EMAIL_PATTERN.test(value)
+            : value.length <= EMAIL_MAX &&
+                EMAIL_PATTERN.test(value) &&
+                !INVISIBLE.test(value)
               ? undefined
               : "invalid";
         if (reason)

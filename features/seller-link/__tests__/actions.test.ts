@@ -443,6 +443,8 @@ describe("saveContactEmail (D5 write, DDR-0001)", () => {
     ["", "empty"],
     [undefined, "empty"],
     ["maria@", "invalid"],
+    [`${"m".repeat(250)}@empresa-exemplo.test`, "invalid"],
+    ["maria\u202E@empresa-exemplo.test", "invalid"],
   ])("rejects %j as %s before any API call", async (email, issue) => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 

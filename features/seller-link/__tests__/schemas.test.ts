@@ -215,12 +215,25 @@ describe("contactEmailSchema", () => {
     });
   });
 
+  it("accepts an address of exactly 254 characters", () => {
+    const email = `${"a".repeat(242)}@empresa.com`;
+    expect(email).toHaveLength(254);
+    expect(contactEmailSchema.safeParse({ email }).success).toBe(true);
+  });
+
   it.each([
     ["empty", ""],
     ["empty", "  "],
     ["empty", undefined],
     ["invalid", "joao@"],
     ["invalid", "joao empresa.com.br"],
+    // Security M3-05: RFC 5321's 254 limit, and no control or format characters.
+    ["invalid", `${"a".repeat(243)}@empresa.com`],
+    ["invalid", "joao\u0000@empresa.com.br"],
+    ["invalid", "joao@empresa.com.br\u0007x"],
+    ["invalid", "joao\u202E@empresa.com.br"],
+    ["invalid", "jo\u200Bao@empresa.com.br"],
+    ["invalid", "joao@empre\uFEFFsa.com.br"],
   ])("gives a distinct %s issue for %j", (reason, email) => {
     expect(issues(contactEmailSchema.safeParse({ email }))).toEqual([
       `email:${reason}`,
