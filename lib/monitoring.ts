@@ -93,12 +93,30 @@ export function initMonitoring(dsn: string | undefined): void {
 }
 
 /**
- * A shape-only marker for something to alert on (e.g. REDIRECT_REFUSED,
- * finding 0003): logged, and sent as an error tagged `marker:<name>`.
- * `context` holds names and codes only, never values.
+ * The markers DevOps alerts on (bursts: credential stuffing, P01 G8).
+ * - REDIRECT_REFUSED: the API answered a 3xx (finding 0003).
+ * - The panel's (threat model P16): AUTH_RATE_LIMITED (a 429),
+ *   PANEL_HOST_MISMATCH (a panel route or action off the panel host),
+ *   SESSION_REJECTED (a sent session got a 401), TURNSTILE_FAILED (the API
+ *   refused the token).
+ */
+export const MARKERS = [
+  "REDIRECT_REFUSED",
+  "AUTH_RATE_LIMITED",
+  "PANEL_HOST_MISMATCH",
+  "SESSION_REJECTED",
+  "TURNSTILE_FAILED",
+] as const;
+
+export type Marker = (typeof MARKERS)[number];
+
+/**
+ * A shape-only marker for something to alert on: logged, and sent as an
+ * error tagged `marker:<name>`. `context` holds names and codes only, never
+ * values (no e-mail, name, token, ticket or host).
  */
 export function reportMarker(
-  marker: string,
+  marker: Marker,
   context: Record<string, string>,
 ): void {
   console.error(`[kybr] ${marker}`, context);

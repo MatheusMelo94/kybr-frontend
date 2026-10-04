@@ -5,6 +5,7 @@ import type { z } from "zod";
 import { sendApiRequest, type ApiResult } from "@/lib/api/client";
 import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
+import { reportMarker } from "@/lib/monitoring";
 
 // The panel's API client (ADR-0009 rule 4, threat model P18), separate from
 // the link's: its own path guard, the session as a bearer token, and no
@@ -74,6 +75,16 @@ export async function panelRequest<T>(
     }),
     ...(request.timeoutMs !== undefined && { timeoutMs: request.timeoutMs }),
   });
+  // Shape-only markers (P16): the operation's name, never a value.
+  if (!result.ok) {
+    const { operation } = request;
+    if (result.error.status === 429)
+      reportMarker("AUTH_RATE_LIMITED", { operation });
+    else if (result.error.code === "TURNSTILE_INVALIDO")
+      reportMarker("TURNSTILE_FAILED", { operation });
+    else if (result.error.status === 401 && request.sessionToken !== undefined)
+      reportMarker("SESSION_REJECTED", { operation });
+  }
   // A 401 on an authenticated call is an expired or revoked session. On the
   // pre-session auth calls it's their own code (CREDENCIAIS_INVALIDAS).
   if (

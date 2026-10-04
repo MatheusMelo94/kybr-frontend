@@ -276,3 +276,75 @@ describe("reportCspViolations", () => {
     });
   });
 });
+
+describe("the panel's events (T61, P16)", () => {
+  const SESSION = "sessao-sintetica-AbCdEf0123456789";
+  const PASSWORD = "senha-sintetica-123";
+
+  it("a panel action's event keeps no arguments, cookies, Authorization header or query (volta)", () => {
+    const event = {
+      message: "Action failed",
+      transaction: "POST /entrar",
+      request: {
+        url: `https://app.kybr.test/entrar?volta=%2Ffila%2Fabc&motivo=sessao`,
+        method: "POST",
+        data: JSON.stringify([
+          { email: EMAIL, senha: PASSWORD, turnstile: "tok" },
+        ]),
+        query_string: "volta=%2Ffila%2Fabc",
+        cookies: {
+          "__Host-kybr_session": SESSION,
+          "__Host-kybr_signup": "ticket",
+        },
+        headers: {
+          authorization: `Bearer ${SESSION}`,
+          cookie: `__Host-kybr_session=${SESSION}`,
+        },
+      },
+      extra: { args: [{ email: EMAIL, senha: PASSWORD }] },
+    } as unknown as ErrorEvent;
+
+    const scrubbed = JSON.stringify(scrubEvent(event));
+
+    for (const secret of [
+      SESSION,
+      PASSWORD,
+      EMAIL,
+      "volta",
+      "Bearer",
+      "kybr_signup",
+    ])
+      expect(scrubbed).not.toContain(secret);
+    expect(scrubbed).toContain('"url":"https://app.kybr.test/entrar"');
+  });
+
+  it("knows the panel's marker names", async () => {
+    const { MARKERS } = await import("@/lib/monitoring");
+    expect(MARKERS).toEqual(
+      expect.arrayContaining([
+        "AUTH_RATE_LIMITED",
+        "PANEL_HOST_MISMATCH",
+        "SESSION_REJECTED",
+        "TURNSTILE_FAILED",
+        "REDIRECT_REFUSED",
+      ]),
+    );
+  });
+
+  it("no code sets a Sentry user, anywhere", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { join, resolve } = await import("node:path");
+    const root = resolve(__dirname, "../..");
+    const files = ["app", "features", "lib", "components"].flatMap((dir) =>
+      readdirSync(join(root, dir), { recursive: true })
+        .map(String)
+        .filter(
+          (file) => /\.(ts|tsx)$/.test(file) && !file.includes("__tests__"),
+        )
+        .map((file) => join(root, dir, file)),
+    );
+    expect(
+      files.filter((file) => /\bsetUser\s*\(/.test(readFileSync(file, "utf8"))),
+    ).toEqual([]);
+  });
+});
