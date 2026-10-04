@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Stable codes from the X1 error envelope (contract-request.md, D7). */
+/** Stable codes from the X1 error envelope (seller-link contract-request.md D7; ops-panel A-X2). */
 export const API_ERROR_CODES = [
   "LINK_NAO_ENCONTRADO",
   "EMPRESA_NAO_ENCONTRADA",
@@ -15,6 +15,21 @@ export const API_ERROR_CODES = [
   "FORMATO_INVALIDO",
   "CASO_DECIDIDO",
   "AUTOFILL_DESATIVADO", // D2 kill switch (contract X6)
+  // The panel's (ops-panel contract-request.md A-X2, M4)
+  "SESSAO_EXPIRADA",
+  "TURNSTILE_REQUERIDO",
+  "TURNSTILE_INVALIDO",
+  "TESTE_INDISPONIVEL",
+  "TESTE_PAUSADO",
+  "CREDENCIAIS_INVALIDAS",
+  "EMAIL_NAO_CONFIRMADO",
+  "EMAIL_EM_USO",
+  "SENHA_FRACA",
+  "VALOR_INVALIDO",
+  "CODIGO_INCORRETO",
+  "CODIGO_EXPIRADO",
+  "TOKEN_INVALIDO",
+  "RECURSO_NAO_ENCONTRADO",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

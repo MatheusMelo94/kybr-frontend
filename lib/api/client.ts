@@ -15,7 +15,7 @@ type ApiRequest<T> = {
   operation: string;
   /** Path under API_BASE_URL, with segments already validated or encoded. */
   path: string;
-  method?: "GET" | "POST" | "PUT";
+  method?: "GET" | "POST" | "PUT" | "DELETE";
   /** Sent as JSON. */
   body?: unknown;
   headers?: Record<string, string>;
@@ -69,16 +69,18 @@ function transportError(error: unknown): AppError {
   return new AppError({ code: aborted ? "TIMEOUT" : "NETWORK" });
 }
 
+/** One call on the shared transport: the URL is already checked by its surface. */
+export type TransportRequest<T> = Omit<ApiRequest<T>, "path"> & { url: URL };
+
 /**
- * Calls the Kybr API from the Next server. It never throws for an HTTP,
- * network or schema failure: those come back as `{ ok: false, error }`, and the
- * data function decides what is expected. It does throw for a path outside the
- * API's /public/ tree: that's a bug or an attack, never a runtime condition.
+ * The one fetch path both surfaces share (the link's apiRequest, the panel's
+ * panelRequest): BFF key, client IP, redirect refusal, timeout, error and
+ * schema mapping. It never throws for an HTTP, network or schema failure.
+ * The headers it sends are never logged.
  */
-export async function apiRequest<T>(
-  request: ApiRequest<T>,
+export async function sendApiRequest<T>(
+  request: TransportRequest<T>,
 ): Promise<ApiResult<T>> {
-  const url = publicApiUrl(request.path);
   const headers = new Headers(request.headers);
   headers.set("accept", "application/json");
   if (env.API_BFF_KEY !== undefined)
@@ -92,7 +94,7 @@ export async function apiRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetch(request.url, {
       method: request.method ?? "GET",
       headers,
       // Never follow a 3xx: a redirect would carry the BFF key to its target (F01).
@@ -143,4 +145,16 @@ export async function apiRequest<T>(
     };
   }
   return { ok: true, data: parsed.data, status, requestId };
+}
+
+/**
+ * Calls the Kybr API's /public/ tree from the Next server (the seller link).
+ * It throws for a path outside that tree: that's a bug or an attack, never a
+ * runtime condition.
+ */
+export async function apiRequest<T>(
+  request: ApiRequest<T>,
+): Promise<ApiResult<T>> {
+  const { path, ...rest } = request;
+  return sendApiRequest({ ...rest, url: publicApiUrl(path) });
 }
