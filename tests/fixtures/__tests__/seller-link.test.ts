@@ -1305,6 +1305,75 @@ describe("M3 mock controls (QA M3 test plan G3, G5, G6)", () => {
     ).toBe(0);
   });
 
+  // Review 0028: a preset's counts and the uploads are one source.
+  describe("G5 + G6: a preset's documentos_enviados are files already received", () => {
+    function presetWith(
+      responsavel: number,
+      other = 0,
+    ): Record<string, unknown> {
+      return {
+        estado: "pending",
+        resultado: {
+          ...CASE_PRESETS.pendingCatalogue.resultado,
+          itens: [
+            {
+              codigo: "DOCUMENTO_RESPONSAVEL",
+              documento_tipo: "RESPONSAVEL",
+              documentos_enviados: responsavel,
+            },
+            {
+              codigo: "DOCUMENTO_SOLICITADO",
+              documento_tipo: "PROCURACAO",
+              documentos_enviados: other,
+            },
+          ],
+        },
+      };
+    }
+
+    function photos(count: number): FormData {
+      const form = new FormData();
+      form.set("tipo", "RESPONSAVEL");
+      for (let i = 0; i < count; i += 1)
+        form.append(
+          "arquivos",
+          new File([jpegBytes(1_000)], `p${i}.jpg`, { type: "image/jpeg" }),
+        );
+      return form;
+    }
+
+    it("an upload adds to the preset's count instead of replacing it", async () => {
+      useControls();
+      const token = await newCase(presetWith(2));
+
+      const { body } = await call(
+        `/public/v/${SLUGS.ok}/cases/${token}/documents`,
+        { method: "POST", body: photos(1) },
+      );
+
+      expect(body.documentos_enviados).toBe(3);
+      const resultado = (await readCase(token)).body.resultado as {
+        itens: { documento_tipo?: string; documentos_enviados?: number }[];
+      };
+      expect(
+        resultado.itens.find((item) => item.documento_tipo === "RESPONSAVEL")
+          ?.documentos_enviados,
+      ).toBe(3);
+    });
+
+    it("the 30-file cap counts the preset's files", async () => {
+      useControls();
+      const token = await newCase(presetWith(20, 9));
+
+      const { response, body } = await call(
+        `/public/v/${SLUGS.ok}/cases/${token}/documents`,
+        { method: "POST", body: photos(2) },
+      );
+
+      expectErrorEnvelope(response, body, 413, "LIMITE_ARQUIVOS");
+    });
+  });
+
   it("G6: starts a case with files already received, which the upload rules then count", async () => {
     useControls();
     const token = await newCase({

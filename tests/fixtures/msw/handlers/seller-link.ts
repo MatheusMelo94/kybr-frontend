@@ -205,12 +205,38 @@ function uploadsFrom(
   return uploads;
 }
 
+/**
+ * An override's document items with documentos_enviados > 0, as files
+ * already received (review 0028), so its counts and the upload rules (the
+ * 30-file cap, PDF-xor-photos) share one source. An explicit G6 seed wins;
+ * the format isn't known, so it's photos (more can be added).
+ */
+function seedUploads(
+  uploads: Map<DocumentType, UploadState>,
+  override: CaseOverride | undefined,
+): Map<DocumentType, UploadState> {
+  const itens = override?.resultado?.itens;
+  if (!Array.isArray(itens)) return uploads;
+  for (const item of itens as Record<string, unknown>[]) {
+    const tipo = item.documento_tipo;
+    const files = item.documentos_enviados;
+    if (
+      isDocumentType(tipo) &&
+      typeof files === "number" &&
+      files > 0 &&
+      !uploads.has(tipo)
+    )
+      uploads.set(tipo, { files, bytes: 0, format: "photos" });
+  }
+  return uploads;
+}
+
 /** G1: a new case with a fresh X3 token. */
 export function createMockCase(input: MockCaseInput = {}): string {
   if (input.kind !== undefined && !isCaseKind(input.kind))
     throw new Error("bad kind");
   const override = overrideFrom(input);
-  const uploads = uploadsFrom(input.uploads);
+  const uploads = seedUploads(uploadsFrom(input.uploads), override);
   const token = Buffer.from(
     crypto.getRandomValues(new Uint8Array(18)),
   ).toString("base64url");
