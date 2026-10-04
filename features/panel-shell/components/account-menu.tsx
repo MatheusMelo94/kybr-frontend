@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   /** The menu's items: elements with role="menuitem" ("Sair"; "Configurações" from M8). */
   children: ReactNode;
+  /** "up" from the sidebar's foot; "down" from the top bar. */
+  placement?: "up" | "down";
   className?: string;
 };
 
@@ -29,7 +31,11 @@ function menuItems(menu: HTMLElement | null): HTMLElement[] {
  * "Conta" (plan § 2.8): a menu button. Enter, Space or ArrowDown open it on
  * the first item; arrows move; Esc closes and returns focus to the button.
  */
-export function AccountMenu({ children, className }: Props): JSX.Element {
+export function AccountMenu({
+  children,
+  placement = "up",
+  className,
+}: Props): JSX.Element {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -111,7 +117,12 @@ export function AccountMenu({ children, className }: Props): JSX.Element {
           tabIndex={-1}
           aria-label={shellCopy["account.menu"]}
           onKeyDown={onMenuKey}
-          className="absolute bottom-full left-0 z-10 mb-2 flex min-w-40 flex-col rounded-lg border border-line bg-surface p-1"
+          className={cn(
+            "absolute z-10 flex min-w-40 flex-col rounded-lg border border-line bg-surface p-1",
+            placement === "up"
+              ? "bottom-full left-0 mb-2"
+              : "top-full right-0 mt-2",
+          )}
         >
           {children}
         </div>

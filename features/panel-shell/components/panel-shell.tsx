@@ -4,6 +4,7 @@ import { AccountMenu } from "@/features/panel-shell/components/account-menu";
 import { LogoutItem } from "@/features/panel-shell/components/logout-item";
 import { PanelNav } from "@/features/panel-shell/components/panel-nav";
 import { PlanBlock } from "@/features/panel-shell/components/plan-block";
+import { TopBar } from "@/features/panel-shell/components/top-bar";
 import { WorkspaceBlock } from "@/features/panel-shell/components/workspace-block";
 import { globalCopy } from "@/features/panel-shell/copy/global";
 import { navItemsInBuild } from "@/features/panel-shell/nav";
@@ -25,12 +26,18 @@ type Props = {
 /**
  * The signed-in panel (spec S5): at lg (1024) and up a 240 px sticky sidebar
  * (brand, workspace, nav with counts, plan block, account menu) beside the
- * main column. The narrow layout lands in T56.
+ * main column; below it, a top bar and a row of scrolling tabs (AC 10).
  */
 export function PanelShell({ shell, children }: Props): JSX.Element {
   const items = navItemsInBuild();
   return (
     <div className="lg:flex">
+      <header className="border-b border-line lg:hidden">
+        <TopBar workspaceNome={shell.workspaceNome} />
+        <div className="pb-2">
+          <PanelNav items={items} contagens={shell.contagens} variant="tabs" />
+        </div>
+      </header>
       <aside className="hidden w-(--size-sidebar) shrink-0 flex-col gap-6 border-r border-line p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
         <p className="px-3 text-body font-title text-ink">{globalCopy.brand}</p>
         <div className="px-3">
