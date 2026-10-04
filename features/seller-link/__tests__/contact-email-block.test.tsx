@@ -152,18 +152,44 @@ describe("ContactEmailBlock (DDR-0001)", () => {
     await user.type(field(), EMAIL);
     await user.click(saveButton());
 
-    expect(
-      await screen.findByText(
-        "Não conseguimos salvar o e-mail. Tente de novo.",
-      ),
-    ).toBeInTheDocument();
+    const error = await screen.findByText(
+      "Não conseguimos salvar o e-mail. Tente de novo.",
+    );
     expect(field()).toHaveValue(EMAIL);
+    // Review 0015: polite, not an alert, and part of the field's and the
+    // button's description while it stands.
+    expect(error.closest('[role="status"]')).not.toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(field()).toHaveAccessibleDescription(
+      expect.stringContaining("Não conseguimos salvar o e-mail."),
+    );
+    expect(saveButton()).toHaveAccessibleDescription(
+      expect.stringContaining("Não conseguimos salvar o e-mail."),
+    );
 
     save.mockResolvedValueOnce({ ok: true });
     await user.click(saveButton());
     expect(
       await screen.findByText(`E-mail salvo. Vamos avisar em ${EMAIL}.`),
     ).toBeInTheDocument();
+  });
+
+  it("review 0015: the network error stops describing the field once the address changes", async () => {
+    const user = userEvent.setup();
+    save.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(<ContactEmailBlock slug={SLUG} token={TOKEN} />);
+
+    await user.type(field(), EMAIL);
+    await user.click(saveButton());
+    await screen.findByText("Não conseguimos salvar o e-mail. Tente de novo.");
+    await user.type(field(), "x");
+
+    expect(field()).not.toHaveAccessibleDescription(
+      expect.stringContaining("Não conseguimos salvar"),
+    );
+    expect(saveButton()).not.toHaveAccessibleDescription(
+      expect.stringContaining("Não conseguimos salvar"),
+    );
   });
 
   it("an UNAVAILABLE answer uses the network copy too", async () => {

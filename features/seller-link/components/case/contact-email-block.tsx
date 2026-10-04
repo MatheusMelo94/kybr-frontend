@@ -4,6 +4,7 @@ import {
   startTransition,
   useActionState,
   useEffect,
+  useId,
   useRef,
   useState,
   type FormEvent,
@@ -52,6 +53,7 @@ export function ContactEmailBlock({
 }: Props): JSX.Element {
   // A decided or gone case: the server re-renders without this block (unmount).
   const refresh = useCommittedRefresh(false);
+  const networkId = useId();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<BlockError | undefined>();
   // The address shown as saved: the masked one from D4, or the one typed here.
@@ -132,6 +134,8 @@ export function ContactEmailBlock({
 
   const fieldError =
     error === "empty" || error === "invalid" ? error : undefined;
+  // While the save failed, the field and the button say why (review 0015).
+  const networkDescribedBy = error === "network" ? networkId : undefined;
 
   return (
     <div className="flex flex-col gap-3">
@@ -162,11 +166,10 @@ export function ContactEmailBlock({
               setError(undefined);
             }}
             {...(fieldError !== undefined && { error: ERROR_COPY[fieldError] })}
+            describedBy={networkDescribedBy}
           />
-          <LiveRegion
-            politeness="alert"
-            className="text-secondary text-danger-ink"
-          >
+          {/* Polite: the seller can retry when ready (review 0015, QA AX03). */}
+          <LiveRegion id={networkId} className="text-secondary text-danger-ink">
             {error === "network" ? ERROR_COPY.network : ""}
           </LiveRegion>
           <Button
@@ -174,6 +177,9 @@ export function ContactEmailBlock({
             variant="secondary"
             busy={isPending}
             busyLabel={emailCopy["email.busy"]}
+            {...(networkDescribedBy !== undefined && {
+              "aria-describedby": networkDescribedBy,
+            })}
             className="self-start"
           >
             {emailCopy["email.submit"]}

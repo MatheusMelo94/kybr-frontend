@@ -234,9 +234,10 @@ describe("DocumentUpload: errors (T31, AC 22)", () => {
       const error = await screen.findByText(copy);
       expect(error.closest('[role="status"]')).not.toBeNull();
       expect(fetchSpy).not.toHaveBeenCalled();
+      // Review 0015: back on the button, the error is part of its description.
       expect(
         screen.getByRole("button", { name: "Enviar documento" }),
-      ).toBeInTheDocument();
+      ).toHaveAccessibleDescription(expect.stringContaining(copy));
     },
   );
 
@@ -302,6 +303,9 @@ describe("DocumentUpload: errors (T31, AC 22)", () => {
       await user.upload(fileInput(container), pdf());
 
       expect(await screen.findByText(copy)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Enviar documento" }),
+      ).toHaveAccessibleDescription(expect.stringContaining(copy));
       expect(container).not.toHaveTextContent("MSG-BACKEND-NAO-EXIBIR");
       expect(router.refresh).not.toHaveBeenCalled();
     },
@@ -356,6 +360,12 @@ describe("DocumentUpload: errors (T31, AC 22)", () => {
 
     expect(picker).not.toHaveBeenCalled();
     expect(await screen.findByText("Recebido: 2 arquivos")).toBeInTheDocument();
+    // Once it's sent, the old error no longer describes the button.
+    expect(
+      screen.getByRole("button", { name: "Adicionar página" }),
+    ).not.toHaveAccessibleDescription(
+      expect.stringContaining("Não conseguimos enviar"),
+    );
     const resent = fetchSpy.mock.calls[1]?.[1]?.body as FormData;
     expect(
       resent.getAll("arquivos").map((file) => (file as File).name),

@@ -59,6 +59,7 @@ export function DocumentUpload({
   describedBy,
 }: Props): JSX.Element {
   const hintId = useId();
+  const statusId = useId();
   const input = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   // Files received as this page counted them; the server's count wins once higher.
@@ -183,6 +184,7 @@ export function DocumentUpload({
         onChange={picked}
       />
       <LiveRegion
+        id={statusId}
         className={
           status.kind === "error" || status.kind === "closed"
             ? "text-secondary text-danger-ink"
@@ -200,9 +202,14 @@ export function DocumentUpload({
             if (retry) void send(retry);
             else input.current?.click();
           }}
-          aria-describedby={
-            received === 0 ? `${describedBy} ${hintId}` : describedBy
-          }
+          aria-describedby={[
+            describedBy,
+            received === 0 && hintId,
+            // While a pick failed, the button says why (review 0015).
+            status.kind === "error" && statusId,
+          ]
+            .filter(Boolean)
+            .join(" ")}
           className="self-start"
         >
           {received === 0 ? uploadCopy["upload.cta"] : uploadCopy["upload.add"]}
