@@ -12,8 +12,8 @@
 // A budgeted route pattern with no built route yet is reported, not failed, so
 // the guard can land before the routes do.
 
-import { readFileSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, appendFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const root = process.cwd();
@@ -130,11 +130,15 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 }
 
 // T34a / ADR-0003: monitoring is server-side only. No page may ship Sentry
-// code to the browser (no browser SDK, no withSentryConfig injection).
+// code to the browser (no browser SDK, no withSentryConfig injection). Every
+// .js under .next/static is scanned, not only the manifest's page files: the
+// next/dynamic leaves (e-mail block, upload) are chunks no page lists
+// (review 0024).
 const clientFiles = new Set(
-  Object.values(manifest.pages)
-    .flat()
-    .filter((f) => f.endsWith(".js")),
+  readdirSync(join(distDir, "static"), { recursive: true })
+    .map(String)
+    .filter((f) => f.endsWith(".js"))
+    .map((f) => relative(distDir, join(distDir, "static", f))),
 );
 const sentryFiles = [...clientFiles].filter((f) =>
   /@sentry\/|sentry\.io|__SENTRY|Sentry\.init/.test(
