@@ -31,3 +31,45 @@ describe("loginSchema (plan § 3.4)", () => {
     ).toEqual({ email: "a@b.c", senha: "x", turnstile: "tok", volta: "/fila" });
   });
 });
+
+describe("signupSchema (D-A1, U-P8)", () => {
+  const valid = {
+    nome: " Pessoa Exemplo ",
+    workspace: " Plataforma ",
+    email: " Pessoa@Exemplo.TEST ",
+    senha: "doze-caracteres",
+    aceite: true,
+    turnstile: "tok",
+    idempotencyKey: "3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e",
+  };
+
+  it("trims and normalizes", async () => {
+    const { signupSchema } = await import("@/features/panel-auth/schemas");
+    expect(signupSchema.parse(valid)).toEqual({
+      ...valid,
+      nome: "Pessoa Exemplo",
+      workspace: "Plataforma",
+      email: "pessoa@exemplo.test",
+    });
+  });
+
+  it.each([
+    ["nome", ""],
+    ["nome", "x".repeat(121)],
+    ["workspace", "   "],
+    ["workspace", "x".repeat(81)],
+    ["email", "nao-e-email"],
+    ["senha", "onze-chars!"],
+    ["senha", "x".repeat(129)],
+    ["aceite", false],
+    ["turnstile", ""],
+    ["idempotencyKey", "nao-uuid"],
+  ])("rejects %s = %j, naming the field", async (field, value) => {
+    const { signupSchema, signupIssues } =
+      await import("@/features/panel-auth/schemas");
+    const result = signupSchema.safeParse({ ...valid, [field]: value });
+    expect(result.success).toBe(false);
+    if (!result.success && field !== "idempotencyKey" && field !== "turnstile")
+      expect(Object.keys(signupIssues(result.error.issues))).toEqual([field]);
+  });
+});

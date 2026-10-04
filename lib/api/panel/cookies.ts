@@ -77,6 +77,8 @@ const pendingSignupSchema = z.object({
   nome: z.string().max(120),
   workspace: z.string().max(80),
   email: z.string().max(254),
+  /** D-A1 reenviar_em: when "Reenviar código" unlocks (ISO 8601). */
+  reenviarEm: z.string().max(64).optional(),
 });
 
 /** The pending sign-up: the API's ticket and the prefill, never the password. */
@@ -85,9 +87,9 @@ export type PendingSignup = z.infer<typeof pendingSignupSchema>;
 export async function setSignupCookie(pending: PendingSignup): Promise<void> {
   const { signup, secure } = await names();
   // Only these four fields, whatever the caller passed.
-  const { ticket, nome, workspace, email } = pending;
+  const { ticket, nome, workspace, email, reenviarEm } = pending;
   const value = Buffer.from(
-    JSON.stringify({ ticket, nome, workspace, email }),
+    JSON.stringify({ ticket, nome, workspace, email, reenviarEm }),
   ).toString("base64url");
   (await cookies()).set(signup, value, options(secure, SIGNUP_SECONDS));
 }

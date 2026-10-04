@@ -1,7 +1,20 @@
 import { z } from "zod";
 
-// The auth forms' schemas (plan § 3.4), shared by the client leaves (inline
-// checks) and the Server Actions (authoritative). Unknown keys are dropped.
+import {
+  EMAIL_MAX_LENGTH,
+  EMAIL_PATTERN,
+  NAME_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  SIGNUP_FIELDS,
+  WORKSPACE_MAX_LENGTH,
+  type SignupField,
+} from "@/features/panel-auth/validation";
+
+// The auth actions' schemas (plan § 3.4), authoritative and server-side. The
+// client leaves check the same rules through validation.ts, which these
+// schemas are built from (the panel's client bundles never import zod:
+// see validation.ts). Unknown keys are dropped.
 
 const email = z.string().trim().toLowerCase().min(1).max(254);
 const turnstile = z.string().min(1).max(2048);
@@ -16,3 +29,34 @@ export const loginSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export { PASSWORD_MIN_LENGTH, type SignupField };
+
+/** D-A1 sign-up. The terms version comes from config, never the client. */
+export const signupSchema = z.object({
+  nome: z.string().trim().min(1).max(NAME_MAX_LENGTH),
+  workspace: z.string().trim().min(1).max(WORKSPACE_MAX_LENGTH),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(EMAIL_MAX_LENGTH)
+    .regex(EMAIL_PATTERN),
+  senha: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  aceite: z.literal(true),
+  turnstile,
+  // A-X7, F17: a UUID only, checked before it becomes a header.
+  idempotencyKey: z.uuid(),
+});
+
+export type SignupInput = z.infer<typeof signupSchema>;
+
+/** The visible fields a schema failure points at, in form order. */
+export function signupIssues(
+  issues: readonly z.core.$ZodIssue[],
+): Partial<Record<SignupField, true>> {
+  const fields: Partial<Record<SignupField, true>> = {};
+  for (const field of SIGNUP_FIELDS)
+    if (issues.some((issue) => issue.path[0] === field)) fields[field] = true;
+  return fields;
+}

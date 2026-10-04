@@ -29,3 +29,35 @@ test.describe("Turnstile scope @feature-ops-panel @panel-access", () => {
     expect(requests).toEqual([]);
   });
 });
+
+test.describe("Turnstile on an auth page @feature-ops-panel @panel-access", () => {
+  test("/cadastro loads the real widget under the nonce CSP, with no violation", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const store = window as unknown as { __csp: string[] };
+      store.__csp = [];
+      document.addEventListener("securitypolicyviolation", (event) => {
+        store.__csp.push(
+          `${event.violatedDirective} ${event.blockedURI} ${event.sourceFile}`,
+        );
+      });
+    });
+    await page.goto("/cadastro");
+
+    // Cloudflare's always-pass test key: the widget renders and solves itself.
+    await expect(page.locator('input[name="turnstile"]')).toHaveValue(
+      "XXXX.DUMMY.TOKEN.XXXX",
+      {
+        timeout: 20_000,
+      },
+    );
+    // No refusal at all: Turnstile needs no relaxation, and the panel's Zod
+    // runs jitless (lib/zod-jitless.ts), so it never probes eval.
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __csp: string[] }).__csp,
+      ),
+    ).toEqual([]);
+  });
+});

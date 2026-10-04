@@ -1,7 +1,6 @@
 import "server-only";
 
 import { env } from "@/lib/env";
-import { toSafeHttpsUrl, type SafeHttpsUrl } from "@/lib/safe-url";
 
 // The panel's runtime config for its pages (ADR-0009). env-schema requires
 // every value whenever PANEL_HOST is set, and a panel page renders only on
@@ -17,18 +16,14 @@ export function turnstileSiteKey(): string {
   return required(env.TURNSTILE_SITE_KEY, "TURNSTILE_SITE_KEY");
 }
 
-/** The sign-up's legal links (P-U3), checked as https: (loopback http: in local builds). */
-export function legalLinks(): {
-  termsUrl: SafeHttpsUrl | string;
-  privacyUrl: SafeHttpsUrl | string;
-  version: string;
-} {
-  const terms = required(env.LEGAL_TERMS_URL, "LEGAL_TERMS_URL");
-  const privacy = required(env.LEGAL_PRIVACY_URL, "LEGAL_PRIVACY_URL");
+/**
+ * The sign-up's legal links (P-U3). env-schema already checked them: https:
+ * in production, a loopback http: only in local production builds.
+ */
+export function legalLinks(): { termsUrl: string; privacyUrl: string } {
   return {
-    termsUrl: toSafeHttpsUrl(terms) ?? terms,
-    privacyUrl: toSafeHttpsUrl(privacy) ?? privacy,
-    version: required(env.LEGAL_TERMS_VERSION, "LEGAL_TERMS_VERSION"),
+    termsUrl: required(env.LEGAL_TERMS_URL, "LEGAL_TERMS_URL"),
+    privacyUrl: required(env.LEGAL_PRIVACY_URL, "LEGAL_PRIVACY_URL"),
   };
 }
 

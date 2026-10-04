@@ -22,7 +22,11 @@ async function submit(page: Page, email: string, senha: string): Promise<void> {
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(senha);
   await Promise.all([
-    page.waitForResponse((response) => response.request().method() === "POST"),
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.request().headers()["next-action"] !== undefined,
+    ),
     page.getByRole("button", { name: "Entrar" }).click(),
   ]);
 }

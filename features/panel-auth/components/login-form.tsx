@@ -14,10 +14,13 @@ import { Button } from "@/components/ui/button";
 import { FormAlert } from "@/components/ui/form-alert";
 import { TextField } from "@/components/ui/text-field";
 import { loginAction, type LoginResult } from "@/features/panel-auth/actions";
+import {
+  NETWORK_ALERT,
+  TURNSTILE_ALERT,
+  rateLimitAlert,
+} from "@/features/panel-auth/alerts";
 import { loginCopy } from "@/features/panel-auth/copy/login";
 import { Turnstile } from "@/features/panel-auth/components/turnstile";
-import { globalCopy } from "@/features/panel-shell/copy/global";
-import { fill, minutesFromSeconds } from "@/features/panel-shell/format";
 
 type Payload =
   | { email: string; senha: string; turnstile?: string; volta?: string }
@@ -26,11 +29,6 @@ type Payload =
 type State = { alert: readonly string[]; navigating: boolean };
 
 const IDLE: State = { alert: [], navigating: false };
-const TURNSTILE_FAILED = [
-  loginCopy["auth.error.turnstile"],
-  loginCopy["auth.error.turnstile.hint"],
-];
-
 type Props = {
   /** The validated `volta` (the action re-validates it). */
   volta: string | null;
@@ -68,7 +66,7 @@ export function LoginForm({
       result = await loginAction(payload);
     } catch {
       inFlight.current = false;
-      return { alert: [globalCopy["error.network"]], navigating: false };
+      return { alert: NETWORK_ALERT, navigating: false };
     }
     if (result.ok || result.code === "EMAIL_NAO_CONFIRMADO") {
       router.push(result.next);
@@ -87,24 +85,20 @@ export function LoginForm({
           navigating: false,
         };
       case "TURNSTILE_INVALIDO":
-        return { alert: TURNSTILE_FAILED, navigating: false };
+        return { alert: TURNSTILE_ALERT, navigating: false };
       case "LIMITE_TENTATIVAS":
         return {
-          alert: [
-            fill(loginCopy["auth.error.rate_limit"], {
-              minutos: minutesFromSeconds(result.retryAfterSeconds),
-            }),
-          ],
+          alert: rateLimitAlert(result.retryAfterSeconds),
           navigating: false,
         };
       case "NETWORK":
-        return { alert: [globalCopy["error.network"]], navigating: false };
+        return { alert: NETWORK_ALERT, navigating: false };
     }
   }
 
   const [state, dispatch, isPending] = useActionState(send, IDLE);
   const busy = isPending || state.navigating;
-  const alert = widgetAlert ? TURNSTILE_FAILED : state.alert;
+  const alert = widgetAlert ? TURNSTILE_ALERT : state.alert;
 
   function submit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();

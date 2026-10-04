@@ -2,12 +2,18 @@
 
 import { z } from "zod";
 
-import { loginSchema } from "@/features/panel-auth/schemas";
+import {
+  loginSchema,
+  signupIssues,
+  signupSchema,
+  type SignupField,
+} from "@/features/panel-auth/schemas";
 import type { AppError } from "@/lib/api/errors";
 import { panelRequest } from "@/lib/api/panel/client";
 import { setSessionCookie, setSignupCookie } from "@/lib/api/panel/cookies";
 import { assertPanelHost } from "@/lib/api/panel/host";
 import { apiPaths } from "@/lib/api/path";
+import { env } from "@/lib/env";
 import { safeReturnPath } from "@/lib/safe-return-path";
 
 // The panel's auth actions (plan § 3.4; ADR-0009). Public POST endpoints:
@@ -87,6 +93,96 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
         code: "EMAIL_NAO_CONFIRMADO",
         next: CONFIRM_FROM_LOGIN,
       };
+    default:
+      return commonFailure(error);
+  }
+}
+
+const signupResponseSchema = z.object({
+  signup_ticket: z.string().min(16).max(512),
+  reenviar_em: z.string().max(64).optional(),
+});
+
+/** API field names (A-X2 VALOR_INVALIDO.field) to the form's. */
+const API_FIELDS: Record<string, SignupField> = {
+  nome: "nome",
+  workspace: "workspace",
+  email: "email",
+  senha: "senha",
+  aceite_termos_versao: "aceite",
+};
+
+export type SignupResult =
+  | { ok: true }
+  | { ok: false; code: "INVALID"; fields: SignupField[] }
+  | {
+      ok: false;
+      code:
+        "EMAIL_EM_USO" | "SENHA_FRACA" | "TESTE_INDISPONIVEL" | "TESTE_PAUSADO";
+    }
+  | CommonFailure;
+
+/**
+ * D-A1: creates the workspace and its login, unconfirmed. Keeps the API's
+ * ticket and the prefill (never the password) in the sign-up cookie for S2
+ * (P19: no PII in a URL). The Idempotency-Key makes a double tap one account.
+ */
+export async function signupAction(input: unknown): Promise<SignupResult> {
+  await assertPanelHost();
+  const parsed = signupSchema.safeParse(input);
+  if (!parsed.success) {
+    const fields = Object.keys(
+      signupIssues(parsed.error.issues),
+    ) as SignupField[];
+    // The token is the widget's, not a field: its failure has its own copy.
+    return fields.length > 0
+      ? { ok: false, code: "INVALID", fields }
+      : { ok: false, code: "TURNSTILE_INVALIDO" };
+  }
+  const { nome, workspace, email, senha, turnstile, idempotencyKey } =
+    parsed.data;
+
+  const result = await panelRequest({
+    operation: "signup",
+    path: apiPaths.panel.signup(),
+    method: "POST",
+    headers: { "idempotency-key": idempotencyKey },
+    body: {
+      nome,
+      workspace,
+      email,
+      senha,
+      aceite_termos_versao: env.LEGAL_TERMS_VERSION,
+      turnstile,
+    },
+    schema: signupResponseSchema,
+    forwardClientIp: true,
+  });
+  if (result.ok) {
+    await setSignupCookie({
+      ticket: result.data.signup_ticket,
+      nome,
+      workspace,
+      email,
+      ...(result.data.reenviar_em !== undefined && {
+        reenviarEm: result.data.reenviar_em,
+      }),
+    });
+    return { ok: true };
+  }
+  const { error } = result;
+  switch (error.code) {
+    case "EMAIL_EM_USO":
+    case "SENHA_FRACA":
+    case "TESTE_INDISPONIVEL":
+    case "TESTE_PAUSADO":
+      return { ok: false, code: error.code };
+    case "VALOR_INVALIDO": {
+      const field = API_FIELDS[error.field ?? ""];
+      return field
+        ? { ok: false, code: "INVALID", fields: [field] }
+        : { ok: false, code: "NETWORK" };
+    }
     default:
       return commonFailure(error);
   }
