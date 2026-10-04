@@ -8,8 +8,13 @@ import { expect, type Page } from "@playwright/test";
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-/** Runs axe on the page as it is now, in both color schemes. */
+/**
+ * Runs axe on the page as it is now, in both color schemes. It first waits for
+ * a title: Next 15 streams metadata on dynamic pages, so after an in-place
+ * refresh the <title> can land after the h1 (review NIT 0033).
+ */
 export async function expectNoAxeViolations(page: Page): Promise<void> {
+  await expect(page).toHaveTitle(/.+/);
   for (const colorScheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme });
     // Controls cross-fade their colors (transition-colors, --duration-fast)
