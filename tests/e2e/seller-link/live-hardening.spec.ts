@@ -164,7 +164,13 @@ test.describe("live status hardening (QA-M2-004) @feature-seller-link", () => {
     const payloads: Promise<string>[] = [];
     page.on("response", (response) => {
       const sent = response.request();
-      if (sent.method() === "POST" || sent.headers()["rsc"] === "1")
+      // The case page's own checks and RSC refreshes. Not prefetches of other
+      // routes (the privacy footer's link): they hold no case data, and a
+      // prefetch body can stay open for ~30 s under load.
+      if (
+        new URL(sent.url()).pathname.endsWith(`/c/${live}`) &&
+        (sent.method() === "POST" || sent.headers()["rsc"] === "1")
+      )
         payloads.push(response.text().catch(() => ""));
     });
     await page.goto(`/v/${SLUGS.ok}/c/${live}`);
