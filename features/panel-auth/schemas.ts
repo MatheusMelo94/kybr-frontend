@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 import {
+  CODE_PATTERN,
   EMAIL_MAX_LENGTH,
   EMAIL_PATTERN,
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  RESET_TOKEN_PATTERN,
   SIGNUP_FIELDS,
   WORKSPACE_MAX_LENGTH,
   type SignupField,
@@ -62,7 +64,9 @@ export function signupIssues(
 }
 
 /** D-A2: the code only. The ticket comes from the sign-up cookie, never the client. */
-export const confirmSchema = z.object({ codigo: z.string().regex(/^\d{6}$/) });
+export const confirmSchema = z.object({
+  codigo: z.string().regex(CODE_PATTERN),
+});
 
 /** D-A3: the Turnstile token only (the ticket, again, from the cookie). */
 export const resendSchema = z.object({ turnstile });
@@ -80,6 +84,6 @@ export const resetRequestSchema = z.object({
 
 /** D-A5 confirm: the token from the URL fragment (posted by the leaf) and the new password. */
 export const resetConfirmSchema = z.object({
-  token: z.string().regex(/^[A-Za-z0-9_-]{22,128}$/),
+  token: z.string().regex(RESET_TOKEN_PATTERN),
   senha: z.string(),
 });

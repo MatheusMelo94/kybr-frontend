@@ -64,13 +64,18 @@ export function normalizeCode(value: string): string {
   return value.replace(/\D/g, "").slice(0, 6);
 }
 
+/** The e-mail code (D-A2): six digits. Shared with confirmSchema. */
+export const CODE_PATTERN = /^\d{6}$/;
+
 export function isCode(value: string): boolean {
-  return /^\d{6}$/.test(value);
+  return CODE_PATTERN.test(value);
 }
 
-/** P04: a reset token from the URL fragment (URL-safe, >= 128 bits). */
+/** P04: a reset token from the URL fragment (URL-safe, >= 128 bits). Shared with resetConfirmSchema. */
+export const RESET_TOKEN_PATTERN = /^[A-Za-z0-9_-]{22,128}$/;
+
 export function isResetToken(value: string): boolean {
-  return /^[A-Za-z0-9_-]{22,128}$/.test(value);
+  return RESET_TOKEN_PATTERN.test(value);
 }
 
 export function isNewPassword(value: string): boolean {
