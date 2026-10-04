@@ -104,7 +104,7 @@ describe("loginAction (D-A4, ADR-0009)", () => {
   });
 
   it("passes TURNSTILE_REQUERIDO and TURNSTILE_INVALIDO through", async () => {
-    panelStore().accounts.get(PANEL_EMAILS.renata)!.loginFailures = 3;
+    panelStore().loginFailures.set(`${PANEL_EMAILS.renata}|203.0.113.9`, 3);
 
     expect(
       await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD }),

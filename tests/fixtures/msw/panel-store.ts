@@ -1,5 +1,6 @@
 import {
   CODE_TTL_MS,
+  IDLE_TTL_MS,
   PANEL_EMAILS,
   PANEL_PASSWORD,
   PRESETS,
@@ -23,8 +24,6 @@ export type Account = {
   senha: string;
   confirmado: boolean;
   workspace: WorkspaceRecord;
-  /** Logins that failed since the last success (PA17). */
-  loginFailures: number;
 };
 
 export type Ticket = {
@@ -40,14 +39,31 @@ export type CallRecord = {
   path: string;
   email?: string;
   turnstile?: string;
+  /** X-Kybr-Client-IP: lets parallel E2E filter their own calls (QA G2). */
+  ip?: string;
+  /** The JSON body's keys, sorted (never the values). */
+  bodyKeys?: string[];
   authorized: boolean;
 };
 
-export type Scenario = "categorias-falham" | "teste-pausado" | "me-falha";
+type Session = { email: string; createdAt: number; lastActivity: number };
+
+export type Scenario =
+  | "categorias-falham"
+  | "categorias-lentas"
+  | "teste-pausado"
+  | "me-falha"
+  | "contagens-falham"
+  | "workspace-falha"
+  | "workspace-queda"
+  | "workspace-invalido"
+  | "logout-falha";
 
 type Store = {
   accounts: Map<string, Account>;
-  sessions: Map<string, { email: string; expiresAt: number }>;
+  sessions: Map<string, Session>;
+  /** Failed logins per "e-mail|client IP" since the last success (PA17, QA G2/G5). */
+  loginFailures: Map<string, number>;
   tickets: Map<string, Ticket>;
   resetTokens: Map<string, { email: string; expiresAt: number; used: boolean }>;
   outbox: Map<string, { codigo?: string; link?: string }>;
@@ -101,6 +117,27 @@ const SEEDED: Record<
     nome: "Pago Exemplo",
     workspace: "Plataforma Paga",
   },
+  // QA G3: count edge cases (also reachable per test through /accounts).
+  "tres-abertos": {
+    email: "tres-abertos@exemplo.test",
+    nome: "Tres Exemplo",
+    workspace: "Plataforma Tres",
+  },
+  "um-aberto": {
+    email: "um-aberto@exemplo.test",
+    nome: "Um Exemplo",
+    workspace: "Plataforma Um",
+  },
+  zerado: {
+    email: "zerado@exemplo.test",
+    nome: "Zerado Exemplo",
+    workspace: "Plataforma Zerada",
+  },
+  "um-vendedor": {
+    email: "um-vendedor@exemplo.test",
+    nome: "Vendedor Exemplo",
+    workspace: "Plataforma Pequena",
+  },
 };
 
 function accountFor(
@@ -115,7 +152,6 @@ function accountFor(
     senha: PANEL_PASSWORD,
     confirmado: preset !== "pendente",
     workspace: workspaceFor(preset, workspace),
-    loginFailures: 0,
   };
 }
 
@@ -135,9 +171,20 @@ function createStore(): Store {
       "Plataforma Existente",
     ),
   );
+  // QA G6: a second workspace (its case is FOREIGN_CASE_ID, from M6).
+  accounts.set(
+    PANEL_EMAILS.outro,
+    accountFor(
+      "renata",
+      PANEL_EMAILS.outro,
+      "Outro Exemplo",
+      "Outra Plataforma",
+    ),
+  );
   return {
     accounts,
     sessions: new Map(),
+    loginFailures: new Map(),
     tickets: new Map(),
     resetTokens: new Map(),
     outbox: new Map(),
@@ -185,17 +232,41 @@ export function openSession(
   now = Date.now(),
 ): { id: string; expira_em: string } {
   const id = randomToken(24);
-  const expiresAt = now + SESSION_TTL_MS;
-  store.sessions.set(id, { email, expiresAt });
-  return { id, expira_em: new Date(expiresAt).toISOString() };
+  store.sessions.set(id, { email, createdAt: now, lastActivity: now });
+  return { id, expira_em: new Date(now + SESSION_TTL_MS).toISOString() };
 }
 
-/** The account behind a live session, or undefined. */
-export function sessionAccount(id: string | undefined): Account | undefined {
+/**
+ * The account behind a live session (12 h sliding idle, 7 d absolute; U-P6),
+ * or undefined. A request slides the idle clock unless `touch` is false (a
+ * poll: the user's Q decision, polls don't keep a session alive).
+ */
+export function sessionAccount(
+  id: string | undefined,
+  touch = true,
+): Account | undefined {
   if (id === undefined) return undefined;
   const session = store.sessions.get(id);
-  if (!session || session.expiresAt <= Date.now()) return undefined;
+  const now = Date.now();
+  if (!session) return undefined;
+  if (
+    now - session.createdAt >= SESSION_TTL_MS ||
+    now - session.lastActivity >= IDLE_TTL_MS
+  ) {
+    store.sessions.delete(id);
+    return undefined;
+  }
+  if (touch) session.lastActivity = now;
   return store.accounts.get(session.email);
+}
+
+/** QA G1: moves a session's last activity and/or creation back in time. */
+export function ageSession(id: string, idleMs = 0, ageMs = 0): boolean {
+  const session = store.sessions.get(id);
+  if (!session) return false;
+  session.lastActivity -= idleMs;
+  session.createdAt -= ageMs;
+  return true;
 }
 
 /** PA12: ends one session, or every session when no id is given. */
@@ -259,6 +330,16 @@ export function scenarioApplies(
   const scope = store.scenarios.get(scenario);
   if (scope === undefined) return false;
   return scope === "all" || (email !== undefined && scope.has(email));
+}
+
+/** Turns a scenario off again (for one e-mail, or everyone). */
+export function unseedScenario(scenario: Scenario, email?: string): void {
+  const scope = store.scenarios.get(scenario);
+  if (email === undefined || scope === "all") {
+    store.scenarios.delete(scenario);
+    return;
+  }
+  scope?.delete(email.toLowerCase());
 }
 
 /** Turns a scenario on, for everyone or for one e-mail (parallel E2E). */

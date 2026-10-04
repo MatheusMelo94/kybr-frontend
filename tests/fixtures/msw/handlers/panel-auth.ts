@@ -16,6 +16,7 @@ import {
   type Preset,
 } from "../../factories/panel.ts";
 import {
+  ageSession,
   createAccount,
   expireSession,
   issueResetToken,
@@ -28,6 +29,7 @@ import {
   scenarioApplies,
   seedScenario,
   sessionAccount,
+  unseedScenario,
   type Scenario,
 } from "../panel-store.ts";
 import {
@@ -143,7 +145,7 @@ const resend = http.post("*/v1/auth/confirm/resend", async ({ request }) => {
 });
 
 const login = http.post("*/v1/auth/login", async ({ request }) => {
-  const { body, refused } = await incoming(request);
+  const { body, token, ip, refused } = await incoming(request);
   if (refused) return refused;
   const email = str(body.email).trim().toLowerCase();
   const senha = str(body.senha);
@@ -153,18 +155,18 @@ const login = http.post("*/v1/auth/login", async ({ request }) => {
   if (hasToken && body.turnstile !== TURNSTILE_TOKENS.pass)
     return apiError(400, "TURNSTILE_INVALIDO");
 
-  const account = panelStore().accounts.get(email);
-  if (
-    account &&
-    account.loginFailures >= FAILURES_BEFORE_TURNSTILE &&
-    !hasToken
-  )
+  // Failures count per e-mail + client IP, for known and unknown addresses
+  // alike (no enumeration; QA G2/G5). No hard lockout: Turnstile after 3.
+  const failures = panelStore().loginFailures;
+  const key = `${email}|${ip ?? ""}`;
+  if ((failures.get(key) ?? 0) >= FAILURES_BEFORE_TURNSTILE && !hasToken)
     return apiError(428, "TURNSTILE_REQUERIDO");
+  const account = panelStore().accounts.get(email);
   if (!account || account.senha !== senha) {
-    if (account) account.loginFailures += 1;
+    failures.set(key, (failures.get(key) ?? 0) + 1);
     return apiError(401, "CREDENCIAIS_INVALIDAS");
   }
-  account.loginFailures = 0;
+  failures.delete(key);
   if (!account.confirmado) {
     // Only after the password verified; a new code goes out (D-A4).
     return apiError(403, "EMAIL_NAO_CONFIRMADO", {
@@ -172,7 +174,9 @@ const login = http.post("*/v1/auth/login", async ({ request }) => {
       reenviar_em: reenviarEm(),
     });
   }
-  // Rotation: a new id on every login (A-X1).
+  // Rotation (A-X1): a new id on every login, and the id this browser
+  // presented, if any, stops working (QA G9).
+  if (token !== undefined) expireSession(token);
   return ok({ sessao: openSession(email) });
 });
 
@@ -181,6 +185,9 @@ const logout = http.post("*/v1/auth/logout", async ({ request }) => {
   if (refused) return refused;
   if (token === undefined) return apiError(401, "SESSAO_EXPIRADA");
   const account = sessionAccount(token);
+  // QA G3: the API fails the logout (the panel still deletes its cookie).
+  if (account && scenarioApplies("logout-falha", account.email))
+    return apiError(500, "ERRO_INTERNO");
   if (account) panelStore().logouts.push(account.email);
   expireSession(token);
   return noContent();
@@ -224,7 +231,9 @@ const passwordResetConfirm = http.post(
     if (!account) return apiError(400, "TOKEN_INVALIDO");
     entry.used = true;
     account.senha = senha;
-    account.loginFailures = 0;
+    for (const key of panelStore().loginFailures.keys())
+      if (key.startsWith(`${account.email}|`))
+        panelStore().loginFailures.delete(key);
     // Every session of the account ends (P04).
     revokeSessionsOf(account.email);
     return noContent();
@@ -244,6 +253,12 @@ export const panelAuthHandlers: RequestHandler[] = [
 // --- Loopback-only controls (M2-06: the mock API binds to 127.0.0.1) ---------
 
 const SCENARIOS: readonly Scenario[] = [
+  "categorias-lentas",
+  "contagens-falham",
+  "workspace-falha",
+  "workspace-queda",
+  "workspace-invalido",
+  "logout-falha",
   "categorias-falham",
   "teste-pausado",
   "me-falha",
@@ -299,6 +314,35 @@ export const panelControlHandlers: RequestHandler[] = [
     );
     return new HttpResponse(null, { status: 204 });
   }),
+  // The scenario off again: { scenario, email? }.
+  http.post("*/__mock/panel/unseed", async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!SCENARIOS.includes(body.scenario as Scenario))
+      return new HttpResponse(null, { status: 400 });
+    unseedScenario(
+      body.scenario as Scenario,
+      typeof body.email === "string" ? body.email : undefined,
+    );
+    return new HttpResponse(null, { status: 204 });
+  }),
+  // QA G1: { id, idleMs?, ageMs? } moves one session's clock back.
+  http.post("*/__mock/panel/age-session", async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    const done =
+      typeof body.id === "string" &&
+      ageSession(
+        body.id,
+        typeof body.idleMs === "number" ? body.idleMs : 0,
+        typeof body.ageMs === "number" ? body.ageMs : 0,
+      );
+    return new HttpResponse(null, { status: done ? 204 : 404 });
+  }),
   // A per-test account from a preset: { email, preset?, senha? }.
   http.post("*/__mock/panel/accounts", async ({ request }) => {
     const body = (await request.json().catch(() => ({}))) as Record<
@@ -321,8 +365,9 @@ export const panelControlHandlers: RequestHandler[] = [
   // "no token in a URL".
   http.get("*/__mock/panel/calls", ({ request }) => {
     const email = queryEmail(request);
+    const ip = new URL(request.url).searchParams.get("ip");
     const calls = panelStore().calls.filter(
-      (call) => !email || call.email === email,
+      (call) => (!email || call.email === email) && (!ip || call.ip === ip),
     );
     return HttpResponse.json(calls);
   }),

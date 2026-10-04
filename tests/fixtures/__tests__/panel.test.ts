@@ -204,7 +204,7 @@ describe("panel mock: sign-up and confirm (PA1–PA5, PA19)", () => {
     expect(paused.status).toBe(503);
     expect(await errorCode(paused)).toBe("TESTE_PAUSADO");
     expect(
-      (await call("POST", "/v1/auth/signup", signupBody("outro@exemplo.test")))
+      (await call("POST", "/v1/auth/signup", signupBody("outra-pessoa@exemplo.test")))
         .status,
     ).toBe(202);
   });
@@ -620,6 +620,7 @@ describe("panel mock: controls", () => {
         path: "/v1/auth/password-reset",
         email: "log@exemplo.test",
         turnstile: PASS,
+        bodyKeys: ["email", "turnstile"],
         authorized: false,
       },
     ]);

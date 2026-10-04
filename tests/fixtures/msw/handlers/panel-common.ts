@@ -52,6 +52,8 @@ export function networkDrop(): Response {
 export type Incoming = {
   body: Record<string, unknown>;
   token: string | undefined;
+  /** X-Kybr-Client-IP, as the Next server forwarded it (QA G2). */
+  ip: string | undefined;
   /** Set when the request must be refused before any handling. */
   refused?: HttpResponse<JsonBodyType>;
 };
@@ -71,14 +73,18 @@ export async function incoming(request: Request): Promise<Incoming> {
   }
   const auth = request.headers.get("authorization") ?? "";
   const token = /^Bearer (\S+)$/.exec(auth)?.[1];
+  const ip = request.headers.get("x-kybr-client-ip") ?? undefined;
+  const bodyKeys = Object.keys(body).sort();
   recordCall({
     method: request.method,
     path: url.pathname + url.search,
     ...(typeof body.email === "string" && { email: body.email.toLowerCase() }),
     ...(typeof body.turnstile === "string" && { turnstile: body.turnstile }),
+    ...(ip !== undefined && { ip }),
+    ...(bodyKeys.length > 0 && { bodyKeys }),
     authorized: token !== undefined,
   });
-  const result: Incoming = { body, token };
+  const result: Incoming = { body, token, ip };
   if (!request.headers.get("x-kybr-bff-key"))
     result.refused = apiError(403, "BFF_KEY_AUSENTE");
   return result;

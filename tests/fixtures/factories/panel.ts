@@ -35,6 +35,12 @@ export const RESET_TOKEN_TTL_MS = 60 * 60_000;
 /** The absolute session lifetime (U-P6): 7 days. */
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60_000;
 
+/** The sliding idle lifetime (U-P6): 12 hours. */
+export const IDLE_TTL_MS = 12 * 60 * 60_000;
+
+/** A case of the second workspace (outro@): any other workspace gets 404 (AC 73, P05; used from M6). */
+export const FOREIGN_CASE_ID = "7d1e5c2a-9b3f-4a6e-8c0d-1f2a3b4c5d6e";
+
 /** PA5: codes with a fixed answer. Any other wrong code is CODIGO_INCORRETO. */
 export const CODES = {
   wrong: "000000",
@@ -71,13 +77,23 @@ export const PANEL_EMAILS = {
   existente: "existente@exemplo.test",
   limite: "limite@exemplo.test",
   ninguem: "ninguem@exemplo.test",
+  outro: "outro@exemplo.test",
 } as const;
 
 /** PA19: sign-ups on this domain get no trial (403 TESTE_INDISPONIVEL). */
 export const DISPOSABLE_DOMAIN = "descartavel.test";
 
 export type Preset =
-  "renata" | "nova" | "pendente" | "parcial" | "esgotado" | "pago";
+  | "renata"
+  | "nova"
+  | "pendente"
+  | "parcial"
+  | "esgotado"
+  | "pago"
+  | "tres-abertos"
+  | "um-aberto"
+  | "zerado"
+  | "um-vendedor";
 
 export const PRESETS: readonly Preset[] = [
   "renata",
@@ -86,6 +102,10 @@ export const PRESETS: readonly Preset[] = [
   "parcial",
   "esgotado",
   "pago",
+  "tres-abertos",
+  "um-aberto",
+  "zerado",
+  "um-vendedor",
 ];
 
 export type Plano = {
@@ -186,6 +206,41 @@ export function workspaceFor(preset: Preset, nome: string): WorkspaceRecord {
         ...ONBOARDED,
         plano: { tipo: "teste", usadas: 200, limite: 200 },
         contagens: { ...COUNTS, fila_vencidos: 0 },
+      };
+    // QA G3: count edge cases for the shell.
+    case "tres-abertos":
+      return {
+        ...common,
+        ...ONBOARDED,
+        plano: TRIAL,
+        contagens: { ...COUNTS, fila_abertos: 3, fila_vencidos: 0 },
+      };
+    case "um-aberto":
+      return {
+        ...common,
+        ...ONBOARDED,
+        plano: TRIAL,
+        contagens: { ...COUNTS, fila_abertos: 1, fila_vencidos: 0 },
+      };
+    case "zerado":
+      return {
+        ...common,
+        ...ONBOARDED,
+        plano: TRIAL,
+        contagens: {
+          fila_abertos: 0,
+          fila_vencidos: 0,
+          alertas_criticos_abertos: 0,
+          vendedores: 0,
+          lote_em_andamento: false,
+        },
+      };
+    case "um-vendedor":
+      return {
+        ...common,
+        ...ONBOARDED,
+        plano: TRIAL,
+        contagens: { ...COUNTS, vendedores: 1 },
       };
     case "pago":
       return {
