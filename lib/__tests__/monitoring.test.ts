@@ -157,10 +157,8 @@ describe("reportCspViolations", () => {
         directive: "script-src-elem",
         disposition: "enforce",
         expected: "no",
-      },
-      extra: {
-        documentUrl: "https://kybr.test/v/loja-exemplo/c/[token]",
         blocked: "https://evil.test/x.js",
+        document_path: "/v/loja-exemplo/c/[token]",
       },
     });
     log.mockRestore();

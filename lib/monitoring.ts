@@ -108,6 +108,14 @@ export function reportMarker(
   });
 }
 
+/** Sentry drops a tag value longer than this. */
+const MAX_TAG_LENGTH = 200;
+
+/** A scrubbed URL's path: no origin, token, query or fragment. */
+function scrubbedPath(url: string): string {
+  return scrubUrl(url).replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, "") || "/";
+}
+
 /** Sentry events the CSP collector may send per minute, per server instance (M3-01). */
 export const CSP_EVENTS_PER_MINUTE = 30;
 const MINUTE = 60_000;
@@ -147,7 +155,6 @@ function admitCsp(key: string): boolean {
  */
 export function reportCspViolations(violations: CspViolation[]): void {
   for (const violation of violations) {
-    const documentUrl = scrubUrl(violation.documentUrl);
     const blocked = violation.blocked.includes("://")
       ? scrubUrl(violation.blocked)
       : violation.blocked;
@@ -165,8 +172,13 @@ export function reportCspViolations(violations: CspViolation[]): void {
         directive: violation.directive,
         disposition: violation.disposition,
         expected,
+        // Tags, not `extra`: scrubEvent drops `extra` whole (M3-03).
+        blocked: blocked.slice(0, MAX_TAG_LENGTH),
+        document_path: scrubbedPath(violation.documentUrl).slice(
+          0,
+          MAX_TAG_LENGTH,
+        ),
       },
-      extra: { documentUrl, blocked },
     });
   }
 }
