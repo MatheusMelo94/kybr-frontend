@@ -5,6 +5,9 @@ import {
   type Response,
 } from "@playwright/test";
 
+import { CASE_TOKENS, SLUGS } from "../../fixtures/factories/seller-link.ts";
+import { createCase } from "../fixtures/mock-api.ts";
+
 // API_PUBLIC_BASE_URL for the E2E build (playwright.config.ts).
 const API_ORIGIN = "http://localhost:4010";
 
@@ -135,6 +138,50 @@ test.describe("security headers @feature-seller-link", () => {
       ),
     ).toEqual([]);
   });
+
+  // QA-M3-001: the case page's lazy leaves (upload, e-mail block) must not
+  // leave a script preload the CSP refuses (no nonce): Chromium logs those as
+  // console errors, and the hint is wasted.
+  for (const [screen, open] of [
+    ["quase lá", async () => `/v/${SLUGS.ok}/c/${CASE_TOKENS.pendente}`],
+    [
+      "em análise",
+      async (request: Parameters<typeof createCase>[0]) =>
+        `/v/${SLUGS.ok}/c/${await createCase(request, { ageMs: 11_000 })}`,
+    ],
+  ] as const) {
+    test(`QA-M3-001: ${screen} has no script preload without the nonce, and no CSP console error`, async ({
+      page,
+      request,
+    }) => {
+      const errors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+
+      const response = await page.goto(await open(request));
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.waitForLoadState("networkidle");
+
+      const nonce = /'nonce-([^']+)'/.exec(csp(response))?.[1];
+      const preloads = await page.$$eval(
+        'link[rel="preload"][as="script"], link[rel="modulepreload"]',
+        (links) =>
+          links.map((link) => ({
+            href: link.getAttribute("href"),
+            nonce: (link as HTMLLinkElement).nonce,
+          })),
+      );
+      expect(preloads.filter((link) => link.nonce !== nonce)).toEqual([]);
+      expect(
+        errors.filter((text) => /Content Security Policy|violates/i.test(text)),
+      ).toEqual([]);
+      // The leaves still render and work from the server HTML.
+      await expect(
+        page.getByRole("button", { name: "Salvar e-mail" }),
+      ).toBeVisible();
+    });
+  }
 
   test("the production build ships no browser source maps", async ({
     page,
