@@ -39,7 +39,9 @@ export default async function RootLayout({
 
   return (
     <html lang="pt-BR" className={inter.variable}>
-      <body>{children}</body>
+      {/* A word longer than the column (a title at 200 % text on a phone) breaks
+          instead of scrolling the page sideways (WCAG 1.4.4 / 1.4.10). */}
+      <body className="wrap-break-word">{children}</body>
     </html>
   );
 }

@@ -12,14 +12,24 @@ import {
   cnpjFor,
   SLUGS,
 } from "../../fixtures/factories/seller-link.ts";
-import { pdf } from "../../fixtures/factories/files.ts";
+import { gif, pdf } from "../../fixtures/factories/files.ts";
 import { expectNoAxeViolations } from "../fixtures/axe.ts";
-import { MOCK_API, createCase } from "../fixtures/mock-api.ts";
+import {
+  MOCK_API,
+  createCase,
+  failContactSaves,
+} from "../fixtures/mock-api.ts";
 
 // T34 (spec AC 33–35; DC § Accessibility Baseline; QA M3 plan § Breakpoint
-// sweep): every state at 360, 768 and 1280 (axe in light and dark, no
-// horizontal scroll), 44 × 44 px targets at 360, 320 px reflow, 200 % text,
-// and the whole journey by keyboard.
+// sweep). 360, 768 and 1280 are all first-class (user decision, 2026-10-04):
+// every state at each width gets axe in light and dark, no horizontal scroll,
+// 44 × 44 px targets, a Tab pass with the focus ring at every stop, and 200 %
+// text; 768 and 1280 also get mouse hover and the wide-screen top spacing.
+// Plus 320 px reflow and the whole journey by keyboard.
+
+const WIDTHS = [360, 768, 1280] as const;
+
+const ANALYSIS = "Sua empresa está em análise";
 
 type Open = (page: Page, request: APIRequestContext) => Promise<void>;
 
@@ -139,7 +149,88 @@ const STATES: [string, Open][] = [
         ...CASE_PRESETS.blocked.GENERICO,
       }).then(() => {}),
   ],
+  [
+    "em análise, offline banner",
+    async (page, request) => {
+      await page.context().setOffline(false);
+      await caseWith(page, request, { ageMs: 11_000 }, ANALYSIS);
+      await page.context().setOffline(true);
+      await expect(
+        page.getByRole("status").filter({ hasText: /^Sem conexão/ }),
+      ).toBeVisible();
+    },
+  ],
+  [
+    "quase lá, e-mail field error",
+    async (page, request) => {
+      await caseWith(page, request, { kind: "pendente", ageMs: 60_000 });
+      await page.getByRole("button", { name: "Salvar e-mail" }).click();
+      await expect(page.getByText("Informe um e-mail.")).toBeVisible();
+    },
+  ],
+  [
+    "quase lá, e-mail network error",
+    async (page, request) => {
+      const token = await caseWith(page, request, {
+        kind: "pendente",
+        ageMs: 60_000,
+      });
+      await failContactSaves(request, token, 503);
+      await page
+        .getByRole("textbox", { name: "Seu e-mail para avisos" })
+        .fill("maria.exemplo@empresa-exemplo.test");
+      await page.getByRole("button", { name: "Salvar e-mail" }).click();
+      await expect(
+        page.getByText("Não conseguimos salvar o e-mail. Tente de novo."),
+      ).toBeVisible();
+    },
+  ],
+  [
+    "quase lá, upload error",
+    async (page, request) => {
+      await caseWith(page, request, { kind: "pendente", ageMs: 60_000 });
+      const chooser = page.waitForEvent("filechooser");
+      await page.getByRole("button", { name: "Enviar documento" }).click();
+      await (await chooser).setFiles(gif());
+      await expect(
+        page.getByText("Formato não aceito. Envie PDF, JPG ou PNG."),
+      ).toBeVisible();
+    },
+  ],
 ];
+
+/**
+ * Hovers every visible control with the mouse and returns the ones whose look
+ * doesn't change (DC § Component States: hover, pointer-fine only). A field in
+ * error keeps its danger border on hover, so it's left out.
+ */
+async function controlsWithoutHover(page: Page): Promise<string[]> {
+  const controls = page.locator(
+    'main a[href], main button:not([disabled]), main input:not([type="hidden"]):not([type="file"]):not([aria-invalid="true"])',
+  );
+  const missing: string[] = [];
+  for (const control of await controls.all()) {
+    if (!(await control.isVisible())) continue;
+    const look = () =>
+      control.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return [
+          style.backgroundColor,
+          style.borderColor,
+          style.color,
+          style.textDecorationThickness,
+        ].join("|");
+      });
+    await page.mouse.move(0, 0);
+    const before = await look();
+    await control.hover();
+    // Transitions run for --duration-fast.
+    await page.waitForTimeout(250);
+    if ((await look()) === before)
+      missing.push(((await control.textContent()) ?? "").trim().slice(0, 40));
+  }
+  return missing;
+}
 
 /** Every visible control's size, for the ones under 44 × 44 px. */
 async function smallTargets(page: Page): Promise<string[]> {
@@ -158,6 +249,50 @@ async function smallTargets(page: Page): Promise<string[]> {
   });
 }
 
+/**
+ * Tabs through the page from the top and returns every stop that draws no
+ * focus ring (DC § Accessibility Baseline: focus-visible always shown).
+ */
+async function stopsWithoutRing(page: Page): Promise<string[]> {
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    window.scrollTo(0, 0);
+  });
+  const missing: string[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press("Tab");
+    const stop = await page.evaluate(() => {
+      const element = document.activeElement as HTMLElement | null;
+      if (!element || element === document.body) return null;
+      const style = getComputedStyle(element);
+      const path: string[] = [];
+      for (let node: Element | null = element; node; node = node.parentElement)
+        path.unshift(
+          `${node.tagName}:${[...(node.parentElement?.children ?? [])].indexOf(node)}`,
+        );
+      return {
+        key: path.join("/"),
+        name: (element.getAttribute("aria-label") ?? element.textContent ?? "")
+          .trim()
+          .slice(0, 40),
+        ring: style.outlineStyle !== "none" && style.outlineWidth !== "0px",
+      };
+    });
+    // Back at the top (or out to the browser): every stop was visited.
+    if (stop === null || seen.has(stop.key)) break;
+    seen.add(stop.key);
+    if (!stop.ring) missing.push(stop.name);
+  }
+  // A page with controls must have been walked (Link not found has none).
+  const controls = await page
+    .locator('main a[href], main button, main input:not([type="hidden"])')
+    .count();
+  if (controls > 0)
+    expect(seen.size, "the Tab pass reached the controls").toBeGreaterThan(0);
+  return missing;
+}
+
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
@@ -165,12 +300,63 @@ async function horizontalOverflow(page: Page): Promise<number> {
 }
 
 test.describe("accessibility and breakpoints @feature-seller-link", () => {
+  for (const [path, heading] of [
+    [`/v/${SLUGS.ok}`, undefined],
+    [`/v/${SLUGS.ok}/c/${CASE_TOKENS.aprovado}`, undefined],
+  ] as const) {
+    test(`wide screens: the same centered column sits lower at 768 and 1024+ (${path})`, async ({
+      page,
+    }) => {
+      const main = page.locator("main");
+      for (const [width, top] of [
+        [360, "32px"],
+        [768, "64px"],
+        [1024, "96px"],
+        [1280, "96px"],
+      ] as const) {
+        await page.setViewportSize({ width, height: 900 });
+        await goto(page, path, heading);
+        expect(
+          await main.evaluate((m) => getComputedStyle(m).paddingTop),
+          `${width}px`,
+        ).toBe(top);
+        const box = await main.evaluate((m) => {
+          const { left, width: w } = m.getBoundingClientRect();
+          return { left, width: w };
+        });
+        expect(box.width, `${width}px column`).toBeLessThanOrEqual(480);
+        // Centered: the same margin on both sides.
+        expect(
+          Math.abs(width - (box.left + box.width) - box.left),
+          `${width}px centered`,
+        ).toBeLessThanOrEqual(1);
+      }
+    });
+  }
+
   for (const [name, open] of STATES) {
-    test(`AC 34 / AC 35: ${name} at 360, 768 and 1280: axe in light and dark, no horizontal scroll, 44 px targets at 360`, async ({
+    test(`hover: every control in ${name} changes on mouse hover at 768 and 1280`, async ({
+      page,
+      request,
+    }, testInfo) => {
+      test.skip(
+        testInfo.project.use.hasTouch === true,
+        "hover is for fine pointers (mouse) only",
+      );
+      for (const width of [768, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        await open(page, request);
+        expect(await controlsWithoutHover(page), `${width}px`).toEqual([]);
+      }
+    });
+  }
+
+  for (const [name, open] of STATES) {
+    test(`AC 34 / AC 35: ${name} at 360, 768 and 1280: axe in light and dark, no horizontal scroll, 44 px targets, a focus ring at every Tab stop`, async ({
       page,
       request,
     }) => {
-      for (const width of [360, 768, 1280]) {
+      for (const width of WIDTHS) {
         await page.setViewportSize({ width, height: 900 });
         await open(page, request);
 
@@ -178,12 +364,13 @@ test.describe("accessibility and breakpoints @feature-seller-link", () => {
           await horizontalOverflow(page),
           `${width}px`,
         ).toBeLessThanOrEqual(0);
-        if (width === 360) expect(await smallTargets(page)).toEqual([]);
+        expect(await smallTargets(page), `${width}px`).toEqual([]);
         await expectNoAxeViolations(page);
+        expect(await stopsWithoutRing(page), `${width}px`).toEqual([]);
       }
     });
 
-    test(`reflow: ${name} at 320 px, and with text at 200 %`, async ({
+    test(`reflow: ${name} at 320 px, and with text at 200 % at 360, 768 and 1280`, async ({
       page,
       request,
     }) => {
@@ -191,13 +378,20 @@ test.describe("accessibility and breakpoints @feature-seller-link", () => {
       await open(page, request);
       expect(await horizontalOverflow(page), "320px").toBeLessThanOrEqual(0);
 
-      await page.setViewportSize({ width: 768, height: 900 });
-      await page.evaluate(() => {
-        document.documentElement.style.fontSize = "200%";
-      });
-      expect(await horizontalOverflow(page), "200 % text").toBeLessThanOrEqual(
-        0,
-      );
+      for (const width of WIDTHS) {
+        await page.setViewportSize({ width, height: 900 });
+        await open(page, request);
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        expect(
+          await horizontalOverflow(page),
+          `200 % text at ${width}px`,
+        ).toBeLessThanOrEqual(0);
+        expect(await smallTargets(page), `200 % text at ${width}px`).toEqual(
+          [],
+        );
+      }
     });
   }
 

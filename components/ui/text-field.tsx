@@ -92,6 +92,8 @@ export function TextField({
         aria-describedby={describedBy || undefined}
         className={cn(
           "h-12 w-full rounded-lg border border-field-line bg-field px-4 text-base text-ink",
+          // hover: applies to fine pointers only (Tailwind 4: @media (hover: hover)).
+          "hover:border-ink-muted",
           "placeholder:text-ink-muted",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           "aria-invalid:border-danger-ink",

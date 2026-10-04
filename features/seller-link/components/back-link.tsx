@@ -54,7 +54,7 @@ export function BackLink({ href }: Props): JSX.Element {
     <Link
       href={href}
       onClick={back}
-      className="inline-flex min-h-11 items-center self-start text-body text-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      className="inline-flex min-h-11 items-center self-start text-body text-ink underline underline-offset-4 hover:decoration-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
     >
       {privacyCopy["privacy.back"]}
     </Link>
