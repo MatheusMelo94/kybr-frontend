@@ -69,6 +69,20 @@
   --duration-base: 250ms;
   --duration-slow: 450ms;
   --duration-loop: 1.4s;
+
+  /* The indeterminate bar on verificando (spec § Motion Intent; tech-design § 5):
+     transform only, so no layout or paint of its track. */
+  --animate-indeterminate: indeterminate var(--duration-loop)
+    var(--ease-in-out-quart) infinite;
+
+  @keyframes indeterminate {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
 }
 
 @layer base {
