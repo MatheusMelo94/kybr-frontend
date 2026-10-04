@@ -129,6 +129,9 @@ export async function logIn(
   await page.getByLabel("Senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/entrar"));
+  // "/" redirects again (to /fila or /comecar): let that settle, or the next
+  // navigation aborts it (Firefox: NS_BINDING_ABORTED).
+  await page.waitForLoadState("networkidle");
 }
 
 /** Fails if the page scrolls sideways at the current width. */
