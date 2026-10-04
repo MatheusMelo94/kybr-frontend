@@ -10,6 +10,7 @@ import {
   CASE_TOKENS,
   DOCUMENT_TYPES,
   ERROR_SENTINEL,
+  MAX_FILES_PER_CASE,
   MAX_UPLOAD_BYTES,
   PUBLIC_LINKS,
   RETRY_AFTER_SECONDS,
@@ -548,6 +549,8 @@ export const sellerLinkHandlers: RequestHandler[] = [
       ) {
         return apiError(409, "CASO_DECIDIDO", { headers });
       }
+      if (names.includes(UPLOAD_MARKERS.fileLimit))
+        return apiError(413, "LIMITE_ARQUIVOS", { headers });
       if (names.includes(UPLOAD_MARKERS.tooLarge))
         return apiError(413, "ARQUIVO_GRANDE", { headers });
       if (
@@ -573,6 +576,13 @@ export const sellerLinkHandlers: RequestHandler[] = [
       ) {
         return apiError(415, "FORMATO_INVALIDO", { headers });
       }
+
+      const caseFiles = [...record.uploads.values()].reduce(
+        (total, upload) => total + upload.files,
+        0,
+      );
+      if (caseFiles + files.length > MAX_FILES_PER_CASE)
+        return apiError(413, "LIMITE_ARQUIVOS", { headers });
 
       const bytes =
         (previous?.bytes ?? 0) +

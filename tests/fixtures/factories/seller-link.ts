@@ -63,6 +63,7 @@ export const CASE_TOKENS = {
 /** Put one of these in an uploaded file's name to force that D6 outcome (S13). */
 export const UPLOAD_MARKERS = {
   tooLarge: "__413__",
+  fileLimit: "__413files__", // LIMITE_ARQUIVOS (F05), without sending 31 files
   badFormat: "__415__",
   decided: "__409__",
   rateLimited: "__429__",
@@ -84,6 +85,8 @@ export const SLOW_RESULT_AFTER_MS = 14_000;
 export const FIXED_CASE_CREATED_AT = "2026-10-01T12:00:00.000Z";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+/** Per-case file cap across every document (F05; contract D6 LIMITE_ARQUIVOS). */
+export const MAX_FILES_PER_CASE = 30;
 
 export const DOCUMENT_TYPES = [
   "CONTRATO_SOCIAL_OU_CCMEI",

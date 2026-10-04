@@ -7,12 +7,31 @@ import { LiveRegion } from "@/components/ui/live-region";
 import { useCommittedRefresh } from "@/features/seller-link/components/case/use-committed-refresh";
 import { uploadCopy } from "@/features/seller-link/copy/upload";
 import { fill } from "@/features/seller-link/format";
-import { uploadResponseSchema } from "@/features/seller-link/upload-schemas";
+import {
+  checkUpload,
+  uploadResponseSchema,
+  uploadType,
+  type UploadIssue,
+} from "@/features/seller-link/upload-schemas";
 
 /** What the picker offers: no `capture`, so the phone offers camera and files. */
 const ACCEPT = "application/pdf,image/jpeg,image/png";
 
-type Status = { kind: "idle" } | { kind: "busy" } | { kind: "error" };
+type UploadError = UploadIssue | "network";
+
+type Status =
+  | { kind: "idle" }
+  | { kind: "busy" }
+  | { kind: "error"; error: UploadError }
+  /** 409: the case was decided; nothing more can be sent. */
+  | { kind: "closed" };
+
+const ERROR_COPY: Record<UploadError, string> = {
+  size: uploadCopy["upload.error.size"],
+  type: uploadCopy["upload.error.type"],
+  mixed: uploadCopy["upload.error.mixed"],
+  network: uploadCopy["upload.error.network"],
+};
 
 type Props = {
   /** D6, built on the server from API_PUBLIC_BASE_URL (ADR-0004b; F01 paths). */
@@ -46,13 +65,32 @@ export function DocumentUpload({
   const [uploaded, setUploaded] = useState(0);
   // What this page sent last: after a PDF, nothing more can be added.
   const [lastFormat, setLastFormat] = useState<"pdf" | "photos" | null>(null);
+  // Bytes this page sent for the document (the 10 MB limit is per document).
+  const [sentBytes, setSentBytes] = useState(0);
+  // The pick that failed on the network: tapping again resends it (AC 22).
+  const [retry, setRetry] = useState<File[] | null>(null);
 
   const received = Math.max(enviados, uploaded);
   // The counts and pending.allreceived are the server's (AC 23).
   const refresh = useCommittedRefresh(enviados >= uploaded);
 
+  /** The error for a non-201 answer (D7 codes, mapped by status; ADR-0004b). */
+  function errorFor(status: number): UploadError {
+    switch (status) {
+      case 413: // ARQUIVO_GRANDE (10 MB) or LIMITE_ARQUIVOS (30 files, F05): one copy (Q7)
+        return "size";
+      case 415:
+        // On an added page the photos are valid on their own: the API refused
+        // the mix with what's already there (which may be a PDF).
+        return received > 0 ? "mixed" : "type";
+      default: // 429 and 5xx: nothing the seller did; tapping again retries
+        return "network";
+    }
+  }
+
   async function send(files: File[]): Promise<void> {
     setStatus({ kind: "busy" });
+    setRetry(null);
     const body = new FormData();
     body.set("tipo", tipo);
     for (const file of files) body.append("arquivos", file);
@@ -65,11 +103,24 @@ export function DocumentUpload({
         credentials: "omit",
       });
     } catch {
-      setStatus({ kind: "error" });
+      setRetry(files);
+      setStatus({ kind: "error", error: "network" });
+      return;
+    }
+    if (response.status === 409) {
+      setStatus({ kind: "closed" });
+      return;
+    }
+    if (response.status === 404) {
+      // The case is gone: the page re-renders as Case not found.
+      setStatus({ kind: "idle" });
+      refresh();
       return;
     }
     if (response.status !== 201) {
-      setStatus({ kind: "error" });
+      const error = errorFor(response.status);
+      if (error === "network") setRetry(files);
+      setStatus({ kind: "error", error });
       return;
     }
     const parsed = uploadResponseSchema.safeParse(
@@ -81,7 +132,12 @@ export function DocumentUpload({
         : received + files.length,
     );
     setLastFormat(
-      files.some((file) => file.type === "application/pdf") ? "pdf" : "photos",
+      files.some((file) => uploadType(file) === "application/pdf")
+        ? "pdf"
+        : "photos",
+    );
+    setSentBytes(
+      (bytes) => bytes + files.reduce((total, file) => total + file.size, 0),
     );
     setStatus({ kind: "idle" });
     refresh();
@@ -91,18 +147,28 @@ export function DocumentUpload({
     const files = Array.from(event.target.files ?? []);
     // Cleared, so picking the same file again still fires `change`.
     event.target.value = "";
-    if (files.length > 0) void send(files);
+    if (files.length === 0) return;
+    // Nothing from a pick that fails a check is sent; files received stay.
+    const issue = checkUpload(files, { received, sentBytes });
+    if (issue !== null) {
+      setRetry(null);
+      setStatus({ kind: "error", error: issue });
+      return;
+    }
+    void send(files);
   }
 
   const canAdd = received > 0 && lastFormat !== "pdf";
   const statusText =
     status.kind === "error"
-      ? uploadCopy["upload.error.network"]
-      : received === 1
-        ? uploadCopy["upload.received.one"]
-        : received > 1
-          ? fill(uploadCopy["upload.received.many"], { n: received })
-          : "";
+      ? ERROR_COPY[status.error]
+      : status.kind === "closed"
+        ? uploadCopy["upload.error.closed"]
+        : received === 1
+          ? uploadCopy["upload.received.one"]
+          : received > 1
+            ? fill(uploadCopy["upload.received.many"], { n: received })
+            : "";
 
   return (
     <div className="mt-2 flex flex-col gap-2">
@@ -116,19 +182,22 @@ export function DocumentUpload({
       />
       <LiveRegion
         className={
-          status.kind === "error"
+          status.kind === "error" || status.kind === "closed"
             ? "text-secondary text-danger-ink"
             : "text-secondary text-ink"
         }
       >
         {statusText}
       </LiveRegion>
-      {(received === 0 || canAdd) && (
+      {status.kind !== "closed" && (received === 0 || canAdd) && (
         <Button
           variant="secondary"
           busy={status.kind === "busy"}
           busyLabel={uploadCopy["upload.busy"]}
-          onClick={() => input.current?.click()}
+          onClick={() => {
+            if (retry) void send(retry);
+            else input.current?.click();
+          }}
           aria-describedby={
             received === 0 ? `${describedBy} ${hintId}` : describedBy
           }
@@ -137,7 +206,7 @@ export function DocumentUpload({
           {received === 0 ? uploadCopy["upload.cta"] : uploadCopy["upload.add"]}
         </Button>
       )}
-      {received === 0 && (
+      {status.kind !== "closed" && received === 0 && (
         <p id={hintId} className="text-secondary text-ink-muted">
           {uploadCopy["upload.hint"]}
         </p>

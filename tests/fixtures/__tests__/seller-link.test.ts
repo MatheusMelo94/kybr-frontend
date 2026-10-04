@@ -869,6 +869,7 @@ describe("D6 document upload", () => {
 
   it.each([
     [UPLOAD_MARKERS.tooLarge, 413, "ARQUIVO_GRANDE"],
+    [UPLOAD_MARKERS.fileLimit, 413, "LIMITE_ARQUIVOS"],
     [UPLOAD_MARKERS.badFormat, 415, "FORMATO_INVALIDO"],
     [UPLOAD_MARKERS.decided, 409, "CASO_DECIDIDO"],
     [UPLOAD_MARKERS.rateLimited, 429, "LIMITE_TENTATIVAS"],
@@ -884,6 +885,31 @@ describe("D6 document upload", () => {
       expectErrorEnvelope(response, body, status, code);
     },
   );
+
+  it("F05: past 30 files across the case's documents, 413 LIMITE_ARQUIVOS", async () => {
+    const photos = (count: number) =>
+      Array.from(
+        { length: count },
+        (_, index) =>
+          new File(
+            [new Uint8Array([0xff, 0xd8, 0xff, 0xe0])],
+            `p${index}.jpg`,
+            {
+              type: "image/jpeg",
+            },
+          ),
+      );
+    const first = await upload(CASE_TOKENS.pendente, "RESPONSAVEL", photos(30));
+    expect(first.response.status).toBe(201);
+
+    const { response, body } = await upload(
+      CASE_TOKENS.pendente,
+      "RESPONSAVEL",
+      photos(1),
+    );
+
+    expectErrorEnvelope(response, body, 413, "LIMITE_ARQUIVOS");
+  });
 
   it("S13: the network-drop marker fails at the network level", async () => {
     await expect(
