@@ -31,17 +31,20 @@ const hosts = hostConfigFromEnv(env);
  */
 const LINK_NOT_FOUND_PATH = "/_kybr/nao-encontrado";
 
-/** Paths both hosts serve as they are (ADR-0008 rule 5). */
+/**
+ * Paths both hosts serve as they are (ADR-0008 rule 5). /favicon.ico is the
+ * empty 204 route: browsers ask for it on every page (P4-001).
+ */
 function isShared(pathname: string): boolean {
-  return pathname.startsWith("/_next/") || pathname === CSP_REPORT_PATH;
+  return (
+    pathname.startsWith("/_next/") ||
+    pathname === CSP_REPORT_PATH ||
+    pathname === "/favicon.ico"
+  );
 }
 
 function isLinkPath(pathname: string): boolean {
-  return (
-    pathname === "/favicon.ico" ||
-    pathname === "/v" ||
-    pathname.startsWith("/v/")
-  );
+  return pathname === "/v" || pathname.startsWith("/v/");
 }
 
 /**

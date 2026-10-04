@@ -77,7 +77,6 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     "/painel/x",
     "/painel",
     "/v/loja-exemplo",
-    "/favicon.ico",
   ]) {
     test(`the panel host answers ${path} with the panel's not-found`, async ({
       page,
@@ -90,6 +89,23 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
       await expect(page.getByText(LINK_404)).toHaveCount(0);
     });
   }
+
+  test("/favicon.ico is the shared 204 on both hosts, and /entrar logs no console error (P4-001)", async ({
+    page,
+  }) => {
+    for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
+      const response = await rawGet("/favicon.ico", host);
+      expect(response.status).toBe(204);
+    }
+
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await page.goto("/entrar");
+    await page.waitForLoadState("networkidle");
+    expect(errors).toEqual([]);
+  });
 
   test("the link host still serves /v/*", async ({ page }) => {
     const response = await page.goto(`${LINK}/v/loja-exemplo`);

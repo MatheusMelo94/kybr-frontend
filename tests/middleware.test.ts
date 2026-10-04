@@ -76,3 +76,14 @@ describe("middleware: panel concerns (T47)", () => {
     expect(response.status).toBe(307);
   });
 });
+
+describe("middleware: shared paths (P4-001)", () => {
+  for (const host of ["app.kybr.test", "kybr.test"]) {
+    it(`passes /favicon.ico through untouched on ${host}, so the 204 route answers it`, () => {
+      const response = middleware(request("/favicon.ico", { host }));
+
+      expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    });
+  }
+});
