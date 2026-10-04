@@ -9,7 +9,7 @@ const twMerge = extendTailwindMerge({
     theme: {
       text: ["body", "secondary", "title"],
       "font-weight": ["title", "body", "strong", "lead"],
-      container: ["link"],
+      container: ["link", "auth"],
       ease: ["out-quart", "in-out-quart"],
     },
   },

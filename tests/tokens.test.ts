@@ -20,6 +20,12 @@ const LIGHT_COLORS = {
   "--color-success": "#1f9d55",
   "--color-success-ink": "#157a45",
   "--color-danger-ink": "#c4302a",
+  // The panel's (spec § Design Handoff 6; plan § 2.6)
+  "--color-warning": "#b8820f",
+  "--color-warning-ink": "#8a6000",
+  "--color-danger": "#d6372f",
+  "--color-badge-monitor": "#0066ff",
+  "--color-badge-monitor-ink": "#ffffff",
 } as const;
 
 const DARK_COLORS: Record<keyof typeof LIGHT_COLORS, string> = {
@@ -37,7 +43,21 @@ const DARK_COLORS: Record<keyof typeof LIGHT_COLORS, string> = {
   "--color-success": "#1f9d55",
   "--color-success-ink": "#1f9d55",
   "--color-danger-ink": "#e5534b",
+  "--color-warning": "#d99a1b",
+  "--color-warning-ink": "#e9b64a",
+  // Same in both themes (spec § Design Handoff 6): not swapped.
+  "--color-danger": "#d6372f",
+  "--color-badge-monitor": "#0066ff",
+  "--color-badge-monitor-ink": "#ffffff",
 };
+
+/** A dark value: the swap's, or the light one when the theme doesn't change it. */
+function darkValue(
+  swap: Map<string, string>,
+  name: string,
+): string | undefined {
+  return swap.get(name) ?? theme.get(name);
+}
 
 const OTHER_TOKENS = {
   "--font-sans": "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
@@ -55,6 +75,11 @@ const OTHER_TOKENS = {
   "--radius-xl": "1.5rem",
   "--radius-full": "9999px",
   "--container-link": "30rem",
+  // Panel layout (plan § 2.6): the sidebar, the panel's 40 px control, and
+  // the auth column (≤ 440 px).
+  "--size-sidebar": "15rem",
+  "--size-control-panel": "2.5rem",
+  "--container-auth": "27.5rem",
   "--ease-out-quart": "cubic-bezier(0.25, 1, 0.5, 1)",
   "--ease-in-out-quart": "cubic-bezier(0.76, 0, 0.24, 1)",
   "--duration-fast": "150ms",
@@ -182,19 +207,24 @@ describe("app/tokens.css", () => {
   it.each(Object.entries(DARK_COLORS))(
     "swaps %s to %s under the dark system setting",
     (name, value) => {
-      expect(darkBySystem.get(name)).toBe(value);
+      expect(darkValue(darkBySystem, name)).toBe(value);
     },
   );
 
   it.each(Object.entries(DARK_COLORS))(
     'swaps %s to %s under [data-theme="dark"]',
     (name, value) => {
-      expect(darkByAttribute.get(name)).toBe(value);
+      expect(darkValue(darkByAttribute, name)).toBe(value);
     },
   );
 
   it.each(Object.entries(OTHER_TOKENS))("declares %s = %s", (name, value) => {
     expect(theme.get(name)).toBe(value);
+  });
+
+  it("never declares --faint or the prototype's raw --warn / --bad (AC 69)", () => {
+    expect(css).not.toMatch(/--faint\b/);
+    expect(css).not.toMatch(/--(warn|bad)\b/);
   });
 
   it("declares no shadow tokens (no shadows, per the brand)", () => {

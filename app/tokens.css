@@ -43,6 +43,13 @@
   --color-success: #1f9d55;
   --color-success-ink: #157a45;
   --color-danger-ink: #c4302a;
+  /* The panel's status colors (spec § Design Handoff 6). Text uses the -ink
+     tokens; --color-badge-monitor is the product's only blue. */
+  --color-warning: #b8820f;
+  --color-warning-ink: #8a6000;
+  --color-danger: #d6372f;
+  --color-badge-monitor: #0066ff;
+  --color-badge-monitor-ink: #ffffff;
 
   /* Type: Inter variable via next/font (--font-inter on <html>) */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -62,8 +69,13 @@
   --radius-xl: 1.5rem;
   --radius-full: 9999px;
 
-  /* Layout: the spec's 480 px column */
+  /* Layout: the link's 480 px column; the panel's auth column (<= 440 px),
+     sidebar (240 px) and primary control height (40 px; coarse pointers
+     still get 44 px). */
   --container-link: 30rem;
+  --container-auth: 27.5rem;
+  --size-sidebar: 15rem;
+  --size-control-panel: 2.5rem;
 
   /* Motion (design-conventions § Motion Principles) */
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
@@ -89,7 +101,10 @@
 }
 
 @layer base {
-  /* Dark values: the same swap twice, for the system setting and for the data-theme hook. */
+  /* Dark values: the same swap twice, for the system setting and for the
+     data-theme hook. Only tokens whose value changes are listed: this layer
+     ships whole to every surface (--color-danger and the monitor badge are
+     the same in both themes). */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --color-surface: #111111;
@@ -106,6 +121,8 @@
       --color-success: #1f9d55;
       --color-success-ink: #1f9d55;
       --color-danger-ink: #e5534b;
+      --color-warning: #d99a1b;
+      --color-warning-ink: #e9b64a;
     }
   }
 
@@ -124,6 +141,8 @@
     --color-success: #1f9d55;
     --color-success-ink: #1f9d55;
     --color-danger-ink: #e5534b;
+    --color-warning: #d99a1b;
+    --color-warning-ink: #e9b64a;
   }
 
   body {
