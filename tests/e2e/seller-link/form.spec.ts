@@ -55,6 +55,15 @@ test.describe("form screen @feature-seller-link", () => {
     );
   });
 
+  test("AC 1: /favicon.ico answers an empty 204, not a 404", async ({
+    request,
+  }) => {
+    const response = await request.get("/favicon.ico");
+
+    expect(response.status()).toBe(204);
+    expect(await response.body()).toHaveLength(0);
+  });
+
   test("the step indicator says Passo 1 de 3", async ({ page }) => {
     await page.goto("/v/loja-exemplo");
 
