@@ -25,6 +25,7 @@ import {
   type OnboardingField,
 } from "@/features/panel-onboarding/validation";
 import { globalCopy } from "@/features/panel-shell/copy/global";
+import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
 
 type Errors = Partial<Record<OnboardingField, string>>;
 type State = { alert: string | null; navigating: boolean };
@@ -35,9 +36,6 @@ const CONTACT_OPTIONS = [
   { value: "url", label: onboardingCopy["onb.contact.type.url"] },
 ] as const;
 
-/** Where the session-expired path sends Renata, coming back here (AC 7). */
-const SESSION_EXPIRED = "/entrar?motivo=sessao&volta=%2Fcomecar";
-
 type Props = {
   categories: readonly { id: string; nome: string; descricao: string }[];
 };
@@ -45,6 +43,7 @@ type Props = {
 /** S4 Começar: how sellers reach the platform, and the seller category (AC 4). */
 export function OnboardingForm({ categories }: Props): JSX.Element {
   const router = useRouter();
+  const expire = useSessionExpiry();
   const [tipo, setTipo] = useState<ContactType>("email");
   const [valor, setValor] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -90,7 +89,7 @@ export function OnboardingForm({ categories }: Props): JSX.Element {
         showErrors(result.fields, payload.contato_vendedor.tipo);
         return IDLE;
       case "SESSAO_EXPIRADA":
-        router.push(SESSION_EXPIRED);
+        expire();
         return { alert: null, navigating: true };
       case "NETWORK":
         return { alert: globalCopy["error.network"], navigating: false };

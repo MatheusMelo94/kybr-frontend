@@ -4,6 +4,7 @@ import { AccountMenu } from "@/features/panel-shell/components/account-menu";
 import { LogoutItem } from "@/features/panel-shell/components/logout-item";
 import { PanelNav } from "@/features/panel-shell/components/panel-nav";
 import { BfcacheGuard } from "@/features/panel-shell/components/bfcache-guard";
+import { SessionExpiryProvider } from "@/features/panel-shell/components/session-expiry-provider";
 import { LivePlanBlock } from "@/features/panel-shell/components/live-plan-block";
 import { ShellStatusPoller } from "@/features/panel-shell/components/shell-status-poller";
 import { TopBar } from "@/features/panel-shell/components/top-bar";
@@ -34,48 +35,50 @@ type Props = {
 export function PanelShell({ shell, children }: Props): JSX.Element {
   const items = navItemsInBuild();
   return (
-    <ShellStatusProvider
-      initial={{ contagens: shell.contagens, plano: shell.plano }}
-    >
-      <ShellStatusPoller />
-      <BfcacheGuard />
-      <div className="lg:flex">
-        <header className="border-b border-line lg:hidden">
-          <TopBar workspaceNome={shell.workspaceNome} />
-          <div className="pb-2">
-            <PanelNav
-              items={items}
-              contagens={shell.contagens}
-              variant="tabs"
-            />
-          </div>
-        </header>
-        <aside className="hidden w-(--size-sidebar) shrink-0 flex-col gap-6 border-r border-line p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
-          <p className="px-3 text-body font-title text-ink">
-            {globalCopy.brand}
-          </p>
-          <div className="px-3">
-            <WorkspaceBlock
-              nome={shell.workspaceNome}
-              vendedores={shell.contagens?.vendedores}
-            />
-          </div>
-          <PanelNav items={items} contagens={shell.contagens} />
-          <div className="mt-auto flex flex-col gap-3">
-            <LivePlanBlock contratarHref={shell.contratarHref} />
-            <AccountMenu>
-              <LogoutItem />
-            </AccountMenu>
-          </div>
-        </aside>
-        {/* max-w-7xl is the page container (design-conventions --container-page: 80rem). */}
-        <main
-          id="conteudo"
-          className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8"
-        >
-          <div className="mx-auto w-full max-w-7xl">{children}</div>
-        </main>
-      </div>
-    </ShellStatusProvider>
+    <SessionExpiryProvider>
+      <ShellStatusProvider
+        initial={{ contagens: shell.contagens, plano: shell.plano }}
+      >
+        <ShellStatusPoller />
+        <BfcacheGuard />
+        <div className="lg:flex">
+          <header className="border-b border-line lg:hidden">
+            <TopBar workspaceNome={shell.workspaceNome} />
+            <div className="pb-2">
+              <PanelNav
+                items={items}
+                contagens={shell.contagens}
+                variant="tabs"
+              />
+            </div>
+          </header>
+          <aside className="hidden w-(--size-sidebar) shrink-0 flex-col gap-6 border-r border-line p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
+            <p className="px-3 text-body font-title text-ink">
+              {globalCopy.brand}
+            </p>
+            <div className="px-3">
+              <WorkspaceBlock
+                nome={shell.workspaceNome}
+                vendedores={shell.contagens?.vendedores}
+              />
+            </div>
+            <PanelNav items={items} contagens={shell.contagens} />
+            <div className="mt-auto flex flex-col gap-3">
+              <LivePlanBlock contratarHref={shell.contratarHref} />
+              <AccountMenu>
+                <LogoutItem />
+              </AccountMenu>
+            </div>
+          </aside>
+          {/* max-w-7xl is the page container (design-conventions --container-page: 80rem). */}
+          <main
+            id="conteudo"
+            className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8"
+          >
+            <div className="mx-auto w-full max-w-7xl">{children}</div>
+          </main>
+        </div>
+      </ShellStatusProvider>
+    </SessionExpiryProvider>
   );
 }

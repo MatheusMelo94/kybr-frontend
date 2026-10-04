@@ -11,19 +11,12 @@ import {
   canPoll,
 } from "@/features/panel-shell/polling";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
+import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
 
 type Props = {
-  /** The session ended: hand off to the session-expiry path, once. */
+  /** The session ended (default: useSessionExpiry(), once, AC 7). */
   onSessionExpired?: () => void;
 };
-
-/** Until T59's hook: a full load of /entrar that brings Renata back here (AC 7). */
-function goToLogin(): void {
-  const volta = window.location.pathname + window.location.search;
-  window.location.assign(
-    `/entrar?motivo=sessao&volta=${encodeURIComponent(volta)}`,
-  );
-}
 
 /**
  * Refreshes the shell's counts and plan every 60 s while the tab is visible
@@ -32,13 +25,17 @@ function goToLogin(): void {
  * hides the counts silently (AC 11); the next success restores them.
  */
 export function ShellStatusPoller({
-  onSessionExpired = goToLogin,
+  onSessionExpired,
 }: Props): JSX.Element | null {
   const { update } = useShellStatus();
+  const expire = useSessionExpiry();
   const stopped = useRef(false);
   const inFlight = useRef(false);
-  const handlers = useRef({ update, onSessionExpired });
-  handlers.current = { update, onSessionExpired };
+  const handlers = useRef({
+    update,
+    onSessionExpired: onSessionExpired ?? expire,
+  });
+  handlers.current = { update, onSessionExpired: onSessionExpired ?? expire };
 
   useEffect(() => {
     async function poll(): Promise<void> {

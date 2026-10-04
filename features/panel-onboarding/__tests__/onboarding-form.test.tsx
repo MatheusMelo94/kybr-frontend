@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const saveOnboardingAction = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ push: vi.fn() }));
@@ -31,6 +31,10 @@ async function submit(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("OnboardingForm (S4, AC 4)", () => {
@@ -139,6 +143,13 @@ describe("OnboardingForm (S4, AC 4)", () => {
   );
 
   it("an expired session goes to /entrar with the way back", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", {
+      ...window.location,
+      pathname: "/comecar",
+      search: "",
+      assign,
+    });
     saveOnboardingAction.mockResolvedValue({
       ok: false,
       code: "SESSAO_EXPIRADA",
@@ -150,7 +161,7 @@ describe("OnboardingForm (S4, AC 4)", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Lojas de peças" }));
     await submit();
 
-    expect(router.push).toHaveBeenCalledWith(
+    expect(assign).toHaveBeenCalledWith(
       "/entrar?motivo=sessao&volta=%2Fcomecar",
     );
   });
