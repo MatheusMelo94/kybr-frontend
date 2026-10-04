@@ -7,6 +7,7 @@ import {
   caseReads,
   createCase,
   delayCaseReads,
+  disableLink,
   uniqueKey,
 } from "../fixtures/mock-api.ts";
 
@@ -85,6 +86,43 @@ test.describe("case route boundaries @feature-seller-link", () => {
       ).toHaveCount(0);
     });
   }
+
+  // QA-M3-002: on a dead link (unknown or disabled slug) the token-less route
+  // is Link not found, like the form and the case routes: no dead "Começar
+  // de novo" back to a form that doesn't exist.
+  for (const path of ["c", "c/"]) {
+    test(`QA-M3-002: /v/{unknown slug}/${path} is Link not found (404), not Case not found`, async ({
+      page,
+    }) => {
+      const response = await page.goto(`/v/${SLUGS.unknown}/${path}`);
+
+      expect(response?.status()).toBe(404);
+      expect(response?.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Link não encontrado" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: "Começar de novo" }),
+      ).toHaveCount(0);
+      await expect(page).toHaveTitle(/Link não encontrado/);
+      await expectNoAxeViolations(page);
+    });
+  }
+
+  test("QA-M3-002: a disabled link's /c is Link not found too", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const slug = uniqueKey(SLUGS.perTest, testInfo);
+    await disableLink(request, slug);
+
+    const response = await page.goto(`/v/${slug}/c`);
+
+    expect(response?.status()).toBe(404);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Link não encontrado" }),
+    ).toBeVisible();
+  });
 
   test("AC 27: an unknown token is Case not found, never indexed; Começar de novo opens the empty form", async ({
     page,
