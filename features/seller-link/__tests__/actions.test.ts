@@ -7,6 +7,7 @@ import { revalidateTag } from "next/cache";
 import {
   lookupCompanyAction,
   pollCaseViewAction,
+  saveContactEmail,
   startVerification,
 } from "@/features/seller-link/actions";
 import { disableLink } from "@/tests/fixtures/msw/handlers/seller-link";
@@ -423,5 +424,94 @@ describe("pollCaseViewAction (read-only, ADR-0004a)", () => {
       ok: false,
       reason: "failed",
     });
+  });
+});
+
+describe("saveContactEmail (D5 write, DDR-0001)", () => {
+  const EMAIL = "maria@empresa-exemplo.test";
+  const input = (email: unknown, token: string = CASE_TOKENS.pendente) => ({
+    slug: SLUGS.ok,
+    token,
+    email,
+  });
+
+  it("saves a valid address (204) and returns ok", async () => {
+    expect(await saveContactEmail(input(`  ${EMAIL} `))).toEqual({ ok: true });
+  });
+
+  it.each([
+    ["", "empty"],
+    [undefined, "empty"],
+    ["maria@", "invalid"],
+  ])(
+    "rejects %j as %s before any API call",
+    async (email, issue) => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      expect(await saveContactEmail(input(email))).toEqual({
+        ok: false,
+        code: "EMAIL_INVALIDO",
+        issue,
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it("maps the API's 422 to EMAIL_INVALIDO (invalid)", async () => {
+    server.use(
+      http.put("http://api.kybr.test/public/v/:slug/cases/:token/contact", () =>
+        HttpResponse.json(
+          { code: "EMAIL_INVALIDO", message: "x", field: "email" },
+          { status: 422 },
+        ),
+      ),
+    );
+
+    expect(await saveContactEmail(input(EMAIL))).toEqual({
+      ok: false,
+      code: "EMAIL_INVALIDO",
+      issue: "invalid",
+    });
+  });
+
+  it("F06a: a decided case is CASO_DECIDIDO", async () => {
+    expect(await saveContactEmail(input(EMAIL, CASE_TOKENS.bloqueado))).toEqual(
+      { ok: false, code: "CASO_DECIDIDO" },
+    );
+  });
+
+  it("an unknown or malformed token is CASO_NAO_ENCONTRADO", async () => {
+    expect(
+      await saveContactEmail(input(EMAIL, CASE_TOKENS.unknown)),
+    ).toEqual({ ok: false, code: "CASO_NAO_ENCONTRADO" });
+    expect(await saveContactEmail(input(EMAIL, "x"))).toEqual({
+      ok: false,
+      code: "CASO_NAO_ENCONTRADO",
+    });
+  });
+
+  it("a 5xx is UNAVAILABLE, and nothing logged carries the address", async () => {
+    server.use(
+      http.put("http://api.kybr.test/public/v/:slug/cases/:token/contact", () =>
+        HttpResponse.json({ code: "X", message: "x" }, { status: 503 }),
+      ),
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await saveContactEmail(input(EMAIL))).toEqual({
+      ok: false,
+      code: "UNAVAILABLE",
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain(EMAIL);
+  });
+
+  it("refuses a malformed envelope without calling the API", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    expect(await saveContactEmail("nope")).toEqual({
+      ok: false,
+      code: "CASO_NAO_ENCONTRADO",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

@@ -492,6 +492,10 @@ export const sellerLinkHandlers: RequestHandler[] = [
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return apiError(422, "EMAIL_INVALIDO", { field: "email" });
       }
+      // F06a: no change once the case is decided.
+      const { estado } = buildPublicCase(record, Date.now());
+      if (estado === "approved" || estado === "blocked")
+        return apiError(409, "CASO_DECIDIDO");
       record.emailMasked = maskEmail(email);
       return noContent();
     },
