@@ -9,7 +9,7 @@ import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
 // the spec key, e.g. cnpj + "check_letters" → form.cnpj.error.check_letters.
 
 export type CnpjIssue = "empty" | "incomplete" | "check_letters" | "invalid";
-/** `invalid` only comes from a tampered request: the name field filters as typed (F07). */
+/** `invalid`: a filled-in name the backend rejects (D3, AC 10), or a tampered request (F07). */
 export type ResponsavelIssue = "empty" | "single" | "invalid";
 export type EmailIssue = "empty" | "invalid";
 

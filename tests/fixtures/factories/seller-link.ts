@@ -251,6 +251,12 @@ export function buildCompany(cnpj: string): Company {
   };
 }
 
+/**
+ * A schema-valid name (two words) that D3 rejects with 422
+ * RESPONSAVEL_INVALIDO (T17b, AC 10 backend case): the client can't catch it.
+ */
+export const REJECTED_RESPONSAVEL = "Nome Recusado";
+
 /** A synthetic full name for fixed-token cases. */
 export function buildResponsavel(key: string): string {
   return fakerFor(`person:${key}`).person.fullName();

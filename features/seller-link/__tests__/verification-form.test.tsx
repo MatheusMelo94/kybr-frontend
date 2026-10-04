@@ -561,6 +561,34 @@ describe("VerificationForm: submit", () => {
     expect(nameInput()).toHaveFocus();
   });
 
+  it("AC 10 (backend case): a name the API rejects shows form.name.error.invalid, linked and focused, with the values kept", async () => {
+    const user = userEvent.setup();
+    start.mockResolvedValue({
+      ok: false,
+      reason: "invalid",
+      fields: { responsavel: "invalid" },
+    });
+    render(<VerificationForm slug="loja-exemplo" />);
+
+    await fillValidForm(user);
+    await user.click(submit());
+
+    await vi.waitFor(() =>
+      expect(nameInput()).toHaveAttribute("aria-invalid", "true"),
+    );
+    expect(nameInput()).toHaveAccessibleDescription(
+      expect.stringContaining(
+        "Não conseguimos usar esse nome. Escreva o nome completo como está no documento.",
+      ),
+    );
+    expect(nameInput()).not.toHaveAccessibleDescription(
+      expect.stringContaining("Informe o nome completo do responsável."),
+    );
+    expect(nameInput()).toHaveFocus();
+    expect(nameInput()).toHaveValue("Maria Exemplo");
+    expect(cnpjInput()).not.toHaveAttribute("aria-invalid");
+  });
+
   it("AC 11: sends nothing while a field is invalid", async () => {
     const user = userEvent.setup();
     render(<VerificationForm slug="loja-exemplo" />);

@@ -13,6 +13,7 @@ import {
   MAX_FILES_PER_CASE,
   MAX_UPLOAD_BYTES,
   PUBLIC_LINKS,
+  REJECTED_RESPONSAVEL,
   RETRY_AFTER_SECONDS,
   SLOW_LINK_DELAY_MS,
   FIXED_CASE_CREATED_AT,
@@ -378,7 +379,10 @@ function startVerification(
   if (!isValidCnpj(cnpj)) {
     return errorReply(422, "CNPJ_INVALIDO", { field: "cnpj" });
   }
-  if (responsavel.split(/\s+/).filter(Boolean).length < 2) {
+  if (
+    responsavel.split(/\s+/).filter(Boolean).length < 2 ||
+    responsavel === REJECTED_RESPONSAVEL
+  ) {
     return errorReply(422, "RESPONSAVEL_INVALIDO", { field: "responsavel" });
   }
   const scenario = scenarioForCnpj(cnpj);

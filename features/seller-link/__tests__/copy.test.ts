@@ -53,6 +53,9 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "form.name.hint": "Nome e sobrenome de quem está fazendo o cadastro.",
     "form.name.error.empty": "Informe o nome completo do responsável.",
     "form.name.error.single": "Escreva nome e sobrenome.",
+    // Spec v2 amendment (M1 review, owner-approved), shipped by T17b.
+    "form.name.error.invalid":
+      "Não conseguimos usar esse nome. Escreva o nome completo como está no documento.",
     "form.submit": "Verificar empresa",
     "form.submit.busy": "Enviando…",
     "form.submit.error.network":

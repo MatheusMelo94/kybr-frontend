@@ -6,6 +6,7 @@ import {
   CASE_TOKENS,
   DOCUMENT_TYPES,
   ERROR_SENTINEL,
+  REJECTED_RESPONSAVEL,
   SLUGS,
   UPLOAD_MARKERS,
   cnpjCheckDigits,
@@ -408,6 +409,15 @@ describe("D3 start a verification", () => {
   it("422 RESPONSAVEL_INVALIDO with field for a single-word name", async () => {
     const { response, body } = await verify(cnpjFor("aprovado"), {
       responsavel: "Maria",
+    });
+
+    expectErrorEnvelope(response, body, 422, "RESPONSAVEL_INVALIDO");
+    expect(body.field).toBe("responsavel");
+  });
+
+  it("422 RESPONSAVEL_INVALIDO for the schema-valid name the backend rejects (T17b, AC 10)", async () => {
+    const { response, body } = await verify(cnpjFor("aprovado"), {
+      responsavel: REJECTED_RESPONSAVEL,
     });
 
     expectErrorEnvelope(response, body, 422, "RESPONSAVEL_INVALIDO");
