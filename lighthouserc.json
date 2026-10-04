@@ -1,10 +1,10 @@
 {
-  "$comment": "Lighthouse CI against the preview (deploy-staging.yml). Mobile preset (Lighthouse default: simulated slow 4G, 4x CPU), median of 3 runs. LCP <= 2.0 s and CLS from ADR-0003 (owned by the Frontend Architect); category scores from frontend-qa-conventions.md § Accessibility & Performance Gates. Change thresholds only through the plan or an ADR, never to turn CI green. The URL comes from the workflow.",
+  "$comment": "Lighthouse CI on a production build against the local mock API (scripts/lighthouse-local.sh; the lighthouse job in ci.yml): the form page and a case page, as the E2E job runs them. Previews have no API until the backend exists (ADR-0005). Mobile preset (Lighthouse default: simulated slow 4G, 4x CPU), median of 3 runs. LCP <= 2.0 s and CLS from ADR-0003 (owned by the Frontend Architect); category scores from frontend-qa-conventions.md § Accessibility & Performance Gates. Change thresholds only through the plan or an ADR, never to turn CI green. The URLs come from the script.",
   "ci": {
     "collect": {
       "numberOfRuns": 3,
       "settings": {
-        "chromeFlags": "--headless=new --no-sandbox"
+        "chromeFlags": "--headless=new --no-sandbox --disable-dev-shm-usage"
       }
     },
     "assert": {

@@ -218,6 +218,43 @@ jobs:
             test-results/
           retention-days: 14
 
+  # ADR-0003 lab budgets (LCP <= 2.0 s, CLS, category scores in
+  # lighthouserc.json), blocking. Measured on a production build against the
+  # local mock API, as the E2E job runs it, because previews have no API
+  # until the backend exists (ADR-0005). No secret is involved.
+  lighthouse:
+    name: Lighthouse CI (form and case pages)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Cache the Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .next/cache
+          key: next-lhci-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'components/**', 'features/**', 'lib/**', 'middleware.ts', 'next.config.ts') }}
+          restore-keys: next-lhci-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      # Starts the mock API and `next start` on a fresh build, then runs the
+      # pinned @lhci/cli (.github/deploy-tools) with the runner's Chrome.
+      - name: Run Lighthouse CI
+        run: sh scripts/lighthouse-local.sh
+
+      - name: Upload the Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lighthouse
+          path: .lighthouseci/
+          if-no-files-found: ignore
+          retention-days: 14
+
   # Staging = Vercel Preview (ADR-0005; frontend-devops-conventions.md § CI
   # Pipeline Shape › deploy-staging.yml). Only after every check above passes
   # on this commit, only for pushes (never fork PRs), never for Dependabot
@@ -225,7 +262,7 @@ jobs:
   # VERCEL_DEPLOY_ENABLED repository variable (docs/devops/vercel-setup.md).
   deploy-staging:
     name: Deploy staging
-    needs: [verify, audit, container, e2e]
+    needs: [verify, audit, container, e2e, lighthouse]
     if: github.event_name == 'push' && github.actor != 'dependabot[bot]' && vars.VERCEL_DEPLOY_ENABLED == 'true'
     uses: ./.github/workflows/deploy-staging.yml
     secrets:

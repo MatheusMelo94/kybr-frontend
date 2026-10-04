@@ -1,11 +1,14 @@
 # Deploy staging (frontend-devops-conventions.md § CI Pipeline Shape ›
 # deploy-staging.yml). Staging is the Vercel Preview environment (ADR-0005):
 # every pushed branch gets a preview, built on Vercel in gru1 against the
-# Preview env vars (the hosted mock API while the backend is Pre-Contract).
+# Preview env vars. Until the backend exists, Preview's API is a placeholder,
+# so /v/* shows its error state there: this job checks the deploy, the env,
+# health, protection and headers. Lighthouse runs in ci.yml against the local
+# mock API instead (the lighthouse job).
 #
-# ci.yml calls this after verify, audit, container and e2e pass on the same commit, so a
-# preview never exists for a red SHA. Vercel's Git integration is off
-# (vercel.json), so this is the only way a preview is made.
+# ci.yml calls this after verify, audit, container, e2e and lighthouse pass on
+# the same commit, so a preview never exists for a red SHA. Vercel's Git
+# integration is off (vercel.json), so this is the only way a preview is made.
 #
 # Secrets (GitHub repository secrets): VERCEL_TOKEN, VERCEL_ORG_ID,
 # VERCEL_PROJECT_ID, VERCEL_AUTOMATION_BYPASS_SECRET. None reaches the build:
@@ -42,7 +45,7 @@ env:
 
 jobs:
   preview:
-    name: Vercel Preview, smoke, Lighthouse
+    name: Vercel Preview and smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -100,49 +103,6 @@ jobs:
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
         run: sh scripts/check-deploy-headers.sh "$DEPLOY_URL"
 
-      # ADR-0003: LCP <= 2.0 s on /v/*, mobile preset, median of 3, against the
-      # preview in the production region. Meaningful once the Preview API
-      # (hosted mock) answers for loja-exemplo.
-      - name: Lighthouse CI on the preview
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
-        run: |
-          lhci autorun --config=lighthouserc.json \
-            --collect.url="$DEPLOY_URL/v/loja-exemplo" \
-            --collect.settings.extraHeaders="{\"x-vercel-protection-bypass\":\"$VERCEL_AUTOMATION_BYPASS_SECRET\"}"
-
-      # Lighthouse writes its settings, extra headers included, into the
-      # reports. Redact the bypass secret before anything is uploaded.
-      - name: Redact the bypass secret from the Lighthouse reports
-        id: redact
-        if: always()
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          [ -d .lighthouseci ] || exit 0
-          secret="$VERCEL_AUTOMATION_BYPASS_SECRET"
-          [ -n "$secret" ] || exit 0
-          grep -rlF -- "$secret" .lighthouseci | while IFS= read -r file; do
-            SECRET="$secret" perl -pi -e 's/\Q$ENV{SECRET}\E/[redacted]/g' "$file"
-          done
-          if grep -rqF -- "$secret" .lighthouseci; then
-            echo "The bypass secret is still in the reports; deleting them." >&2
-            rm -rf .lighthouseci
-            exit 1
-          fi
-
-      # Only after a successful redaction (Security DV-04): a redaction that
-      # stopped part-way must never upload unredacted reports.
-      - name: Upload the Lighthouse reports
-        if: always() && steps.redact.outcome == 'success'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: lighthouse-preview
-          path: .lighthouseci/
-          if-no-files-found: ignore
-          retention-days: 14
-
       - name: Summary
         if: always() && steps.deploy.outputs.url != ''
         env:
@@ -155,5 +115,5 @@ jobs:
             echo ""
             echo "- URL: $DEPLOY_URL (Vercel Deployment Protection: log in or use the bypass)"
             echo "- Commit: \`$COMMIT_SHA\` on \`$COMMIT_REF\`"
-            echo "- Region: gru1; API: Preview env (hosted mock while Pre-Contract)"
+            echo "- Region: gru1; API: Preview env (a placeholder until the backend exists)"
           } >> "$GITHUB_STEP_SUMMARY"
