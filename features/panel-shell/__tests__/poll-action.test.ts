@@ -3,7 +3,11 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PANEL_EMAILS } from "@/tests/fixtures/factories/panel";
-import { openSession, panelStore } from "@/tests/fixtures/msw/panel-store";
+import {
+  ageSession,
+  openSession,
+  panelStore,
+} from "@/tests/fixtures/msw/panel-store";
 import { server } from "@/tests/fixtures/msw/server";
 
 const state = vi.hoisted(() => ({
@@ -74,6 +78,15 @@ describe("pollShellStatusAction (ADR-0011 rule 3, AC 11)", () => {
       ok: false,
       code: "FAILED",
     });
+  });
+
+  it("doesn't keep the session alive: a poll leaves the idle clock where it was (Q2)", async () => {
+    const id = state.token as string;
+    ageSession(id, 60 * 60_000);
+    const before = panelStore().sessions.get(id)?.lastActivity;
+
+    expect((await pollShellStatusAction()).ok).toBe(true);
+    expect(panelStore().sessions.get(id)?.lastActivity).toBe(before);
   });
 
   it("polls with a short timeout (4 s, plan § 2.3)", () => {

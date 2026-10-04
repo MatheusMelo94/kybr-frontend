@@ -18,7 +18,8 @@ export type ShellStatusResult =
  * A read-only action for the shell's poller (ADR-0011 rule 3): /me's counts
  * and plan, nothing else (a minimal projection, no name or e-mail). A 401
  * becomes SESSAO_EXPIRADA; any other failure is FAILED (the leaf hides the
- * counts silently).
+ * counts silently). X-Kybr-Poll marks it as background, so it doesn't
+ * slide the 12 h idle session (QA plan Q2).
  */
 export async function pollShellStatusAction(): Promise<ShellStatusResult> {
   const token = await sessionToken();
@@ -27,6 +28,7 @@ export async function pollShellStatusAction(): Promise<ShellStatusResult> {
     operation: "shell-status",
     path: apiPaths.panel.me(),
     schema: meSchema,
+    headers: { "x-kybr-poll": "1" },
     sessionToken: token,
     timeoutMs: POLL_TIMEOUT_MS,
   });
