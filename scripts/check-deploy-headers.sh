@@ -12,9 +12,10 @@
 # middleware.ts on every page response.
 #
 # EXPECT_PROTECTED=true: also check that a request *without* the bypass is
-# refused (401/403). For generated *.vercel.app URLs, which run with real env
-# and must stay behind Deployment Protection (Security DV-06). Not for the
-# public production domain.
+# refused (401/403) or sent to Vercel's login (302/307 to
+# https://vercel.com/sso-api). For generated *.vercel.app URLs, which run
+# with real env and must stay behind Deployment Protection (Security DV-06).
+# Not for the public production domain.
 #
 # EXPECT_SINGLE_HSTS=true: the response has exactly one Strict-Transport-
 # Security field, with our value (Security DV-07). For the production domain;
@@ -49,10 +50,24 @@ health_status=$(fetch "--output /dev/null --write-out %{http_code}" /api/health)
 
 if [ "${EXPECT_PROTECTED:-}" = "true" ]; then
   echo "Smoke: ${base} refuses a request without the bypass"
-  anon_status=$(curl --silent --max-time 30 --output /dev/null --write-out '%{http_code}' "${base}/api/health")
+  # Vercel Authentication answers an anonymous request with a 302/307 to its
+  # login (Location: https://vercel.com/sso-api?url=…), or 401/403 for other
+  # protection methods. %{redirect_url} is curl's parse of the Location header
+  # (made absolute, never followed). Any other answer, including a 200 or a
+  # redirect elsewhere, means the deployment is open.
+  anon=$(curl --silent --max-time 30 --output /dev/null \
+    --write-out '%{http_code} %{redirect_url}' "${base}/api/health")
+  anon_status=${anon%% *}
+  anon_location=${anon#* }
   case "$anon_status" in
     401 | 403) ;;
-    *) fail "an unauthenticated request got ${anon_status}, not 401/403: Deployment Protection is off" ;;
+    302 | 307)
+      case "$anon_location" in
+        https://vercel.com/sso-api | "https://vercel.com/sso-api?"* | https://vercel.com/sso-api/*) ;;
+        *) fail "an unauthenticated request got ${anon_status} to somewhere other than Vercel's login: Deployment Protection is off" ;;
+      esac
+      ;;
+    *) fail "an unauthenticated request got ${anon_status}, not 401/403 or a redirect to Vercel's login: Deployment Protection is off" ;;
   esac
 fi
 
