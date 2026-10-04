@@ -84,13 +84,15 @@ test.describe("panel middleware @feature-ops-panel @panel-access", () => {
     "/senha/esqueci",
     "/senha/nova",
   ]) {
-    test(`${path} is never redirected, cookie or not`, async () => {
+    test(`${path} is never sent to /entrar, cookie or not`, async () => {
       for (const headers of [
         {},
         { cookie: "kybr_session=qualquer-valor-0123456789" },
       ]) {
+        // A page may redirect on its own (S2 without a pending sign-up goes
+        // to /cadastro); middleware never sends an auth page to /entrar.
         const response = await rawGet(path, headers);
-        expect(response.status).not.toBe(307);
+        expect(response.headers.location ?? "").not.toMatch(/\/entrar/);
       }
     });
   }

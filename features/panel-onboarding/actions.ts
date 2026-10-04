@@ -1,0 +1,75 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { ONBOARDING_NEXT } from "@/features/panel-onboarding/next";
+import { onboardingSchema } from "@/features/panel-onboarding/schemas";
+import {
+  onboardingIssues,
+  type OnboardingField,
+} from "@/features/panel-onboarding/validation";
+import { panelRequest } from "@/lib/api/panel/client";
+import { sessionToken } from "@/lib/api/panel/session";
+import { apiPaths } from "@/lib/api/path";
+import { workspaceSchema } from "@/lib/api/schemas/panel/workspace";
+import { panelPath } from "@/lib/panel-paths";
+
+export type OnboardingResult =
+  | { ok: true; next: string }
+  | { ok: false; code: "INVALID"; fields: OnboardingField[] }
+  | { ok: false; code: "SESSAO_EXPIRADA" | "NETWORK" };
+
+function fieldsOf(input: unknown): OnboardingField[] {
+  const value = (input ?? {}) as {
+    contato_vendedor?: { tipo?: unknown; valor?: unknown };
+    categoria?: unknown;
+  };
+  const issues = onboardingIssues({
+    tipo: value.contato_vendedor?.tipo === "url" ? "url" : "email",
+    valor:
+      typeof value.contato_vendedor?.valor === "string"
+        ? value.contato_vendedor.valor
+        : "",
+    categoria: typeof value.categoria === "string" ? value.categoria : "",
+  });
+  return issues.length > 0 ? issues : ["valor"];
+}
+
+/**
+ * D-W3: saves the seller contact and category (onboarding step 1). The
+ * session check is the host check plus the cookie; a 401 comes back as
+ * SESSAO_EXPIRADA for the client to send Renata to /entrar (ADR-0009 rule 7).
+ */
+export async function saveOnboardingAction(
+  input: unknown,
+): Promise<OnboardingResult> {
+  const token = await sessionToken();
+  const parsed = onboardingSchema.safeParse(input);
+  if (!parsed.success)
+    return { ok: false, code: "INVALID", fields: fieldsOf(input) };
+  if (token === undefined) return { ok: false, code: "SESSAO_EXPIRADA" };
+
+  const result = await panelRequest({
+    operation: "workspace-onboarding",
+    path: apiPaths.panel.workspace(),
+    method: "PUT",
+    body: parsed.data,
+    schema: workspaceSchema,
+    sessionToken: token,
+  });
+  if (result.ok) {
+    // The shell and the onboarding gate read /me: refresh the whole panel.
+    revalidatePath(panelPath("/"), "layout");
+    return { ok: true, next: ONBOARDING_NEXT };
+  }
+  const { error } = result;
+  if (error.code === "SESSAO_EXPIRADA")
+    return { ok: false, code: "SESSAO_EXPIRADA" };
+  if (error.code === "VALOR_INVALIDO")
+    return {
+      ok: false,
+      code: "INVALID",
+      fields: [error.field === "categoria" ? "categoria" : "valor"],
+    };
+  return { ok: false, code: "NETWORK" };
+}
