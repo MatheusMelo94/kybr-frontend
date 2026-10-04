@@ -448,6 +448,15 @@ test.describe("accessibility and breakpoints @feature-seller-link", () => {
     const result = h1(page, "Quase lá");
     await expect(result).toBeFocused({ timeout: 10_000 });
     expect((await focused()).ring).toBe(true);
+    // The result arrived by client navigation, so the lazy leaves render once
+    // their chunks load: wait for them (focus stays on the h1) before tabbing.
+    await expect(
+      page.getByRole("button", { name: "Enviar documento" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("textbox", { name: "Seu e-mail para avisos" }),
+    ).toBeVisible();
+    await expect(result).toBeFocused();
 
     // Spec § Keyboard path: each item's action, then the e-mail field and
     // "Salvar e-mail", then the contact actions and the privacy link.
