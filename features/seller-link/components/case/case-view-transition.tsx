@@ -35,6 +35,8 @@ type Props = {
   viewKey: CaseViewKey;
   /** What the polite region says for it (caseAnnouncement, on the server). */
   announcement: string;
+  /** The step indicator: it fills in on a view change, never on first paint (review 0022). */
+  step?: ReactNode;
   children: ReactNode;
 };
 
@@ -50,6 +52,7 @@ type Props = {
 export function CaseViewTransition({
   viewKey,
   announcement,
+  step,
   children,
 }: Props): JSX.Element {
   const container = useRef<HTMLDivElement>(null);
@@ -93,6 +96,9 @@ export function CaseViewTransition({
 
   return (
     <ViewChangeContext value={announceViewChange}>
+      {step !== undefined && (
+        <div data-changed={changed || undefined}>{step}</div>
+      )}
       <LiveRegion className="sr-only">{message}</LiveRegion>
       <div ref={container}>
         {/* Keyed by the server's view, so every view change remounts the

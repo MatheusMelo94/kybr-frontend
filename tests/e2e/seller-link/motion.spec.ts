@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { SLUGS } from "../../fixtures/factories/seller-link.ts";
+import { CASE_TOKENS, SLUGS } from "../../fixtures/factories/seller-link.ts";
 import { createCase, setCaseState } from "../fixtures/mock-api.ts";
 
 // T33 (spec § Motion Intent, AC 32; tech-design § 5): CSS-only motion. The
@@ -109,6 +109,25 @@ test.describe("motion @feature-seller-link", () => {
     // so the step segment's fill transitions `scale` (still transform only).
     expect(new Set(log.transitions)).toEqual(new Set(["opacity", "scale"]));
   });
+
+  // Review 0022: the step fill marks a step change, never the first paint
+  // (spec § Motion Intent: no entrance reveals).
+  for (const [name, path] of [
+    ["the form (step 1)", `/v/${SLUGS.ok}`],
+    ["a reloaded result (step 3)", `/v/${SLUGS.ok}/c/${CASE_TOKENS.aprovado}`],
+  ] as const) {
+    test(`review 0022: nothing fills in on the first paint of ${name}`, async ({
+      page,
+    }) => {
+      await recordMotion(page);
+
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.waitForLoadState("networkidle");
+
+      expect((await motionLog(page)).transitions).toEqual([]);
+    });
+  }
 
   test("AC 32: the bar is gone on em análise", async ({ page, request }) => {
     const token = await createCase(request, { ageMs: 8_000 });

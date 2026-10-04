@@ -24,20 +24,51 @@ describe("motion (T33)", () => {
     ).toBeInTheDocument();
   });
 
-  it("step indicator: only the current segment fills in (scale-x from 0), instantly under reduced motion", () => {
+  it("step indicator: only the current segment fills in (scale-x from 0), only under a view change, instantly under reduced motion", () => {
     const { container } = render(<StepIndicator step={2} />);
     const [first, current, next] = container.querySelectorAll("[data-segment]");
 
     expect(current).toHaveClass(
       "origin-left",
-      "starting:scale-x-0",
+      "in-data-changed:starting:scale-x-0",
       "transition-transform",
       "duration-(--duration-base)",
       "ease-out-quart",
       "motion-reduce:transition-none",
     );
-    expect(first).not.toHaveClass("starting:scale-x-0");
-    expect(next).not.toHaveClass("starting:scale-x-0");
+    expect(current).not.toHaveClass("starting:scale-x-0");
+    expect(first).not.toHaveClass("in-data-changed:starting:scale-x-0");
+    expect(next).not.toHaveClass("in-data-changed:starting:scale-x-0");
+  });
+
+  it("review 0022: the step sits under data-changed only after a view change, never on the first render", () => {
+    const { container, rerender } = render(
+      <CaseViewTransition
+        viewKey="verifying"
+        announcement="a"
+        step={<StepIndicator step={2} />}
+      >
+        <h1 tabIndex={-1}>Verificando sua empresa</h1>
+      </CaseViewTransition>,
+    );
+    const changed = (): Element | null =>
+      container.querySelector("[data-segment]")?.closest("[data-changed]") ??
+      null;
+    expect(changed()).toBeNull();
+
+    act(() =>
+      rerender(
+        <CaseViewTransition
+          viewKey="approved"
+          announcement="b"
+          step={<StepIndicator step={3} />}
+        >
+          <h1 tabIndex={-1}>Tudo certo, Maria.</h1>
+        </CaseViewTransition>,
+      ),
+    );
+
+    expect(changed()).not.toBeNull();
   });
 
   it("view change: the new view fades in (opacity only), instantly under reduced motion; never on the first render", () => {

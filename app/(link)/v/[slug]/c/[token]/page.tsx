@@ -41,10 +41,10 @@ export default async function CasePage({
   const view = deriveCaseView(caseResult.publicCase, Date.now());
   return (
     <div className="flex flex-col gap-6">
-      <StepIndicator step={view.step} />
       <CaseViewTransition
         viewKey={view.viewKey}
         announcement={caseAnnouncement(view.viewKey, caseResult.publicCase)}
+        step={<StepIndicator step={view.step} />}
       >
         <CaseContent
           slug={slug}
