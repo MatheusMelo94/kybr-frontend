@@ -63,6 +63,32 @@ describe("ContactEmailBlock (DDR-0001)", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  // QA-M3-003: every failed save puts focus back on the field, even when the
+  // error is the same as the one already shown.
+  it("QA-M3-003: a second identical error moves focus back to the field", async () => {
+    const user = userEvent.setup();
+    render(<ContactEmailBlock slug={SLUG} token={TOKEN} />);
+
+    await user.click(saveButton());
+    expect(field()).toHaveFocus();
+    await user.click(saveButton());
+
+    expect(field()).toHaveFocus();
+  });
+
+  it("QA-M3-003: two invalid addresses in a row each move focus to the field", async () => {
+    const user = userEvent.setup();
+    render(<ContactEmailBlock slug={SLUG} token={TOKEN} />);
+
+    await user.type(field(), "maria@");
+    await user.click(saveButton());
+    expect(field()).toHaveFocus();
+    await user.type(field(), "x");
+    await user.click(saveButton());
+
+    expect(field()).toHaveFocus();
+  });
+
   it("AC 24: invalid input shows email.error.invalid, with no request", async () => {
     const user = userEvent.setup();
     render(<ContactEmailBlock slug={SLUG} token={TOKEN} />);

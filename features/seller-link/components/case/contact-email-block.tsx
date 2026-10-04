@@ -63,6 +63,9 @@ export function ContactEmailBlock({
   const change = useRef<HTMLButtonElement>(null);
   // Where focus goes after the next render: never on mount (the h1 owns it).
   const focusNext = useRef<"input" | "change" | null>(null);
+  // Bumped on every failed save, so the same error twice still re-renders and
+  // moves focus (QA-M3-003).
+  const [failures, setFailures] = useState(0);
 
   // An address typed before this lazy leaf hydrated lives only in the DOM:
   // adopt it once, on mount (tech-design R3, as CnpjField does).
@@ -75,11 +78,14 @@ export function ContactEmailBlock({
     if (focusNext.current === "input") input.current?.focus();
     if (focusNext.current === "change") change.current?.focus();
     focusNext.current = null;
-  }, [editing, error]);
+  }, [editing, error, failures]);
 
   function showError(next: BlockError): void {
     setError(next);
-    if (next !== "network") focusNext.current = "input";
+    if (next !== "network") {
+      focusNext.current = "input";
+      setFailures((count) => count + 1);
+    }
   }
 
   async function save(_previous: null, address: string): Promise<null> {

@@ -241,6 +241,46 @@ describe("DocumentUpload: errors (T31, AC 22)", () => {
     },
   );
 
+  // QA-M3-004 (lead-approved UX default): an error never hides what was
+  // received; the count stays, and the error shows under it.
+  it("QA-M3-004: an error keeps Recebido: n arquivos visible, with the error under it", async () => {
+    const user = setup();
+    const { container } = renderUpload(2);
+
+    await user.upload(fileInput(container), pdf());
+
+    const error = await screen.findByText(
+      "Cada documento aceita um único PDF ou só fotos. Escolha de novo.",
+    );
+    const received = screen.getByText("Recebido: 2 arquivos");
+    expect(
+      received.compareDocumentPosition(error) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Two regions: the count isn't re-announced when an error appears.
+    expect(received.closest('[role="status"]')).not.toBe(
+      error.closest('[role="status"]'),
+    );
+    expect(
+      screen.getByRole("button", { name: "Adicionar página" }),
+    ).toHaveAccessibleDescription(expect.stringContaining("Escolha de novo."));
+  });
+
+  it("QA-M3-004: an API error after a received file keeps the count too", async () => {
+    const user = setup();
+    fetchSpy.mockResolvedValue(apiError(500, "ERRO_INTERNO"));
+    const { container } = renderUpload(1);
+
+    await user.upload(fileInput(container), photo("p2.jpg"));
+
+    expect(
+      await screen.findByText(
+        "Não conseguimos enviar o documento. Tente de novo.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Recebido: 1 arquivo")).toBeInTheDocument();
+  });
+
   it("a PDF added to photos already received is mixed, and the photos stay", async () => {
     const user = setup();
     const { container } = renderUpload(2);

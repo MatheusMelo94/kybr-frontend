@@ -162,16 +162,20 @@ export function DocumentUpload({
   }
 
   const canAdd = received > 0 && lastFormat !== "pdf";
-  const statusText =
+  // What was received stays visible whatever happens next; an error shows
+  // under it, in its own region (QA-M3-004, lead-approved UX default).
+  const receivedText =
+    received === 1
+      ? uploadCopy["upload.received.one"]
+      : received > 1
+        ? fill(uploadCopy["upload.received.many"], { n: received })
+        : "";
+  const errorText =
     status.kind === "error"
       ? ERROR_COPY[status.error]
       : status.kind === "closed"
         ? uploadCopy["upload.error.closed"]
-        : received === 1
-          ? uploadCopy["upload.received.one"]
-          : received > 1
-            ? fill(uploadCopy["upload.received.many"], { n: received })
-            : "";
+        : "";
 
   return (
     <div className="mt-2 flex flex-col gap-2">
@@ -183,16 +187,15 @@ export function DocumentUpload({
         hidden
         onChange={picked}
       />
-      <LiveRegion
-        id={statusId}
-        className={
-          status.kind === "error" || status.kind === "closed"
-            ? "text-secondary text-danger-ink"
-            : "text-secondary text-ink"
-        }
-      >
-        {statusText}
-      </LiveRegion>
+      {/* One block, so the two lines take a single gap, as one line did. */}
+      <div>
+        <LiveRegion className="text-secondary text-ink">
+          {receivedText}
+        </LiveRegion>
+        <LiveRegion id={statusId} className="text-secondary text-danger-ink">
+          {errorText}
+        </LiveRegion>
+      </div>
       {status.kind !== "closed" && (received === 0 || canAdd) && (
         <Button
           variant="secondary"
