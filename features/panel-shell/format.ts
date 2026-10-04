@@ -27,3 +27,8 @@ const numbers = new Intl.NumberFormat("pt-BR");
 export function formatNumber(value: number): string {
   return numbers.format(value);
 }
+
+/** `{minutos}` from a Retry-After in seconds: at least 1 (plan § 2.9). */
+export function minutesFromSeconds(seconds: number | undefined): number {
+  return Math.max(1, Math.ceil((seconds ?? 60) / 60));
+}

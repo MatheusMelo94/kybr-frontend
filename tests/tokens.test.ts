@@ -188,7 +188,7 @@ describe("the per-surface entries (ADR-0010 rule 2)", () => {
     expect(sources(panelCss).sort()).toEqual(
       [
         ".",
-        "../../../features/panel-*",
+        "../../../features/panel-*/**/*.{ts,tsx}",
         "../../../components/ui",
         "../../../components/panel",
         "../../layout.tsx",

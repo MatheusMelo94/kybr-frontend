@@ -50,8 +50,8 @@ function panelApiUrl(path: string): URL {
 /**
  * Calls the Kybr API for the panel. Every call is `cache: "no-store"` (no
  * caller can opt out: one workspace's data must never be served to another,
- * P06), and any 401 becomes SESSAO_EXPIRADA, so the DAL and the actions send
- * Renata back to /entrar (ADR-0009 rule 7).
+ * P06), and a 401 on a call that carried the session becomes SESSAO_EXPIRADA,
+ * so the DAL and the actions send Renata back to /entrar (ADR-0009 rule 7).
  */
 export async function panelRequest<T>(
   request: PanelRequest<T>,
@@ -74,7 +74,13 @@ export async function panelRequest<T>(
     }),
     ...(request.timeoutMs !== undefined && { timeoutMs: request.timeoutMs }),
   });
-  if (!result.ok && result.error.status === 401) {
+  // A 401 on an authenticated call is an expired or revoked session. On the
+  // pre-session auth calls it's their own code (CREDENCIAIS_INVALIDAS).
+  if (
+    !result.ok &&
+    result.error.status === 401 &&
+    request.sessionToken !== undefined
+  ) {
     return {
       ok: false,
       error: new AppError({

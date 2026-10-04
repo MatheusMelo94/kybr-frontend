@@ -128,6 +128,28 @@ describe("panelRequest (ADR-0009 rule 4, P18)", () => {
     expect(result.error.message).not.toContain("MSG-BACKEND");
   });
 
+  it("keeps a pre-session 401's own code (login's CREDENCIAIS_INVALIDAS)", async () => {
+    server.use(
+      http.post(`${API}/v1/auth/login`, () =>
+        HttpResponse.json(
+          { code: "CREDENCIAIS_INVALIDAS", message: "x" },
+          { status: 401 },
+        ),
+      ),
+    );
+    const result = await panelRequest({
+      operation: "login",
+      path: "/v1/auth/login",
+      method: "POST",
+      body: {},
+      schema: meSchema,
+    });
+
+    expect(result.ok ? undefined : result.error.code).toBe(
+      "CREDENCIAIS_INVALIDAS",
+    );
+  });
+
   it.each([
     "CREDENCIAIS_INVALIDAS",
     "EMAIL_NAO_CONFIRMADO",
