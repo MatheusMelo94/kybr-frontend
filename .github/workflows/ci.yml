@@ -181,6 +181,9 @@ jobs:
             browser: chromium
           - project: panel-webkit-360
             browser: webkit
+          # The same build with PANEL_HOST unset (H-07): the panel stays dark.
+          - project: panel-dark
+            browser: chromium
     env:
       # E2E only: the Playwright webServer runs a production build against the
       # http: mock API on loopback. Never set in a deployed environment
