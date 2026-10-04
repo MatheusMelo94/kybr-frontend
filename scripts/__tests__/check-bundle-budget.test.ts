@@ -283,3 +283,20 @@ describe("check-bundle-budget: the panel (ADR-0010)", () => {
     expect(run(dir).status).toBe(1);
   });
 });
+
+describe("check-bundle-budget: layouts count (T55)", () => {
+  it("adds every ancestor layout's JS to a page's First Load JS", () => {
+    const dir = fixture(
+      {
+        "/(panel)/painel/(app)/page": { js: { "page.js": 2_000 } },
+        "/(panel)/painel/(app)/layout": { js: { "shell.js": 170_000 } },
+      },
+      BUDGET,
+    );
+
+    const { status, output } = run(dir);
+    // 2 kB of page + 170 kB of layout: over 180 only if the layout counts.
+    expect(output).toMatch(/'\/painel' +│ '\d+\.\d' +│ '180 \(\/painel\/\*\)' +│ 'OVER'/);
+    expect(status).toBe(1);
+  });
+});

@@ -32,3 +32,18 @@ export function formatNumber(value: number): string {
 export function minutesFromSeconds(seconds: number | undefined): number {
   return Math.max(1, Math.ceil((seconds ?? 60) / 60));
 }
+
+/** `{data}`: dd/mm/aaaa in Brasília time (spec § Content & Copy › Rules). */
+export function formatDate(iso: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+      .formatToParts(new Date(iso))
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.day}/${parts.month}/${parts.year}`;
+}

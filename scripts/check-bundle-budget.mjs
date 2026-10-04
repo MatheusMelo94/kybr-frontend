@@ -5,9 +5,11 @@
 // (frontend-architecture-conventions.md § Performance Budgets, ADR-0003).
 // Never raise one here to turn CI green.
 //
-// It reproduces the "First Load JS" column of `next build` (Next 15, webpack):
-// the gzip size (level 9) of the .js files that .next/app-build-manifest.json
-// lists for the page, in kB of 1000 bytes. Run it after `pnpm build`.
+// It measures First Load JS like the "First Load JS" column of `next build`
+// (Next 15, webpack): the gzip size (level 9) of the .js files that
+// .next/app-build-manifest.json lists, in kB of 1000 bytes, but for the page
+// AND its ancestor layouts (Next's column leaves nested layouts out). Run it
+// after `pnpm build`.
 //
 // A budgeted route pattern with no built route yet is reported, not failed, so
 // the guard can land before the routes do.
@@ -72,6 +74,14 @@ function matches(pattern, route) {
   return route === pattern;
 }
 
+/** "/(a)/b/page" -> ["/layout", "/(a)/layout", "/(a)/b/layout"]. */
+function ancestorLayouts(entry) {
+  const segments = entry.split("/").slice(1, -1);
+  return segments
+    .map((_, index) => `/${segments.slice(0, index + 1).join("/")}/layout`)
+    .concat("/layout");
+}
+
 /** The page's client reference manifest, or undefined (not built, or a fixture without one). */
 function referenceManifest(entry) {
   const file = join(
@@ -118,7 +128,19 @@ const isolationProblems = [];
 for (const [entry, files] of Object.entries(manifest.pages)) {
   const route = routeOf(entry);
   if (route === null) continue;
-  const js = [...new Set(files.filter((f) => f.endsWith(".js")))];
+  // The page's chunks plus every ancestor layout's: Next's own "First Load
+  // JS" column leaves nested layouts out, which would hide a shell's client
+  // code (the panel's (app) layout, T55).
+  const js = [
+    ...new Set(
+      [
+        ...files,
+        ...ancestorLayouts(entry).flatMap(
+          (layout) => manifest.pages[layout] ?? [],
+        ),
+      ].filter((f) => f.endsWith(".js")),
+    ),
+  ];
   const rsc = referenceManifest(entry);
   const css = cssFilesOf(rsc);
   routes.set(route, {

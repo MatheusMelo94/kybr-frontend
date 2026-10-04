@@ -15,7 +15,9 @@ import {
 import type { AppError } from "@/lib/api/errors";
 import { panelRequest } from "@/lib/api/panel/client";
 import {
+  deleteSessionCookie,
   deleteSignupCookie,
+  readSessionToken,
   readSignupCookie,
   setSessionCookie,
   setSignupCookie,
@@ -332,4 +334,28 @@ export async function resetPasswordAction(
   if (error.code === "TOKEN_INVALIDO" || error.code === "SENHA_FRACA")
     return { ok: false, code: error.code };
   return commonFailure(error);
+}
+
+/** Where logout lands: a full page load drops the client's router cache (P15). */
+const AFTER_LOGOUT = "/entrar?motivo=saiu";
+
+/**
+ * D-A4 logout (ADR-0009 rule 8, P15): a POST only (a <form>, never a link or
+ * a GET). Revokes the session server-side, then deletes the cookie even if
+ * that call failed, so this browser is logged out either way.
+ */
+export async function logoutAction(): Promise<{ ok: true; next: string }> {
+  await assertPanelHost();
+  const token = await readSessionToken();
+  if (token !== undefined) {
+    await panelRequest({
+      operation: "logout",
+      path: apiPaths.panel.logout(),
+      method: "POST",
+      schema: z.unknown(),
+      sessionToken: token,
+    });
+  }
+  await deleteSessionCookie();
+  return { ok: true, next: AFTER_LOGOUT };
 }
