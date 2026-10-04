@@ -58,4 +58,63 @@ describe("POST /api/csp-report", () => {
     expect(response.status).toBe(413);
     expect(reportCspViolations).not.toHaveBeenCalled();
   });
+
+  // Security M3-02: the cap holds whatever the headers say.
+  it("answers 204 to any other content type without reading the body", async () => {
+    const request = post(JSON.stringify({ "csp-report": {} }), "text/plain");
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(204);
+    expect(request.bodyUsed).toBe(false);
+    expect(reportCspViolations).not.toHaveBeenCalled();
+  });
+
+  it("counts bytes, not characters: 9 000 'é' (18 000 bytes) is over 16 KB", async () => {
+    const response = await POST(
+      post(`"${"é".repeat(9_000)}"`, "application/csp-report"),
+    );
+
+    expect(response.status).toBe(413);
+  });
+
+  it("stops reading a 4 MB body with no Content-Length at 16 KB", async () => {
+    let pulled = 0;
+    const large = new ReadableStream<Uint8Array>({
+      // 4 MB (Vercel's body limit is 4.5 MB): reading it all is the bug.
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 4096) controller.close();
+        else controller.enqueue(new Uint8Array(1024).fill(0x20));
+      },
+    });
+    const request = new Request("https://kybr.test/api/csp-report", {
+      method: "POST",
+      headers: { "content-type": "application/reports+json" },
+      body: large,
+      duplex: "half",
+    } as RequestInit);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThanOrEqual(20);
+    expect(reportCspViolations).not.toHaveBeenCalled();
+  });
+
+  it("still reads a body of exactly 16 KB", async () => {
+    const report = JSON.stringify({
+      "csp-report": {
+        "document-uri": "https://kybr.test/v/loja-exemplo",
+        "blocked-uri": "inline",
+        "effective-directive": "script-src-elem",
+      },
+    });
+    const body = report + " ".repeat(16 * 1024 - report.length);
+
+    const response = await POST(post(body, "application/csp-report"));
+
+    expect(response.status).toBe(204);
+    expect(reportCspViolations).toHaveBeenCalledTimes(1);
+  });
 });
