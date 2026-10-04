@@ -142,6 +142,26 @@ test.describe("document upload errors @feature-seller-link", () => {
     });
   }
 
+  test("G11 / UE17: the mock's drop marker reaches the browser as a network failure (upload.error.network, not a 5xx path)", async ({
+    page,
+    request,
+  }) => {
+    await openPending(page, request);
+    const failures: string[] = [];
+    page.on("requestfailed", (failed) => {
+      if (failed.url().endsWith("/documents")) failures.push(failed.url());
+    });
+
+    await pick(
+      page,
+      "Enviar documento",
+      pdf(`doc${UPLOAD_MARKERS.networkDrop}.pdf`),
+    );
+
+    await expect(page.getByText(COPY.network)).toBeVisible();
+    expect(failures).toHaveLength(1);
+  });
+
   test("AC 22: 409 shows upload.error.closed and the button goes away", async ({
     page,
     request,

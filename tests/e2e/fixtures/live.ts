@@ -1,7 +1,23 @@
 import type { Page, Request } from "@playwright/test";
 
-function isCheck(request: Request): boolean {
-  return request.method() === "POST" && !!request.headers()["next-action"];
+/**
+ * A status check is the pollCaseViewAction POST: its body is the two string
+ * arguments (slug, token). The e-mail save (saveContactEmail) is a Server
+ * Action POST too, with one object argument, so it never counts (QA M3 G10).
+ */
+export function isCheck(request: Request): boolean {
+  if (request.method() !== "POST" || !request.headers()["next-action"])
+    return false;
+  try {
+    const args: unknown = JSON.parse(request.postData() ?? "");
+    return (
+      Array.isArray(args) &&
+      args.length === 2 &&
+      args.every((arg) => typeof arg === "string")
+    );
+  } catch {
+    return false;
+  }
 }
 
 export type CheckLog = {
@@ -27,11 +43,7 @@ export function recordChecks(page: Page): CheckLog {
 
 /** Resolves when the page sends its next status check. */
 export function nextCheck(page: Page, timeout = 3_000): Promise<unknown> {
-  return page.waitForRequest(
-    (request) =>
-      request.method() === "POST" && !!request.headers()["next-action"],
-    { timeout },
-  );
+  return page.waitForRequest(isCheck, { timeout });
 }
 
 /** Marks the document; the mark survives only if it's never reloaded. */
