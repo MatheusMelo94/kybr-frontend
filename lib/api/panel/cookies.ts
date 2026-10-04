@@ -30,19 +30,8 @@ async function isLocalHttp(): Promise<boolean> {
   return isLoopbackHostname(host.replace(/:\d+$/, ""));
 }
 
-async function names(): Promise<{
-  session: string;
-  signup: string;
-  secure: boolean;
-}> {
-  const local = await isLocalHttp();
-  return local
-    ? { session: "kybr_session", signup: "kybr_signup", secure: false }
-    : {
-        session: "__Host-kybr_session",
-        signup: "__Host-kybr_signup",
-        secure: true,
-      };
+async function names(): Promise<PanelCookieNames> {
+  return panelCookieNames(await isLocalHttp());
 }
 
 function options(secure: boolean, maxAge: number) {

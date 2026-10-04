@@ -10,3 +10,9 @@
 @source "../layout.tsx";
 @source "../not-found.tsx";
 @source "../global-error.tsx";
+/* Panel-only primitives live in components/ui (ADR-0010 rule 3) but the link
+   never renders them: keep their classes out of /v/*. */
+@source not "../../components/ui/notice.tsx";
+@source not "../../components/ui/checkbox.tsx";
+@source not "../../components/ui/radio-group.tsx";
+@source not "../../components/ui/form-alert.tsx";

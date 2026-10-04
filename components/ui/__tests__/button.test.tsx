@@ -138,4 +138,38 @@ describe("Button", () => {
     expect(button).toHaveAccessibleDescription("Contrato social ou CCMEI");
     expect(button).toHaveClass("w-full");
   });
+
+  describe('size="panel" (plan § 2.6)', () => {
+    it("is 40 px (--size-control-panel), at least 44 px on a coarse pointer", () => {
+      render(<Button size="panel">Entrar</Button>);
+
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass(
+        "h-(--size-control-panel)",
+        "pointer-coarse:h-11",
+      );
+      expect(button).not.toHaveClass("h-12");
+    });
+
+    it("keeps the secondary variant at 44 px on a coarse pointer", () => {
+      render(
+        <Button size="panel" variant="secondary">
+          Cancelar
+        </Button>,
+      );
+
+      expect(screen.getByRole("button")).toHaveClass(
+        "min-h-(--size-control-panel)",
+        "pointer-coarse:min-h-11",
+      );
+    });
+
+    it("leaves the link's default size alone", () => {
+      render(<Button>Verificar empresa</Button>);
+
+      expect(screen.getByRole("button")).not.toHaveClass(
+        "h-(--size-control-panel)",
+      );
+    });
+  });
 });

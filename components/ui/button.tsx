@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   children: ReactNode;
   variant?: "primary" | "secondary";
+  /** "panel": the panel's 40 px control, still 44 px on coarse pointers (plan § 2.6). */
+  size?: "default" | "panel";
   type?: "button" | "submit";
   /** Pending async work: shows `busyLabel`, keeps the width, ignores presses. */
   busy?: boolean;
@@ -31,6 +33,12 @@ const VARIANTS = {
     "min-h-11 border border-field-line bg-transparent text-ink hover:bg-surface-raised active:bg-field",
 } as const;
 
+// The panel's height replaces the link's (cn() resolves the h-/min-h- conflict).
+const PANEL_SIZE = {
+  primary: "h-(--size-control-panel) pointer-coarse:h-11",
+  secondary: "min-h-(--size-control-panel) pointer-coarse:min-h-11",
+} as const;
+
 // Busy stays focusable (aria-disabled, not `disabled`), so keyboard focus isn't
 // dropped mid-submit. Cancelling the click also cancels the form submission it
 // would trigger, including implicit submission from Enter in a field.
@@ -41,6 +49,7 @@ function ignorePress(event: MouseEvent<HTMLButtonElement>): void {
 export function Button({
   children,
   variant = "primary",
+  size = "default",
   type = "button",
   busy = false,
   busyLabel,
@@ -63,7 +72,12 @@ export function Button({
       aria-disabled={busy || undefined}
       aria-describedby={describedBy}
       onClick={busy ? ignorePress : onClick}
-      className={cn(BASE, VARIANTS[variant], className)}
+      className={cn(
+        BASE,
+        VARIANTS[variant],
+        size === "panel" && PANEL_SIZE[variant],
+        className,
+      )}
     >
       {/* Both labels share one grid cell, so the button is as wide as the longer one. */}
       <span className="grid">

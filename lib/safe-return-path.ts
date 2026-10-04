@@ -46,7 +46,6 @@ export function safeReturnPath(
     !decoded.startsWith("/") ||
     decoded.startsWith("//") ||
     decoded.includes("\\") ||
-    // eslint-disable-next-line no-control-regex -- refusing control characters is the point
     /[\u0000-\u001f\u007f]/.test(decoded)
   )
     return null;
