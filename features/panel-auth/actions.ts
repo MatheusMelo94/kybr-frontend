@@ -81,8 +81,10 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
     forwardClientIp: true,
   });
   if (result.ok) {
-    // A new id replaces any previous cookie value (rotation, A-X1).
+    // A new id replaces any previous cookie value (rotation, A-X1), and an
+    // abandoned sign-up's PII leaves this browser (ADR-0009 rule 10, M4-01).
     await setSessionCookie(result.data.sessao);
+    await deleteSignupCookie();
     return { ok: true, next: safeReturnPath(volta) ?? "/" };
   }
   const { error } = result;
@@ -342,7 +344,8 @@ const AFTER_LOGOUT = "/entrar?motivo=saiu";
 /**
  * D-A4 logout (ADR-0009 rule 8, P15): a POST only (a <form>, never a link or
  * a GET). Revokes the session server-side, then deletes the cookie even if
- * that call failed, so this browser is logged out either way.
+ * that call failed, so this browser is logged out either way. A pending
+ * sign-up cookie goes too (ADR-0009 rule 10).
  */
 export async function logoutAction(): Promise<{ ok: true; next: string }> {
   await assertPanelHost();
@@ -357,5 +360,6 @@ export async function logoutAction(): Promise<{ ok: true; next: string }> {
     });
   }
   await deleteSessionCookie();
+  await deleteSignupCookie();
   return { ok: true, next: AFTER_LOGOUT };
 }

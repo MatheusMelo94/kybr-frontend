@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({ headers: new Headers() }));
 const cookies = vi.hoisted(() => ({
   setSessionCookie: vi.fn(),
   setSignupCookie: vi.fn(),
+  deleteSignupCookie: vi.fn(),
 }));
 vi.mock("next/headers", () => ({ headers: async () => state.headers }));
 vi.mock("next/navigation", () => ({
@@ -73,6 +74,14 @@ describe("loginAction (D-A4, ADR-0009)", () => {
       ok: true,
       next: "/",
     });
+  });
+
+  it("drops a pending sign-up cookie on success only (M4-01)", async () => {
+    await login({ email: PANEL_EMAILS.renata, senha: "senha-errada-000" });
+    expect(cookies.deleteSignupCookie).not.toHaveBeenCalled();
+
+    await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD });
+    expect(cookies.deleteSignupCookie).toHaveBeenCalledOnce();
   });
 
   it("maps wrong credentials to CREDENCIAIS_INVALIDAS, setting no cookie", async () => {

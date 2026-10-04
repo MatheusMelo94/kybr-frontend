@@ -14,7 +14,10 @@ const state = vi.hoisted(() => ({
   headers: new Headers(),
   token: undefined as string | undefined,
 }));
-const cookies = vi.hoisted(() => ({ deleteSessionCookie: vi.fn() }));
+const cookies = vi.hoisted(() => ({
+  deleteSessionCookie: vi.fn(),
+  deleteSignupCookie: vi.fn(),
+}));
 vi.mock("next/headers", () => ({ headers: async () => state.headers }));
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
@@ -68,5 +71,11 @@ describe("logoutAction (D-A4, ADR-0009 rule 8, P15)", () => {
       next: "/entrar?motivo=saiu",
     });
     expect(panelStore().calls).toEqual([]);
+  });
+
+  it("also drops a pending sign-up cookie, even when the API call fails (M4-01)", async () => {
+    server.use(http.post("*/v1/auth/logout", () => HttpResponse.error()));
+    await logoutAction();
+    expect(cookies.deleteSignupCookie).toHaveBeenCalledOnce();
   });
 });
