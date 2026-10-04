@@ -14,9 +14,9 @@ describe("GET /favicon.ico", () => {
     expect(await response.text()).toBe("");
   });
 
-  it("is cacheable, so the browser asks once", () => {
+  it("is cacheable by the browser and by the CDN, so a new visitor doesn't invoke a function (review 0023)", () => {
     expect(GET().headers.get("cache-control")).toBe(
-      "public, max-age=86400",
+      "public, max-age=86400, s-maxage=86400",
     );
   });
 

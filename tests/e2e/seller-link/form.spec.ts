@@ -62,6 +62,8 @@ test.describe("form screen @feature-seller-link", () => {
 
     expect(response.status()).toBe(204);
     expect(await response.body()).toHaveLength(0);
+    // Served as set: the CDN may answer it too (review 0023).
+    expect(response.headers()["cache-control"]).toContain("s-maxage=86400");
   });
 
   test("the step indicator says Passo 1 de 3", async ({ page }) => {
