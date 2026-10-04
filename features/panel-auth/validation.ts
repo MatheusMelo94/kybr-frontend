@@ -67,3 +67,14 @@ export function normalizeCode(value: string): string {
 export function isCode(value: string): boolean {
   return /^\d{6}$/.test(value);
 }
+
+/** P04: a reset token from the URL fragment (URL-safe, >= 128 bits). */
+export function isResetToken(value: string): boolean {
+  return /^[A-Za-z0-9_-]{22,128}$/.test(value);
+}
+
+export function isNewPassword(value: string): boolean {
+  return (
+    value.length >= PASSWORD_MIN_LENGTH && value.length <= PASSWORD_MAX_LENGTH
+  );
+}

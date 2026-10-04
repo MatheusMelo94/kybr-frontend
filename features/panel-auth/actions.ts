@@ -6,6 +6,8 @@ import {
   confirmSchema,
   loginSchema,
   resendSchema,
+  resetConfirmSchema,
+  resetRequestSchema,
   signupIssues,
   signupSchema,
   type SignupField,
@@ -20,6 +22,7 @@ import {
 } from "@/lib/api/panel/cookies";
 import { assertPanelHost } from "@/lib/api/panel/host";
 import { apiPaths } from "@/lib/api/path";
+import { isNewPassword } from "@/features/panel-auth/validation";
 import { env } from "@/lib/env";
 import { safeReturnPath } from "@/lib/safe-return-path";
 
@@ -271,4 +274,62 @@ export async function resendCodeAction(input: unknown): Promise<ResendResult> {
     reenviarEm: new Date(Date.now() + resendInMs).toISOString(),
   });
   return { ok: true, resendInMs };
+}
+
+export type ResetRequestResult = { ok: true } | CommonFailure;
+
+/**
+ * D-A5 request: 202 whether or not the account exists, so the result reads
+ * the same for any address (AC 6, P12). Behind Turnstile.
+ */
+export async function requestPasswordResetAction(
+  input: unknown,
+): Promise<ResetRequestResult> {
+  await assertPanelHost();
+  const parsed = resetRequestSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "TURNSTILE_INVALIDO" };
+
+  const result = await panelRequest({
+    operation: "password-reset",
+    path: apiPaths.panel.passwordReset(),
+    method: "POST",
+    body: parsed.data,
+    schema: z.unknown(),
+    forwardClientIp: true,
+  });
+  return result.ok ? { ok: true } : commonFailure(result.error);
+}
+
+export type ResetPasswordResult =
+  | { ok: true }
+  | { ok: false; code: "TOKEN_INVALIDO" | "SENHA_CURTA" | "SENHA_FRACA" }
+  | CommonFailure;
+
+/**
+ * D-A5 confirm: sets the new password with the token the leaf read from the
+ * URL fragment (P04: it never travels in a URL). A malformed token is
+ * refused before any API call. Success revokes every session (the API).
+ */
+export async function resetPasswordAction(
+  input: unknown,
+): Promise<ResetPasswordResult> {
+  await assertPanelHost();
+  const parsed = resetConfirmSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "TOKEN_INVALIDO" };
+  if (!isNewPassword(parsed.data.senha))
+    return { ok: false, code: "SENHA_CURTA" };
+
+  const result = await panelRequest({
+    operation: "password-reset-confirm",
+    path: apiPaths.panel.passwordResetConfirm(),
+    method: "POST",
+    body: parsed.data,
+    schema: z.unknown(),
+    forwardClientIp: true,
+  });
+  if (result.ok) return { ok: true };
+  const { error } = result;
+  if (error.code === "TOKEN_INVALIDO" || error.code === "SENHA_FRACA")
+    return { ok: false, code: error.code };
+  return commonFailure(error);
 }

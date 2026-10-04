@@ -66,3 +66,20 @@ export const confirmSchema = z.object({ codigo: z.string().regex(/^\d{6}$/) });
 
 /** D-A3: the Turnstile token only (the ticket, again, from the cookie). */
 export const resendSchema = z.object({ turnstile });
+
+/** D-A5 request: the address and the Turnstile token. */
+export const resetRequestSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(EMAIL_MAX_LENGTH)
+    .regex(EMAIL_PATTERN),
+  turnstile,
+});
+
+/** D-A5 confirm: the token from the URL fragment (posted by the leaf) and the new password. */
+export const resetConfirmSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{22,128}$/),
+  senha: z.string(),
+});
