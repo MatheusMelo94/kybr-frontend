@@ -3,6 +3,7 @@ import type { JSX, ReactNode } from "react";
 import { AccountMenu } from "@/features/panel-shell/components/account-menu";
 import { LogoutItem } from "@/features/panel-shell/components/logout-item";
 import { PanelNav } from "@/features/panel-shell/components/panel-nav";
+import { BfcacheGuard } from "@/features/panel-shell/components/bfcache-guard";
 import { LivePlanBlock } from "@/features/panel-shell/components/live-plan-block";
 import { ShellStatusPoller } from "@/features/panel-shell/components/shell-status-poller";
 import { TopBar } from "@/features/panel-shell/components/top-bar";
@@ -37,6 +38,7 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
       initial={{ contagens: shell.contagens, plano: shell.plano }}
     >
       <ShellStatusPoller />
+      <BfcacheGuard />
       <div className="lg:flex">
         <header className="border-b border-line lg:hidden">
           <TopBar workspaceNome={shell.workspaceNome} />
