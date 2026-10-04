@@ -1,10 +1,6 @@
-import type { JSX } from "react";
+import { redirect } from "next/navigation";
 
-// Placeholder for the panel's home: T60 makes it redirect('/fila').
-export default function PanelHome(): JSX.Element {
-  return (
-    <main>
-      <h1>Kybr</h1>
-    </main>
-  );
+// MVP home = the Fila (spec S9 MVP note); Início replaces it in M8.
+export default function PanelHome(): never {
+  redirect("/fila");
 }

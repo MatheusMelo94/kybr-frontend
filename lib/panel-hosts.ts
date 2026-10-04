@@ -54,9 +54,39 @@ export const PUBLIC_PANEL_PATHS: ReadonlySet<string> = new Set([
   "/senha/nova",
 ]);
 
-/** True for every external panel path except the five public ones. */
+/**
+ * The signed-in panel's screens: "/" and these prefixes (the spec's routes,
+ * shipped or not). Shared with lib/safe-return-path.ts.
+ */
+export const PANEL_SCREENS: readonly string[] = [
+  "/fila",
+  "/lote",
+  "/monitoramento",
+  "/comecar",
+  "/vendedores",
+  "/regras",
+  "/relatorio",
+  "/integracoes",
+  "/ver-como-vendedor",
+  "/configuracoes",
+];
+
+export function isPanelScreen(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    PANEL_SCREENS.some(
+      (screen) => pathname === screen || pathname.startsWith(`${screen}/`),
+    )
+  );
+}
+
+/**
+ * True for the panel screens: without a session cookie, middleware sends
+ * them to /entrar. The five public paths aren't, and neither is an unknown
+ * path: the panel's not-found answers it, logged in or not (AC 13).
+ */
 export function isProtectedPanelPath(path: string): boolean {
-  return !PUBLIC_PANEL_PATHS.has(path);
+  return !PUBLIC_PANEL_PATHS.has(path) && isPanelScreen(path);
 }
 
 /** The auth pages that render Cloudflare Turnstile (ADR-0009 rule 13): its origin is allowed there only. */

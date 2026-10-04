@@ -17,12 +17,12 @@ test.describe("session expiry mid-task @feature-ops-panel @panel-access", () => 
     const email = uniqueEmail("expira", testInfo);
     await createAccount(request, email);
     await logIn(page, email);
-    await page.goto("/?aba=x");
+    await page.goto("/fila?aba=x");
 
     await expireSessions(request, email);
     await page.reload();
     await expect(page).toHaveURL(
-      /\/entrar\?motivo=sessao&volta=%2F%3Faba%3Dx$/,
+      /\/entrar\?motivo=sessao&volta=%2Ffila%3Faba%3Dx$/,
     );
     await expect(
       page.getByRole("status").filter({ hasText: "Sua sessão expirou." }),
@@ -31,7 +31,7 @@ test.describe("session expiry mid-task @feature-ops-panel @panel-access", () => 
     await page.getByLabel("E-mail").fill(email);
     await page.getByLabel("Senha").fill("senha-correta-123");
     await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page).toHaveURL(/\/\?aba=x$/);
+    await expect(page).toHaveURL(/\/fila\?aba=x$/);
   });
 
   test("a client-sent x-kybr-panel-path never becomes volta (T47's deferred check)", async ({
@@ -44,9 +44,9 @@ test.describe("session expiry mid-task @feature-ops-panel @panel-access", () => 
     await expireSessions(request, email);
 
     await page.setExtraHTTPHeaders({ "x-kybr-panel-path": "/fila/forjado" });
-    await page.goto("/?real=1");
+    await page.goto("/fila?real=1");
     await expect(page).toHaveURL(
-      /\/entrar\?motivo=sessao&volta=%2F%3Freal%3D1$/,
+      /\/entrar\?motivo=sessao&volta=%2Ffila%3Freal%3D1$/,
     );
   });
 
@@ -57,6 +57,7 @@ test.describe("session expiry mid-task @feature-ops-panel @panel-access", () => 
     const email = uniqueEmail("poller", testInfo);
     await createAccount(request, email);
     await logIn(page, email);
+    await expect(page).toHaveURL(/\/fila$/);
     await expect(
       page.getByRole("navigation", { name: "Navegação do painel" }).first(),
     ).toBeAttached();
@@ -76,7 +77,7 @@ test.describe("session expiry mid-task @feature-ops-panel @panel-access", () => 
       document.dispatchEvent(new Event("visibilitychange")),
     );
 
-    await expect(page).toHaveURL(/\/entrar\?motivo=sessao&volta=%2F$/);
+    await expect(page).toHaveURL(/\/entrar\?motivo=sessao&volta=%2Ffila$/);
     await expect(
       page.getByRole("status").filter({ hasText: "Sua sessão expirou." }),
     ).toBeVisible();

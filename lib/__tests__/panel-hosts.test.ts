@@ -73,7 +73,7 @@ describe("hostConfigFromEnv", () => {
   });
 });
 
-describe("isProtectedPanelPath (ADR-0009 rule 6)", () => {
+describe("isProtectedPanelPath (ADR-0009 rule 6; AC 13)", () => {
   it.each([
     "/entrar",
     "/cadastro",
@@ -89,15 +89,28 @@ describe("isProtectedPanelPath (ADR-0009 rule 6)", () => {
     "/fila",
     "/fila/abc",
     "/comecar",
-    "/entrar/x",
-    "/entrarx",
-    "/cadastro/confirmar/x",
-    "/senha",
-    "/senha/nova/x",
-    "/ENTRAR",
-  ])("%s is protected", (path) => {
+    "/lote",
+    "/monitoramento/x",
+    "/configuracoes",
+  ])("the panel screen %s is protected", (path) => {
     expect(isProtectedPanelPath(path)).toBe(true);
   });
+
+  // AC 13: an unknown path renders the panel's not-found, logged in or not.
+  it.each([
+    "/qualquer",
+    "/entrar/x",
+    "/entrarx",
+    "/filas",
+    "/senha",
+    "/ENTRAR",
+    "/v/x",
+  ])(
+    "the unknown path %s isn't redirected (the panel's not-found answers it)",
+    (path) => {
+      expect(isProtectedPanelPath(path)).toBe(false);
+    },
+  );
 
   it("lists exactly the five public paths", () => {
     expect([...PUBLIC_PANEL_PATHS].sort()).toEqual(

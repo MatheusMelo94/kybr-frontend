@@ -243,7 +243,11 @@ export const panelAuthHandlers: RequestHandler[] = [
 
 // --- Loopback-only controls (M2-06: the mock API binds to 127.0.0.1) ---------
 
-const SCENARIOS: readonly Scenario[] = ["categorias-falham", "teste-pausado"];
+const SCENARIOS: readonly Scenario[] = [
+  "categorias-falham",
+  "teste-pausado",
+  "me-falha",
+];
 
 function isPreset(value: unknown): value is Preset {
   return PRESETS.includes(value as Preset);

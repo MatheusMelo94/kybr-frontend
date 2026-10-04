@@ -71,7 +71,7 @@ export async function outbox(
 
 export async function seed(
   request: APIRequestContext,
-  scenario: "categorias-falham" | "teste-pausado",
+  scenario: "categorias-falham" | "teste-pausado" | "me-falha",
   email: string,
 ): Promise<void> {
   await request.post(`${CONTROLS}/seed`, { data: { scenario, email } });

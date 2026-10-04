@@ -146,7 +146,6 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
 
     const panelFila = await routed("/fila", "127.0.0.1:3000");
     expect(panelFila.headers["x-nextjs-rewritten-path"]).toBe("/painel/fila");
-    expect(panelFila.body).not.toContain(LINK_404);
 
     const panelLink = await routed("/v/loja-exemplo", "127.0.0.1:3000");
     expect(panelLink.headers["x-nextjs-rewritten-path"]).toBe(

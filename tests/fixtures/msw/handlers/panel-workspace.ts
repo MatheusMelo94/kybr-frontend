@@ -45,6 +45,9 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
     if (refused) return refused;
     const account = sessionAccount(token);
     if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    // An unexpected failure, for the panel's fatal-error screen (S16).
+    if (scenarioApplies("me-falha", account.email))
+      return apiError(500, "ERRO_INTERNO");
     return ok({
       nome: account.nome,
       email: account.email,

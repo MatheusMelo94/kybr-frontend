@@ -43,7 +43,7 @@ export type CallRecord = {
   authorized: boolean;
 };
 
-export type Scenario = "categorias-falham" | "teste-pausado";
+export type Scenario = "categorias-falham" | "teste-pausado" | "me-falha";
 
 type Store = {
   accounts: Map<string, Account>;

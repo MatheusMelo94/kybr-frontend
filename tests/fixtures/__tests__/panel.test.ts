@@ -248,7 +248,10 @@ describe("panel mock: sign-up and confirm (PA1–PA5, PA19)", () => {
     const { codigo } = await json<{ codigo: string }>(
       await control("GET", `/outbox?to=${email}`),
     );
-    const right = await call("POST", "/v1/auth/confirm", { signup_ticket, codigo });
+    const right = await call("POST", "/v1/auth/confirm", {
+      signup_ticket,
+      codigo,
+    });
     expect(await errorCode(right)).toBe("CODIGO_EXPIRADO");
   });
 
@@ -636,6 +639,31 @@ describe("panel mock: controls", () => {
     expect(await json(await control("GET", "/calls"))).toEqual([
       expect.objectContaining({ path: "/v1/me" }),
     ]);
+  });
+
+  it("me-falha: /v1/me answers 500 for the seeded account only", async () => {
+    await control("POST", "/accounts", { email: "mefalha@exemplo.test" });
+    await control("POST", "/seed", {
+      scenario: "me-falha",
+      email: "mefalha@exemplo.test",
+    });
+    const failing = await login("mefalha@exemplo.test");
+    const fine = await login(PANEL_EMAILS.renata);
+
+    expect(
+      (
+        await call("GET", "/v1/me", undefined, {
+          authorization: `Bearer ${failing}`,
+        })
+      ).status,
+    ).toBe(500);
+    expect(
+      (
+        await call("GET", "/v1/me", undefined, {
+          authorization: `Bearer ${fine}`,
+        })
+      ).status,
+    ).toBe(200);
   });
 
   it("uses only synthetic addresses", () => {

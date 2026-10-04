@@ -62,7 +62,7 @@ test.describe("panel middleware @feature-ops-panel @panel-access", () => {
     );
   });
 
-  for (const path of ["/", "/comecar", "/qualquer"]) {
+  for (const path of ["/", "/comecar", "/fila"]) {
     test(`${path} without a cookie redirects too`, async () => {
       const response = await rawGet(path);
       expect(response.status).toBe(307);
@@ -70,11 +70,18 @@ test.describe("panel middleware @feature-ops-panel @panel-access", () => {
     });
   }
 
-  test("a session cookie's presence lets the request through (the DAL checks it)", async () => {
+  test("an unknown path isn't redirected: the panel's not-found answers it (AC 13)", async () => {
+    const response = await rawGet("/qualquer");
+    expect(response.status).toBe(404);
+    expect(response.headers.location).toBeUndefined();
+  });
+
+  test("a session cookie's presence lets the request through: the DAL checks it", async () => {
     const response = await rawGet("/fila", {
       cookie: "kybr_session=qualquer-valor-0123456789",
     });
-    expect(response.status).not.toBe(307);
+    // Not middleware's redirect (?volta=): the DAL rejected the bogus session.
+    expect(response.headers.location ?? "").toMatch(/\/entrar\?motivo=sessao/);
   });
 
   for (const path of [
