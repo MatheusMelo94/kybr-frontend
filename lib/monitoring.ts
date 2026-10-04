@@ -110,16 +110,54 @@ export const MARKERS = [
 
 export type Marker = (typeof MARKERS)[number];
 
+/** Sentry events each marker may send per minute, per server instance (M4-08). */
+export const MARKER_EVENTS_PER_MINUTE = 20;
+
+// Each marker's window on this instance, like the CSP collector's (M3-01).
+const markerWindows = new Map<
+  Marker,
+  { start: number; sent: number; full: boolean }
+>();
+
+/** True when this marker may go to Sentry now; logs once when its budget runs out. */
+function admitMarker(marker: Marker): boolean {
+  const now = Date.now();
+  let window = markerWindows.get(marker);
+  if (
+    window === undefined ||
+    now < window.start ||
+    now - window.start >= 60_000
+  ) {
+    window = { start: now, sent: 0, full: false };
+    markerWindows.set(marker, window);
+  }
+  if (window.sent >= MARKER_EVENTS_PER_MINUTE) {
+    if (!window.full) {
+      window.full = true;
+      console.warn("[kybr] MARKER_BUDGET", {
+        marker,
+        perMinute: String(MARKER_EVENTS_PER_MINUTE),
+      });
+    }
+    return false;
+  }
+  window.sent += 1;
+  return true;
+}
+
 /**
- * A shape-only marker for something to alert on: logged, and sent as an
- * error tagged `marker:<name>`. `context` holds names and codes only, never
- * values (no e-mail, name, token, ticket or host).
+ * A shape-only marker for something to alert on: always logged (the log
+ * keeps the count for alerting), and sent as an error tagged
+ * `marker:<name>` at most MARKER_EVENTS_PER_MINUTE times a minute per
+ * marker, since anyone can trigger some of them (M4-08). `context` holds
+ * names and codes only, never values (no e-mail, name, token, ticket or host).
  */
 export function reportMarker(
   marker: Marker,
   context: Record<string, string>,
 ): void {
   console.error(`[kybr] ${marker}`, context);
+  if (!admitMarker(marker)) return;
   Sentry.captureMessage(marker, {
     level: "error",
     tags: { marker, ...context },

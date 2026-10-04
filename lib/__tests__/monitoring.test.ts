@@ -155,6 +155,53 @@ describe("reportMarker", () => {
   });
 });
 
+describe("M4-08: a per-instance budget per marker", () => {
+  let minute = 0;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // A fresh window for every test: an hour apart.
+    minute += 60;
+    vi.setSystemTime(minute * 60_000);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("logs every marker, sends each marker at most 20 times a minute, then again next minute", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 50; i++) reportMarker("PANEL_HOST_MISMATCH", {});
+    expect(error).toHaveBeenCalledTimes(50);
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(20);
+
+    // Another marker has its own budget, so a flood of one can't mute it.
+    reportMarker("SESSION_REJECTED", { operation: "me" });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(21);
+
+    vi.advanceTimersByTime(60_000);
+    reportMarker("PANEL_HOST_MISMATCH", {});
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(22);
+    error.mockRestore();
+    warn.mockRestore();
+  });
+
+  it("logs one MARKER_BUDGET line per marker when its budget runs out", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 30; i++) reportMarker("TURNSTILE_FAILED", {});
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith("[kybr] MARKER_BUDGET", {
+      marker: "TURNSTILE_FAILED",
+      perMinute: "20",
+    });
+    error.mockRestore();
+    warn.mockRestore();
+  });
+});
+
 describe("reportCspViolations", () => {
   it("sends each violation scrubbed, as a warning", () => {
     const log = vi.spyOn(console, "warn").mockImplementation(() => {});
