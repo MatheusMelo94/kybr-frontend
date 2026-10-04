@@ -5,6 +5,7 @@ const pathname = vi.hoisted(() => ({ value: "/fila" }));
 vi.mock("next/navigation", () => ({ usePathname: () => pathname.value }));
 
 import { PanelNav } from "@/features/panel-shell/components/panel-nav";
+import { ShellStatusProvider } from "@/features/panel-shell/shell-status-context";
 
 const ITEMS = [
   { key: "fila", href: "/fila", label: "Fila de revisão" },
@@ -37,5 +38,34 @@ describe("PanelNav (AC 9)", () => {
     const link = screen.getByRole("link", { name: "Fila de revisão" });
     expect(link).not.toHaveAttribute("aria-current");
     expect(link).toHaveAttribute("href", "/fila");
+  });
+
+  it("inside the shell, the poller's live counts win over the server's (AC 11)", () => {
+    pathname.value = "/fila";
+    render(
+      <ShellStatusProvider
+        initial={{
+          contagens: {
+            fila_abertos: 3,
+            fila_vencidos: 2,
+            alertas_criticos_abertos: 0,
+            vendedores: 1,
+            lote_em_andamento: false,
+          },
+          plano: undefined,
+        }}
+      >
+        <PanelNav
+          items={ITEMS}
+          contagens={{ fila_abertos: 7, fila_vencidos: 0 }}
+        />
+      </ShellStatusProvider>,
+    );
+
+    expect(
+      screen.getByRole("link", {
+        name: "Fila de revisão 3 casos para decidir, 2 fora do prazo",
+      }),
+    ).toBeInTheDocument();
   });
 });

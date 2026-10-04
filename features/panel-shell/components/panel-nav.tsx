@@ -78,10 +78,10 @@ export function PanelNav({
                 )}
               >
                 <span>{item.label}</span>{" "}
-                {item.key === "fila" && contagens !== undefined && (
+                {item.key === "fila" && counts !== undefined && (
                   <NavCount
-                    abertos={contagens.fila_abertos}
-                    vencidos={contagens.fila_vencidos}
+                    abertos={counts.fila_abertos}
+                    vencidos={counts.fila_vencidos}
                   />
                 )}
               </Link>
