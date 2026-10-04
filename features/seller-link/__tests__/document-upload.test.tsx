@@ -132,7 +132,7 @@ describe("DocumentUpload: happy path (T30, AC 21)", () => {
     expect(
       screen.queryByRole("button", { name: "Enviar documento" }),
     ).toBeNull();
-    await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
   it("several photos: upload.received.many and upload.add; adding a page sends only the new photo", async () => {

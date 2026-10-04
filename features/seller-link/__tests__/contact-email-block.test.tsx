@@ -59,7 +59,7 @@ describe("ContactEmailBlock (DDR-0001)", () => {
     expect(field()).toHaveAccessibleDescription(
       expect.stringContaining("Informe um e-mail."),
     );
-    await waitFor(() => expect(field()).toHaveFocus());
+    expect(field()).toHaveFocus();
     expect(save).not.toHaveBeenCalled();
   });
 
@@ -119,7 +119,7 @@ describe("ContactEmailBlock (DDR-0001)", () => {
       await screen.findByRole("button", { name: "Trocar e-mail" }),
     );
 
-    await waitFor(() => expect(field()).toHaveFocus());
+    expect(field()).toHaveFocus();
     expect(field()).toHaveValue(EMAIL);
   });
 
