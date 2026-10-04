@@ -52,9 +52,6 @@ describe("RadioGroup", () => {
     ).toHaveAccessibleDescription(
       "Dá para ajustar depois. Escolha um tipo de vendedor.",
     );
-    expect(screen.getByText("Escolha um tipo de vendedor.")).toHaveClass(
-      "text-danger-ink",
-    );
   });
 
   it("is controlled: value + onChange", () => {
@@ -90,17 +87,5 @@ describe("RadioGroup", () => {
     expect(ref.current).toBe(
       screen.getByRole("radio", { name: "Oficinas e serviços" }),
     );
-  });
-
-  it("has 24 px radios in rows at least 44 px tall on coarse pointers, with the states", () => {
-    render(<RadioGroup name="categoria" legend="Tipo" options={OPTIONS} />);
-
-    const radio = screen.getByRole("radio", { name: "Lojas de peças" });
-    expect(radio).toHaveClass(
-      "size-6",
-      "accent-accent",
-      "focus-visible:outline-focus",
-    );
-    expect(radio.closest("label")).toHaveClass("pointer-coarse:min-h-11");
   });
 });

@@ -10,7 +10,8 @@ describe("FormAlert", () => {
     expect(screen.getByRole("alert")).toBeEmptyDOMElement();
   });
 
-  it("renders the form-level message, links included, in the danger ink", () => {
+  // Its danger ink: primitives.spec (Playwright).
+  it("renders the form-level message, links included", () => {
     render(
       <FormAlert id="erro">
         Já existe uma conta. <a href="/entrar">Entrar</a>
@@ -19,7 +20,6 @@ describe("FormAlert", () => {
 
     const alert = screen.getByRole("alert");
     expect(alert).toHaveAttribute("id", "erro");
-    expect(alert).toHaveClass("text-danger-ink");
     expect(screen.getByRole("link", { name: "Entrar" })).toBeInTheDocument();
   });
 });

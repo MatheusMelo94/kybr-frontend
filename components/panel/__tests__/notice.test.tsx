@@ -31,19 +31,16 @@ describe("Notice", () => {
     expect(notice).toHaveAttribute("tabindex", "-1");
     ref.current?.focus();
     expect(notice).toHaveFocus();
-    expect(notice).toHaveClass("focus-visible:outline-focus");
   });
 
-  it.each([
-    ["info", "border-line"],
-    ["warning", "text-warning-ink"],
-    ["danger", "text-danger-ink"],
-  ] as const)(
-    "the %s tone uses %s (never color alone: the text carries it)",
-    (tone, token) => {
-      render(<Notice tone={tone}>Texto</Notice>);
-
-      expect(screen.getByRole("status")).toHaveClass(token);
-    },
-  );
+  // The info tone's colours: primitives.spec (Playwright).
+  it("each tone renders its own way (the text carries the meaning)", () => {
+    const looks = (["info", "warning", "danger"] as const).map((tone) => {
+      const { unmount } = render(<Notice tone={tone}>Texto</Notice>);
+      const look = screen.getByRole("status").className;
+      unmount();
+      return look;
+    });
+    expect(new Set(looks).size).toBe(3);
+  });
 });

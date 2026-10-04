@@ -6,12 +6,18 @@ import { PlanBlock } from "@/features/panel-shell/components/plan-block";
 import { WorkspaceBlock } from "@/features/panel-shell/components/workspace-block";
 
 describe("NavCount (AC 11, Q9)", () => {
-  it("a neutral count: the number is aria-hidden, the screen-reader name is nav.fila.count_sr.*", () => {
-    render(<NavCount abertos={7} vencidos={0} />);
+  it("a neutral count: the number is aria-hidden, the screen-reader name is nav.fila.count_sr.*, no late cue", () => {
+    render(
+      <a href="/fila">
+        <NavCount abertos={7} vencidos={0} />
+      </a>,
+    );
 
     expect(screen.getByText("7")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByText("7 casos para decidir")).toHaveClass("sr-only");
-    expect(screen.getByTestId("nav-count")).not.toHaveClass("bg-danger");
+    expect(
+      screen.getByRole("link", { name: "7 casos para decidir" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("nav-count").querySelector("svg")).toBeNull();
   });
 
   it("1 case uses the .one form", () => {
@@ -20,21 +26,25 @@ describe("NavCount (AC 11, Q9)", () => {
   });
 
   it("with an overdue case: the danger badge with the glyph, the late line, and count_sr_late", () => {
-    render(<NavCount abertos={7} vencidos={2} />);
-
-    expect(screen.getByTestId("nav-count")).toHaveClass(
-      "bg-danger",
-      "text-danger-badge-ink",
+    // The badge's and the late line's colours: primitives.spec (Playwright).
+    render(
+      <a href="/fila">
+        <NavCount abertos={7} vencidos={2} />
+      </a>,
     );
+
     expect(
       screen.getByTestId("nav-count").querySelector("svg"),
     ).toHaveAttribute("aria-hidden", "true");
     expect(
-      screen.getByText("7 casos para decidir, 2 fora do prazo"),
-    ).toHaveClass("sr-only");
-    const late = screen.getByText("2 fora do prazo");
-    expect(late).toHaveAttribute("aria-hidden", "true");
-    expect(late).toHaveClass("text-danger-ink");
+      screen.getByRole("link", {
+        name: "7 casos para decidir, 2 fora do prazo",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 fora do prazo")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 
   it("is hidden at zero", () => {
@@ -108,7 +118,8 @@ describe("PlanBlock (AC 12, S5)", () => {
     const text = screen.getByText(
       "As verificações do plano acabaram. Contrate para continuar verificando.",
     );
-    expect(text).toHaveClass("text-warning-ink");
+    // Its warning ink: primitives.spec (Playwright).
+    expect(text).toBeVisible();
     expect(screen.getByRole("link", { name: "Contratar" })).toBeInTheDocument();
   });
 

@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -142,17 +142,12 @@ describe("Turnstile (ADR-0009 rule 13)", () => {
     expect(props.onToken).toHaveBeenLastCalledWith(null);
   });
 
+  // The 64 px reserved before the script loads: primitives.spec (Playwright).
   it("removes the widget on unmount", async () => {
     const { unmount } = renderWidget();
     await act(async () => {});
 
     unmount();
     expect(turnstile.remove).toHaveBeenCalledWith("widget-1");
-  });
-
-  it("reserves the widget's height, so it never shifts the form", () => {
-    renderWidget();
-
-    expect(screen.getByTestId("turnstile")).toHaveClass("min-h-16");
   });
 });

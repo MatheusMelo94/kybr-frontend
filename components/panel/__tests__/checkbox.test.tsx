@@ -62,27 +62,12 @@ describe("Checkbox", () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
-  it("has every state: hover (fine pointers), focus-visible ring, checked (accent), disabled, error", () => {
+  // Accent, focus ring, the invalid outline and the 24 px / 44 px geometry:
+  // primitives.spec (Playwright).
+  it("can be disabled", () => {
     render(<Checkbox name="aceite" label="Aceito" error="Erro" disabled />);
 
-    const box = screen.getByRole("checkbox");
-    expect(box).toBeDisabled();
-    expect(box).toHaveClass(
-      "accent-accent",
-      "focus-visible:outline-focus",
-      "aria-invalid:outline-danger-ink",
-      "disabled:cursor-not-allowed",
-    );
-  });
-
-  it("is a 24 px box in a label at least 44 px tall on coarse pointers", () => {
-    render(<Checkbox name="aceite" label="Aceito" />);
-
-    expect(screen.getByRole("checkbox")).toHaveClass("size-6");
-    expect(screen.getByRole("checkbox").closest("label")).toHaveClass(
-      "min-h-6",
-      "pointer-coarse:min-h-11",
-    );
+    expect(screen.getByRole("checkbox")).toBeDisabled();
   });
 
   it("forwards its ref, so a form can focus it", () => {

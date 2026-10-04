@@ -31,21 +31,16 @@ afterEach(() => {
 });
 
 describe("PanelNav tabs (AC 10)", () => {
-  it("is a row that scrolls inside itself, the active tab scrolled into view on load", () => {
+  // The row scrolling inside itself and the 44 px tabs: primitives.spec.
+  it("scrolls the active tab into view on load", () => {
     reducedMotion(false);
     render(<PanelNav items={ITEMS} contagens={undefined} variant="tabs" />);
 
-    const list = screen.getByRole("list");
-    expect(list).toHaveClass("overflow-x-auto", "flex-row");
     expect(scrollIntoView).toHaveBeenCalledWith({
       inline: "nearest",
       block: "nearest",
       behavior: "smooth",
     });
-    expect(screen.getByRole("link", { name: "Fila de revisão" })).toHaveClass(
-      "pointer-coarse:min-h-11",
-      "whitespace-nowrap",
-    );
   });
 
   it("scrolls instantly under reduced motion", () => {
@@ -67,15 +62,15 @@ describe("PanelNav tabs (AC 10)", () => {
 });
 
 describe("TopBar (AC 10)", () => {
-  it("shows the workspace name and the Conta menu, opening downward", () => {
+  // The 44 px button and the menu opening below it: primitives.spec.
+  it("shows the workspace name and the Conta menu", () => {
     reducedMotion(false);
     render(<TopBar workspaceNome="Loja Exemplo" />);
 
     expect(screen.getByText("Loja Exemplo")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "Conta" });
-    expect(button).toHaveClass("pointer-coarse:min-h-11");
     fireEvent.click(button);
-    expect(screen.getByRole("menu")).toHaveClass("top-full");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Sair" })).toBeInTheDocument();
   });
 });
