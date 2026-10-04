@@ -13,8 +13,8 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { FormAlert } from "@/components/ui/form-alert";
+import { Checkbox } from "@/components/panel/checkbox";
+import { FormAlert } from "@/components/panel/form-alert";
 import { TextField } from "@/components/ui/text-field";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { signupAction, type SignupResult } from "@/features/panel-auth/actions";

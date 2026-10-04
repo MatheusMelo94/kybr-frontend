@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it } from "vitest";
 
-import { Notice } from "@/components/ui/notice";
+import { Notice } from "@/components/panel/notice";
 
 describe("Notice", () => {
   it("is a polite status banner by default", () => {

@@ -2,7 +2,8 @@
 @import "../tokens.css";
 
 /* The link's stylesheet (ADR-0010 rule 2): utilities from the link's files
-   only, so panel classes never reach /v/* (the bundle guard checks it). The
+   only, so panel classes never reach /v/* (the bundle guard checks it). Panel-only
+   primitives live in components/panel, which this file never scans. The
    root layout, not-found.tsx and global-error.tsx render the link's copy. */
 @source ".";
 @source "../../features/seller-link";
@@ -10,9 +11,3 @@
 @source "../layout.tsx";
 @source "../not-found.tsx";
 @source "../global-error.tsx";
-/* Panel-only primitives live in components/ui (ADR-0010 rule 3) but the link
-   never renders them: keep their classes out of /v/*. */
-@source not "../../components/ui/notice.tsx";
-@source not "../../components/ui/checkbox.tsx";
-@source not "../../components/ui/radio-group.tsx";
-@source not "../../components/ui/form-alert.tsx";

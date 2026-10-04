@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { FormAlert } from "@/components/ui/form-alert";
+import { FormAlert } from "@/components/panel/form-alert";
 
 describe("FormAlert", () => {
   it("stays mounted as an empty alert region, so a later message is announced", () => {

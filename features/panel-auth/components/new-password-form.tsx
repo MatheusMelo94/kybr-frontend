@@ -13,7 +13,7 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
-import { FormAlert } from "@/components/ui/form-alert";
+import { FormAlert } from "@/components/panel/form-alert";
 import { TextField } from "@/components/ui/text-field";
 import {
   resetPasswordAction,

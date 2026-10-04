@@ -173,20 +173,6 @@ describe("the per-surface entries (ADR-0010 rule 2)", () => {
     );
   });
 
-  it("the link entry skips the panel-only primitives in components/ui", () => {
-    const excluded = [...linkCss.matchAll(/@source\s+not\s+"([^"]+)"/g)].map(
-      (match) => match[1],
-    );
-    expect(excluded.sort()).toEqual(
-      [
-        "../../components/ui/checkbox.tsx",
-        "../../components/ui/form-alert.tsx",
-        "../../components/ui/notice.tsx",
-        "../../components/ui/radio-group.tsx",
-      ].sort(),
-    );
-  });
-
   it("the panel entry scans only the panel's files", () => {
     expect(sources(panelCss).sort()).toEqual(
       [

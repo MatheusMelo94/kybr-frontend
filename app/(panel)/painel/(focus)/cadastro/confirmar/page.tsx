@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { JSX } from "react";
 
-import { Notice } from "@/components/ui/notice";
+import { Notice } from "@/components/panel/notice";
 import { AuthLinks } from "@/features/panel-auth/components/auth-links";
 import { ConfirmCodeForm } from "@/features/panel-auth/components/confirm-code-form";
 import { confirmCopy } from "@/features/panel-auth/copy/confirm";

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { RadioGroup } from "@/components/ui/radio-group";
+import { RadioGroup } from "@/components/panel/radio-group";
 
 const OPTIONS = [
   { value: "a", label: "Lojas de peças", description: "Vendem peças." },

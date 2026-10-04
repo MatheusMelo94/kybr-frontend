@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type JSX } from "react";
 
-import { Notice } from "@/components/ui/notice";
+import { Notice } from "@/components/panel/notice";
 import { loginCopy } from "@/features/panel-auth/copy/login";
 import { resetCopy } from "@/features/panel-auth/copy/reset";
 import { globalCopy } from "@/features/panel-shell/copy/global";

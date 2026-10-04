@@ -11,8 +11,8 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
-import { FormAlert } from "@/components/ui/form-alert";
-import { RadioGroup } from "@/components/ui/radio-group";
+import { FormAlert } from "@/components/panel/form-alert";
+import { RadioGroup } from "@/components/panel/radio-group";
 import { TextField } from "@/components/ui/text-field";
 import {
   saveOnboardingAction,
