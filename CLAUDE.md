@@ -18,7 +18,7 @@ Context for AI-assisted development in this repo.
 
 ## Deploy target
 
-**Vercel**, functions in São Paulo (`gru1`), per ADR-0005 (Proposed). Posture: Production.
+**Vercel**, functions in São Paulo (`gru1`), per ADR-0005 (Accepted 2026-10-03). Posture: Production.
 
 - **Environments:** Local → the mock API (`pnpm mock:api`). Preview (staging, every pushed branch) → a placeholder API URL until backend staging exists (no hosted mock), so Lighthouse runs in CI against the local mock instead. Production → `https://api.kybr.com.br` only, never a mock. Cross-wiring is a NO-GO, and `scripts/check-deploy-env.mjs` fails the deploy on it.
 - **Client IP:** `CLIENT_IP_HEADER=x-vercel-forwarded-for` on Vercel, with no trusted hops. `lib/env-schema.ts` rejects any other header when `VERCEL=1` (threat model F02).
