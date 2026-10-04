@@ -15,6 +15,7 @@ import {
   scrubEvent,
   scrubUrl,
 } from "@/lib/monitoring";
+import { scrubText } from "@/lib/scrub";
 
 // T34a (threat model F10; SEC § Logging & Monitoring): server-side Sentry,
 // scrubbed. Synthetic values only.
@@ -40,6 +41,24 @@ describe("scrubUrl", () => {
     expect(scrubUrl("/v/loja-exemplo?ext_id=SELLER-42")).toBe(
       "/v/loja-exemplo",
     );
+  });
+
+  // Security M3-04: every URL shape that carries the token (page, D4–D6 API).
+  it.each([
+    [
+      `https://api.kybr.test/public/v/loja/cases/${TOKEN}/documents`,
+      "https://api.kybr.test/public/v/loja/cases/[token]/documents",
+    ],
+    [
+      `https://api.kybr.test/public/v/loja/cases/${TOKEN}`,
+      "https://api.kybr.test/public/v/loja/cases/[token]",
+    ],
+    [`/v/loja/C/${TOKEN}`, "/v/loja/C/[token]"],
+    [`/V/loja/CASES/${TOKEN}/contact`, "/V/loja/CASES/[token]/contact"],
+    [`/v//c/${TOKEN}`, "/v//c/[token]"],
+  ])("masks the token in %s", (url, scrubbed) => {
+    expect(scrubUrl(url)).toBe(scrubbed);
+    expect(scrubText(`fetch failed: ${url}`)).toBe(`fetch failed: ${scrubbed}`);
   });
 });
 

@@ -2,8 +2,12 @@
 // SEC § Logging & Monitoring). Pure: shared by lib/monitoring.ts and the CSP
 // report parser.
 
-/** A case URL's last segment is its capability token. */
-const CASE_TOKEN = /(\/v\/[^/?#\s]+\/c\/)[^/?#\s"']+/g;
+/**
+ * The capability token in every URL shape that carries one (M3-04): the page
+ * (/v/{slug}/c/{token}) and the API (/public/v/{slug}/cases/{token}/…, D4–D6),
+ * in any letter case and with an empty slug.
+ */
+const CASE_TOKEN = /(\/v\/[^/?#\s]*\/(?:c|cases)\/)[^/?#\s"']+/gi;
 /** 14-character CNPJs (numeric or alphanumeric, bare or punctuated). */
 const CNPJ =
   /\b[0-9A-Z]{2}\.?[0-9A-Z]{3}\.?[0-9A-Z]{3}\/?[0-9A-Z]{4}-?\d{2}\b/g;
