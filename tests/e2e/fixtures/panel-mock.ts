@@ -139,3 +139,49 @@ export async function horizontalOverflow(page: Page): Promise<number> {
       document.documentElement.clientWidth,
   );
 }
+
+/** The BFF key the E2E build sends (playwright.config.ts); the mock only needs one. */
+const BFF = { "x-kybr-bff-key": "e2e-only-bff-key-for-the-local-mock-api" };
+
+/**
+ * A pending sign-up, as /cadastro leaves it: the account on the mock (D-A1)
+ * and the httpOnly sign-up cookie in this browser. `resendInMs` sets when
+ * "Reenviar código" unlocks (0 = now).
+ */
+export async function pendingSignup(
+  page: Page,
+  email: string,
+  resendInMs = 60_000,
+): Promise<{ ticket: string }> {
+  const response = await page.request.post(`${MOCK_API}/v1/auth/signup`, {
+    headers: BFF,
+    data: {
+      nome: "Pessoa Exemplo",
+      workspace: "Plataforma Exemplo",
+      email,
+      senha: "uma-senha-segura-1",
+      aceite_termos_versao: "e2e-1",
+      turnstile: "XXXX.DUMMY.TOKEN.XXXX",
+    },
+  });
+  if (response.status() !== 202)
+    throw new Error(`pendingSignup: ${response.status()}`);
+  const { signup_ticket: ticket } = (await response.json()) as {
+    signup_ticket: string;
+  };
+  const value = Buffer.from(
+    JSON.stringify({
+      ticket,
+      nome: "Pessoa Exemplo",
+      workspace: "Plataforma Exemplo",
+      email,
+      reenviarEm: new Date(Date.now() + resendInMs).toISOString(),
+    }),
+  ).toString("base64url");
+  await page
+    .context()
+    .addCookies([
+      { name: "kybr_signup", value, url: PANEL_URL, httpOnly: true },
+    ]);
+  return { ticket };
+}

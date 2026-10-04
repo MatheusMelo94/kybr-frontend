@@ -219,7 +219,7 @@ describe("panel mock: sign-up and confirm (PA1–PA5, PA19)", () => {
     ).rejects.toThrow();
   });
 
-  it("PA5: 000000 is wrong, 111111 expired, and the 6th wrong attempt is rate-limited", async () => {
+  it("PA5: 000000 is wrong, 111111 expired, and from the 6th attempt the code is dead (CODIGO_EXPIRADO, spec v1.2 Q3)", async () => {
     const email = "pa5@exemplo.test";
     const { signup_ticket } = await json<{ signup_ticket: string }>(
       await call("POST", "/v1/auth/signup", signupBody(email)),
@@ -242,8 +242,14 @@ describe("panel mock: sign-up and confirm (PA1–PA5, PA19)", () => {
       signup_ticket,
       codigo: CODES.wrong,
     });
-    expect(sixth.status).toBe(429);
-    expect(await errorCode(sixth)).toBe("LIMITE_TENTATIVAS");
+    expect(sixth.status).toBe(400);
+    expect(await errorCode(sixth)).toBe("CODIGO_EXPIRADO");
+    // Even the right code is refused now (A-X2, CR-P3).
+    const { codigo } = await json<{ codigo: string }>(
+      await control("GET", `/outbox?to=${email}`),
+    );
+    const right = await call("POST", "/v1/auth/confirm", { signup_ticket, codigo });
+    expect(await errorCode(right)).toBe("CODIGO_EXPIRADO");
   });
 
   it("D-A3: resend needs Turnstile, mails a new code, and PA3 rate-limits it", async () => {

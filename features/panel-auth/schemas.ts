@@ -60,3 +60,9 @@ export function signupIssues(
     if (issues.some((issue) => issue.path[0] === field)) fields[field] = true;
   return fields;
 }
+
+/** D-A2: the code only. The ticket comes from the sign-up cookie, never the client. */
+export const confirmSchema = z.object({ codigo: z.string().regex(/^\d{6}$/) });
+
+/** D-A3: the Turnstile token only (the ticket, again, from the cookie). */
+export const resendSchema = z.object({ turnstile });

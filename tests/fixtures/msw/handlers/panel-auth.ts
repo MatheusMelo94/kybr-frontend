@@ -112,8 +112,9 @@ const confirm = http.post("*/v1/auth/confirm", async ({ request }) => {
   const store = panelStore();
   const ticket = store.tickets.get(str(body.signup_ticket));
   if (!ticket) return apiError(400, "CODIGO_EXPIRADO");
+  // After 5 wrong codes the code is dead, even the right one (A-X2, spec v1.2 Q3).
   if (ticket.attempts >= MAX_CODE_ATTEMPTS)
-    return apiError(429, "LIMITE_TENTATIVAS");
+    return apiError(400, "CODIGO_EXPIRADO");
   const codigo = str(body.codigo);
   if (codigo === CODES.expired || ticket.expiresAt <= Date.now())
     return apiError(400, "CODIGO_EXPIRADO");

@@ -55,3 +55,15 @@ export function signupFieldIssues(values: SignupValues): SignupField[] {
   };
   return SIGNUP_FIELDS.filter((field) => broken[field]);
 }
+
+/** CR-P3: the e-mail code's lifetime, shown in confirm.body's {minutos}. */
+export const CODE_TTL_MINUTES = 10;
+
+/** The 6 digits of a typed or pasted code: spaces and separators dropped. */
+export function normalizeCode(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 6);
+}
+
+export function isCode(value: string): boolean {
+  return /^\d{6}$/.test(value);
+}

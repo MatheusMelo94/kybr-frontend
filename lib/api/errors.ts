@@ -57,6 +57,7 @@ type AppErrorInit = {
   retryAfterSeconds?: number | undefined;
   field?: string | undefined;
   signupTicket?: string | undefined;
+  reenviarEm?: string | undefined;
 };
 
 /**
@@ -72,6 +73,8 @@ export class AppError extends Error {
   readonly field: string | undefined;
   /** D-A4 EMAIL_NAO_CONFIRMADO: the pending account's ticket (server-side only). */
   readonly signupTicket: string | undefined;
+  /** D-A4 EMAIL_NAO_CONFIRMADO: when the next resend unlocks (ISO 8601). */
+  readonly reenviarEm: string | undefined;
 
   constructor({
     code,
@@ -80,6 +83,7 @@ export class AppError extends Error {
     retryAfterSeconds,
     field,
     signupTicket,
+    reenviarEm,
   }: AppErrorInit) {
     super(`Kybr API error: ${code}`);
     this.code = code;
@@ -88,6 +92,7 @@ export class AppError extends Error {
     this.retryAfterSeconds = retryAfterSeconds;
     this.field = field;
     this.signupTicket = signupTicket;
+    this.reenviarEm = reenviarEm;
   }
 }
 
@@ -101,6 +106,7 @@ const errorEnvelopeSchema = z.object({
     .regex(/^[A-Za-z0-9_-]{16,512}$/)
     .optional()
     .catch(undefined),
+  reenviar_em: z.string().max(64).optional().catch(undefined),
 });
 
 function isApiErrorCode(code: string | undefined): code is ApiErrorCode {
@@ -130,5 +136,6 @@ export async function appErrorFromResponse(
     retryAfterSeconds: parseRetryAfter(response.headers.get("retry-after")),
     field: envelope.success ? envelope.data.field : undefined,
     signupTicket: envelope.success ? envelope.data.signup_ticket : undefined,
+    reenviarEm: envelope.success ? envelope.data.reenviar_em : undefined,
   });
 }

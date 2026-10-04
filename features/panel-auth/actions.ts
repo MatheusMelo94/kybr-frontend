@@ -3,14 +3,21 @@
 import { z } from "zod";
 
 import {
+  confirmSchema,
   loginSchema,
+  resendSchema,
   signupIssues,
   signupSchema,
   type SignupField,
 } from "@/features/panel-auth/schemas";
 import type { AppError } from "@/lib/api/errors";
 import { panelRequest } from "@/lib/api/panel/client";
-import { setSessionCookie, setSignupCookie } from "@/lib/api/panel/cookies";
+import {
+  deleteSignupCookie,
+  readSignupCookie,
+  setSessionCookie,
+  setSignupCookie,
+} from "@/lib/api/panel/cookies";
 import { assertPanelHost } from "@/lib/api/panel/host";
 import { apiPaths } from "@/lib/api/path";
 import { env } from "@/lib/env";
@@ -87,6 +94,7 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
         nome: "",
         workspace: "",
         email,
+        ...(error.reenviarEm !== undefined && { reenviarEm: error.reenviarEm }),
       });
       return {
         ok: false,
@@ -186,4 +194,81 @@ export async function signupAction(input: unknown): Promise<SignupResult> {
     default:
       return commonFailure(error);
   }
+}
+
+export type ConfirmResult =
+  | { ok: true; next: string }
+  | { ok: false; code: "CODIGO_INCORRETO" | "CODIGO_EXPIRADO" | "SEM_CADASTRO" }
+  | CommonFailure;
+
+/**
+ * D-A2: confirms the e-mail with the ticket from the sign-up cookie (never a
+ * client value), starts the session and drops the pending sign-up.
+ */
+export async function confirmEmailAction(
+  input: unknown,
+): Promise<ConfirmResult> {
+  await assertPanelHost();
+  const parsed = confirmSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "CODIGO_INCORRETO" };
+  const pending = await readSignupCookie();
+  if (pending === null) return { ok: false, code: "SEM_CADASTRO" };
+
+  const result = await panelRequest({
+    operation: "confirm",
+    path: apiPaths.panel.confirm(),
+    method: "POST",
+    body: { signup_ticket: pending.ticket, codigo: parsed.data.codigo },
+    schema: sessaoSchema,
+    forwardClientIp: true,
+  });
+  if (result.ok) {
+    await setSessionCookie(result.data.sessao);
+    await deleteSignupCookie();
+    return { ok: true, next: "/comecar" };
+  }
+  const { error } = result;
+  if (error.code === "CODIGO_INCORRETO" || error.code === "CODIGO_EXPIRADO")
+    return { ok: false, code: error.code };
+  return commonFailure(error);
+}
+
+const resendResponseSchema = z.object({
+  reenviar_em: z.string().max(64).optional(),
+});
+
+/** The 60 s spacing between resends (contract D-A1), when the API gives no time. */
+const RESEND_SPACING_MS = 60_000;
+
+export type ResendResult =
+  | { ok: true; resendInMs: number }
+  | { ok: false; code: "SEM_CADASTRO" }
+  | CommonFailure;
+
+/** D-A3: mails a new code for the cookie's ticket, behind Turnstile. */
+export async function resendCodeAction(input: unknown): Promise<ResendResult> {
+  await assertPanelHost();
+  const parsed = resendSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "TURNSTILE_INVALIDO" };
+  const pending = await readSignupCookie();
+  if (pending === null) return { ok: false, code: "SEM_CADASTRO" };
+
+  const result = await panelRequest({
+    operation: "confirm-resend",
+    path: apiPaths.panel.confirmResend(),
+    method: "POST",
+    body: { signup_ticket: pending.ticket, turnstile: parsed.data.turnstile },
+    schema: resendResponseSchema,
+    forwardClientIp: true,
+  });
+  if (!result.ok) return commonFailure(result.error);
+  const at = Date.parse(result.data.reenviar_em ?? "");
+  const resendInMs = Number.isFinite(at)
+    ? Math.max(0, at - Date.now())
+    : RESEND_SPACING_MS;
+  await setSignupCookie({
+    ...pending,
+    reenviarEm: new Date(Date.now() + resendInMs).toISOString(),
+  });
+  return { ok: true, resendInMs };
 }

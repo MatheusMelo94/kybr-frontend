@@ -147,6 +147,7 @@ describe("loginAction (D-A4, ADR-0009)", () => {
       nome: "",
       workspace: "",
       email: PANEL_EMAILS.pendente,
+      reenviarEm: expect.any(String),
     });
     expect(cookies.setSessionCookie).not.toHaveBeenCalled();
   });
