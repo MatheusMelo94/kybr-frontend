@@ -18,17 +18,12 @@ const LIGHT_COLORS = {
   "--color-accent-ink": "#ffffff",
   "--color-focus": "#141414",
   "--color-success": "#1f9d55",
-  "--color-success-ink": "#157a45",
   "--color-danger-ink": "#c4302a",
   // The panel's (spec § Design Handoff 6; plan § 2.6)
   // Brand v1 (DDR-0003): the same amber in both themes, as a dot or bar only.
   "--color-warning": "#d99a1b",
-  "--color-warning-ink": "#8a6000",
   "--color-danger": "#d6372f",
   "--color-monitor": "#0066ff",
-  "--color-badge-monitor-ink": "#ffffff",
-  // White on --color-danger in both themes (4.72:1): the late Fila badge.
-  "--color-danger-badge-ink": "#ffffff",
 } as const;
 
 const DARK_COLORS: Record<keyof typeof LIGHT_COLORS, string> = {
@@ -44,15 +39,11 @@ const DARK_COLORS: Record<keyof typeof LIGHT_COLORS, string> = {
   "--color-accent-ink": "#141414",
   "--color-focus": "#f5f5f5",
   "--color-success": "#1f9d55",
-  "--color-success-ink": "#1f9d55",
   "--color-danger-ink": "#e5534b",
   "--color-warning": "#d99a1b",
-  "--color-warning-ink": "#e9b64a",
   // Same in both themes (spec § Design Handoff 6): not swapped.
   "--color-danger": "#d6372f",
   "--color-monitor": "#0066ff",
-  "--color-badge-monitor-ink": "#ffffff",
-  "--color-danger-badge-ink": "#ffffff",
 };
 
 /** A dark value: the swap's, or the light one when the theme doesn't change it. */
@@ -245,6 +236,15 @@ describe("app/tokens.css", () => {
   it("brand v1: the monitoring blue is --color-monitor (no --color-badge-monitor)", () => {
     expect(css).toMatch(/--color-monitor:\s*#0066ff;/);
     expect(css).not.toMatch(/--color-badge-monitor:/);
+  });
+
+  it.each([
+    "--color-success-ink",
+    "--color-warning-ink",
+    "--color-danger-badge-ink",
+    "--color-badge-monitor-ink",
+  ])("brand v1 (DDR-0003, B13): %s is retired", (name) => {
+    expect(css).not.toContain(`${name}:`);
   });
 
   it("declares no shadow tokens (no shadows, per the brand)", () => {
