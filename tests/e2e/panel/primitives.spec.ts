@@ -190,7 +190,7 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     );
   });
 
-  test("DDR-0003: the late Fila count is a neutral pill with a danger dot and an ink-muted late line; an exhausted plan is ink with a warning dot; in grayscale the late state still shows (AC 11, 69, 71)", async ({
+  test("DDR-0003: the late Fila count is a neutral pill with a danger dot and an ink-muted late line; an exhausted plan is ink with a warning dot; the late state differs from an on-time one beyond colour (AC 11, 69, 71)", async ({
     page,
     request,
   }, testInfo) => {
@@ -214,12 +214,22 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
         "color",
       ),
     ).toBe(await tokenValue(page, "--color-ink-muted", "color"));
-    // AC 71: without colour, the glyph and the late line still say it.
-    await page.addStyleTag({ content: "html { filter: grayscale(1) }" });
-    await expect(badge.locator("svg")).toBeVisible();
+    // AC 71 (B-007): the late state differs from an on-time one in more
+    // than colour: the glyph and the late line are there only when late.
+    await expect(badge.locator("svg")).toHaveCount(1);
     await expect(
       page.locator("aside").getByText("2 fora do prazo", { exact: true }),
     ).toBeVisible();
+    const onTime = uniqueEmail("cores-em-dia", testInfo);
+    await createAccount(request, onTime, "tres-abertos");
+    await page.context().clearCookies();
+    await logIn(page, onTime);
+    const onTimeBadge = page.locator("aside").getByTestId("nav-count");
+    await expect(onTimeBadge).toBeVisible();
+    await expect(onTimeBadge.locator("svg")).toHaveCount(0);
+    await expect(page.locator("aside").getByText(/fora do prazo/)).toHaveCount(
+      0,
+    );
 
     const exhausted = uniqueEmail("cores-esgotado", testInfo);
     await createAccount(request, exhausted, "esgotado");
