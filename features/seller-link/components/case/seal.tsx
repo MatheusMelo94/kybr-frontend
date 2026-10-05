@@ -14,10 +14,7 @@ import { resultsCopy } from "@/features/seller-link/copy/results";
 export function Seal(): JSX.Element {
   return (
     <p className="flex">
-      <span
-        data-testid="seal"
-        className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-secondary dark:bg-surface-raised"
-      >
+      <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-secondary dark:bg-surface-raised">
         <StatusDot tone="success" />
         <span className="font-strong text-ink">
           {resultsCopy["approved.seal"]}

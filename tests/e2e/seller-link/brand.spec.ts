@@ -49,7 +49,9 @@ test("AC 19: the seal reads 'Vendedor verificado por Kybr', its words in ink @fe
   page,
 }) => {
   await page.goto(`/v/${SLUGS.ok}/c/${CASE_TOKENS.aprovado}`);
-  const seal = page.getByTestId("seal");
+  const seal = page
+    .getByText("Vendedor verificado", { exact: true })
+    .locator("xpath=..");
   await expect(seal).toHaveText("Vendedor verificado por");
   await expect(seal.getByRole("img", { name: "Kybr" })).toBeVisible();
   const ink = await page.evaluate(() => getComputedStyle(document.body).color);

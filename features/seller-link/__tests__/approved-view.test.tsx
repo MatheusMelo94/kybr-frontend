@@ -46,7 +46,10 @@ describe("ApprovedView (tudo certo)", () => {
   it("AC 19: the seal reads 'Vendedor verificado por Kybr' (a dot, ink text, the inline wordmark), and the h1 uses the first name as typed", () => {
     render(<ApprovedView resultado={S4} marketplace="Loja Exemplo" />);
 
-    const seal = screen.getByTestId("seal");
+    // Found by its words, not a test id (review B-006: none ships).
+    const seal = screen.getByText("Vendedor verificado")
+      .parentElement as HTMLElement;
+    expect(seal.closest("[data-testid]")).toBeNull();
     expect(seal.querySelector('[aria-hidden="true"]')).toBeEmptyDOMElement();
     expect(within(seal).getByText("Vendedor verificado")).toBeVisible();
     expect(within(seal).getByText("por")).toBeVisible();
