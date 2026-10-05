@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Writes Lote's spreadsheet fixtures to tests/fixtures/files/lote/ (T72; T73
-// adds the XLSX and XLS files). Synthetic CNPJs only, from the shared
+// Writes Lote's spreadsheet fixtures to tests/fixtures/files/lote/ (T72: CSV;
+// T73: XLSX/XLS through SheetJS, and the malformed zips the guard refuses,
+// written by the small ZIP writer below so each declares exactly what it
+// should). Synthetic CNPJs only, from the shared
 // factories (tests/fixtures/factories/panel.ts). The outputs are committed;
 // re-run after a factory change: `node scripts/make-lote-fixtures.mjs`.
 // Needs Node >= 22.18 (type stripping, like the mock API).
@@ -8,6 +10,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { crc32, deflateRawSync } from "node:zlib";
+
+import * as XLSX from "xlsx";
 
 import { AC16, cnpjWithRoot } from "../tests/fixtures/factories/panel.ts";
 
@@ -81,6 +86,211 @@ const files = {
     Buffer.alloc(2_000, 0x20),
   ]),
 };
+
+// --- XLSX / XLS (T73) -------------------------------------------------------
+
+/** The AC 16 sheet as Excel holds it: unmasked numeric CNPJs are numbers (so a leading 0 is lost). */
+function ac16Sheet() {
+  return XLSX.utils.aoa_to_sheet([
+    HEADER,
+    ...ac16.map(([cnpj, nome, id]) =>
+      /^\d{14}$/.test(cnpj) ? [Number(cnpj), nome, id] : [cnpj, nome, id],
+    ),
+  ]);
+}
+
+function book(...sheets) {
+  const wb = XLSX.utils.book_new();
+  for (const [name, sheet] of sheets) XLSX.utils.book_append_sheet(wb, sheet, name);
+  return wb;
+}
+
+/** Excel compresses its zips; so do the fixtures (realistic ratios, C7). */
+function write(wb, bookType) {
+  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType, compression: true }));
+}
+
+const ac16Xlsx = write(book(["Vendedores", ac16Sheet()]), "xlsx");
+
+/** The entries of a zip SheetJS wrote: [name, content][], files only. */
+function entriesOf(zip) {
+  const cfb = XLSX.CFB.read(zip, { type: "buffer" });
+  return cfb.FileIndex.map((file, index) => [
+    cfb.FullPaths[index].replace(/^[^/]*\//, ""),
+    file,
+  ])
+    .filter(([, file]) => file.type === 2)
+    .map(([name, file]) => [name, Buffer.from(file.content)]);
+}
+
+/**
+ * A minimal ZIP writer (deflate), so a fixture can declare exactly the sizes,
+ * flags, offsets and end records the zip guard must refuse.
+ * entry: { name, data, flags?, usize?, csize?, offsetOf? (reuse another
+ * entry's local header offset: an overlap) }
+ * options: { disk?: number, zip64?: boolean }
+ */
+function zip(entries, options = {}) {
+  const locals = [];
+  const offsets = [];
+  let offset = 0;
+  const prepared = entries.map((entry) => {
+    const data = deflateRawSync(entry.data);
+    return { ...entry, raw: entry.data, data };
+  });
+  for (const entry of prepared) {
+    const name = Buffer.from(entry.name);
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(entry.flags ?? 0, 6);
+    header.writeUInt16LE(8, 8);
+    header.writeUInt16LE(0x21, 12);
+    header.writeUInt32LE(crc32(entry.raw), 14);
+    header.writeUInt32LE(entry.csize ?? entry.data.length, 18);
+    header.writeUInt32LE(entry.usize ?? entry.raw.length, 22);
+    header.writeUInt16LE(name.length, 26);
+    offsets.push(offset);
+    locals.push(header, name, entry.data);
+    offset += 30 + name.length + entry.data.length;
+  }
+  const central = [];
+  const cdStart = offset;
+  prepared.forEach((entry, index) => {
+    const name = Buffer.from(entry.name);
+    const header = Buffer.alloc(46);
+    header.writeUInt32LE(0x02014b50, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(20, 6);
+    header.writeUInt16LE(entry.flags ?? 0, 8);
+    header.writeUInt16LE(8, 10);
+    header.writeUInt16LE(0x21, 14);
+    header.writeUInt32LE(crc32(entry.raw), 16);
+    header.writeUInt32LE(entry.csize ?? entry.data.length, 20);
+    header.writeUInt32LE(entry.usize ?? entry.raw.length, 24);
+    header.writeUInt16LE(name.length, 28);
+    header.writeUInt32LE(
+      offsets[entry.offsetOf ?? index] ?? 0,
+      42,
+    );
+    central.push(header, name);
+  });
+  const cdSize = central.reduce((sum, part) => sum + part.length, 0);
+  const tail = [];
+  if (options.zip64) {
+    const record = Buffer.alloc(56);
+    record.writeUInt32LE(0x06064b50, 0);
+    record.writeBigUInt64LE(44n, 4);
+    record.writeBigUInt64LE(BigInt(prepared.length), 24);
+    record.writeBigUInt64LE(BigInt(prepared.length), 32);
+    record.writeBigUInt64LE(BigInt(cdSize), 40);
+    record.writeBigUInt64LE(BigInt(cdStart), 48);
+    const locator = Buffer.alloc(20);
+    locator.writeUInt32LE(0x07064b50, 0);
+    locator.writeBigUInt64LE(BigInt(cdStart + cdSize), 8);
+    locator.writeUInt32LE(1, 16);
+    tail.push(record, locator);
+  }
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(options.disk ?? 0, 4);
+  end.writeUInt16LE(options.disk ?? 0, 6);
+  end.writeUInt16LE(options.zip64 ? 0xffff : prepared.length, 8);
+  end.writeUInt16LE(options.zip64 ? 0xffff : prepared.length, 10);
+  end.writeUInt32LE(options.zip64 ? 0xffffffff : cdSize, 12);
+  end.writeUInt32LE(options.zip64 ? 0xffffffff : cdStart, 16);
+  return Buffer.concat([...locals, ...central, ...tail, end]);
+}
+
+const base = entriesOf(ac16Xlsx);
+const withEntries = (list, extra = {}) =>
+  list.map(([name, data]) => ({ name, data, ...(extra[name] ?? {}) }));
+const MiB = 1024 * 1024;
+const sheetName = "xl/worksheets/sheet1.xml";
+
+// A hidden first sheet, then the data (only the first VISIBLE sheet is read).
+const hiddenFirst = book(
+  ["Notas", XLSX.utils.aoa_to_sheet([["CNPJ"], ["isto não é lido"]])],
+  ["Vendedores", ac16Sheet()],
+);
+hiddenFirst.Workbook = { Sheets: [{ Hidden: 1 }, { Hidden: 0 }] };
+
+// A formula with a cached value, and one without (written by another tool).
+const formulas = XLSX.utils.aoa_to_sheet([["CNPJ", "Responsável"], [ac16[1][0], "Ana Exemplo"]]);
+formulas.A3 = { t: "s", f: 'CONCATENATE("12ABC34501","DE35")', v: "12ABC34501DE35" };
+formulas.B3 = { t: "s", f: 'UPPER("joão")' };
+formulas["!ref"] = "A1:B3";
+
+// A numeric CNPJ shown in scientific format (the value is the number).
+const scientific = XLSX.utils.aoa_to_sheet([["CNPJ"], [Number(ac16[1][0])]]);
+scientific.A2.z = "0.00E+00";
+
+const xlsxFiles = {
+  "ac16.xlsx": ac16Xlsx,
+  "ac16.xls": write(book(["Vendedores", ac16Sheet()]), "biff8"),
+  // BIFF5 needs codepage tables the worker doesn't load (ADR-0012 item 4).
+  "biff5.xls": write(book(["Vendedores", XLSX.utils.aoa_to_sheet([["CNPJ"], [ac16[1][0]]])]), "biff5"),
+  "aba-oculta.xlsx": write(hiddenFirst, "xlsx"),
+  "formulas.xlsx": write(book(["Vendedores", formulas]), "xlsx"),
+  "cientifico.xlsx": write(book(["Vendedores", scientific]), "xlsx"),
+  // A truncated download.
+  "corrupt.xlsx": ac16Xlsx.subarray(0, Math.floor(ac16Xlsx.length / 2)),
+  // A macro-enabled workbook named .xlsx (its content type says so) → type.
+  "macro.xlsx": zip([
+    ...withEntries(base).map((entry) =>
+      entry.name === "[Content_Types].xml"
+        ? {
+            ...entry,
+            data: Buffer.from(
+              entry.data
+                .toString("utf8")
+                .replace(
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+                  "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+                ),
+            ),
+          }
+        : entry,
+    ),
+    { name: "xl/vbaProject.bin", data: Buffer.from("macro") },
+  ]),
+  // C7 zip guard v1.1 (ADR-0012 Amendment 2): each is refused before SheetJS.
+  "zip-bomb.xlsx": zip([
+    ...withEntries(base).filter((entry) => entry.name !== sheetName),
+    { name: sheetName, data: Buffer.alloc(101 * MiB, 0x20) },
+  ]),
+  "zip-razao.xlsx": zip(withEntries(base, { [sheetName]: { usize: 2 * MiB, csize: 1024 } }).map((entry) =>
+    entry.name === sheetName ? { ...entry, data: Buffer.alloc(1024, 0x20) } : entry,
+  )),
+  "zip-tamanho-falso.xlsx": zip(
+    withEntries(base, {
+      [sheetName]: { usize: 80 * MiB },
+      "xl/styles.xml": { usize: 80 * MiB },
+    }),
+  ),
+  "zip-sobreposto.xlsx": zip([
+    ...withEntries(base),
+    { name: "xl/outro.xml", data: Buffer.from("<x/>"), offsetOf: 0 },
+  ]),
+  "zip64.xlsx": zip(withEntries(base), { zip64: true }),
+  "zip-multidisco.xlsx": zip(withEntries(base), { disk: 1 }),
+  "zip-criptografado.xlsx": zip(withEntries(base, { [sheetName]: { flags: 1 } })),
+  "zip-duplicado.xlsx": zip([
+    ...withEntries(base),
+    { name: sheetName, data: Buffer.from("<worksheet/>") },
+  ]),
+  "zip-2001-entradas.xlsx": zip([
+    ...withEntries(base),
+    ...Array.from({ length: 2001 - base.length }, (_, i) => ({
+      name: `xl/extra/${i}.xml`,
+      data: Buffer.from("<x/>"),
+    })),
+  ]),
+  "sem-workbook.xlsx": zip(
+    withEntries(base).filter((entry) => entry.name !== "xl/workbook.xml"),
+  ),
+};
+Object.assign(files, xlsxFiles);
 
 for (const [name, body] of Object.entries(files)) {
   writeFileSync(join(out, name), body);

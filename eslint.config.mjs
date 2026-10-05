@@ -31,7 +31,8 @@ const eslintConfig = [
   // which runs in its worker (never in First Load JS).
   {
     files: ["**/*.{ts,tsx,js,mjs}"],
-    ignores: ["features/panel-lote/parser/**"],
+    // The fixture generator writes XLSX/XLS with SheetJS (Node only).
+    ignores: ["features/panel-lote/parser/**", "scripts/make-lote-fixtures.mjs"],
     rules: {
       "no-restricted-imports": [
         "error",
