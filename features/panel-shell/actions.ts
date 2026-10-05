@@ -8,7 +8,7 @@ import type { Contagens, Plano } from "@/lib/api/schemas/panel/me";
 
 export type ShellStatusResult =
   | { ok: true; contagens: Contagens | undefined; plano: Plano | undefined }
-  | { ok: false; code: "SESSAO_EXPIRADA" | "FAILED" };
+  | { ok: false; code: "FAILED" };
 
 /**
  * A read-only action for the shell's poller (ADR-0011 rule 3 and note):
