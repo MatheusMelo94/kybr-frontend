@@ -34,6 +34,8 @@ type Props = {
   /** IME / dead-key composition: lets a filtering field leave the value alone while composing. */
   onCompositionStart?: (event: CompositionEvent<HTMLInputElement>) => void;
   onCompositionEnd?: (event: CompositionEvent<HTMLInputElement>) => void;
+  /** Tabular figures, for numbers that must not jitter as they're typed (CNPJ). */
+  tabularNums?: boolean;
   className?: string;
   ref?: Ref<HTMLInputElement>;
 };
@@ -58,6 +60,7 @@ export function TextField({
   onBlur,
   onCompositionStart,
   onCompositionEnd,
+  tabularNums = false,
   className,
   ref,
 }: Props): JSX.Element {
@@ -100,6 +103,7 @@ export function TextField({
           "placeholder:text-ink-muted",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           "aria-invalid:border-danger-ink",
+          tabularNums && "tabular-nums",
         )}
       />
       {hint && (
