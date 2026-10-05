@@ -7,13 +7,11 @@ import { useEffect, useRef, type JSX } from "react";
 import { NavCount } from "@/features/panel-shell/components/nav-count";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
 import type { NavItem } from "@/features/panel-shell/nav";
-import { useOptionalShellStatus } from "@/features/panel-shell/shell-status-context";
+import { useShellStatus } from "@/features/panel-shell/shell-status-context";
 import { cn } from "@/lib/utils";
 
 type Props = {
   items: readonly NavItem[];
-  /** The Fila's counts from /me; inside the shell the poller's live values win. Missing hides them (AC 11). */
-  contagens: { fila_abertos: number; fila_vencidos: number } | undefined;
   /** "sidebar" at lg and up; "tabs": the scrolling row below it (AC 10). */
   variant?: "sidebar" | "tabs";
 };
@@ -24,17 +22,15 @@ function isActive(pathname: string, href: string): boolean {
     : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** The panel's nav (AC 9): the build's items, the active one marked, the Fila's count. */
-export function PanelNav({
-  items,
-  contagens,
-  variant = "sidebar",
-}: Props): JSX.Element {
+/**
+ * The panel's nav (AC 9): the build's items, the active one marked, the
+ * Fila's count from the shell's live status (missing hides it, AC 11).
+ */
+export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
   // The external path: the ADR-0008 spike proved usePathname() sees it under the rewrite.
   const pathname = usePathname();
   const tabs = variant === "tabs";
-  const live = useOptionalShellStatus();
-  const counts = live !== null ? live.contagens : contagens;
+  const counts = useShellStatus().contagens;
   const activeLink = useRef<HTMLAnchorElement>(null);
 
   // The active tab in view on load, inside the row only (instant under reduced motion).

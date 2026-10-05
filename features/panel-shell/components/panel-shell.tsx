@@ -47,11 +47,7 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
           <header className="border-b border-line lg:hidden">
             <TopBar workspaceNome={shell.workspaceNome} />
             <div className="pb-2">
-              <PanelNav
-                items={items}
-                contagens={shell.contagens}
-                variant="tabs"
-              />
+              <PanelNav items={items} variant="tabs" />
             </div>
           </header>
           <aside className="hidden w-(--size-sidebar) shrink-0 flex-col gap-6 border-r border-line p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
@@ -64,7 +60,7 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
                 vendedores={shell.contagens?.vendedores}
               />
             </div>
-            <PanelNav items={items} contagens={shell.contagens} />
+            <PanelNav items={items} />
             <div className="mt-auto flex flex-col gap-3">
               <LivePlanBlock contratarHref={shell.contratarHref} />
               <AccountMenu>
