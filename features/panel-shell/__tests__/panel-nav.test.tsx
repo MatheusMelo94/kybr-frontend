@@ -74,3 +74,38 @@ describe("PanelNav (AC 9)", () => {
     logged.mockRestore();
   });
 });
+
+describe("PanelNav: the Lote item (S5 batch running, T77)", () => {
+  const LOTE_ITEMS = [
+    { key: "fila", href: "/fila", label: "Fila de revisão" },
+    { key: "lote", href: "/lote", label: "Verificar em lote" },
+  ] as const;
+
+  function renderLote(running: boolean): void {
+    pathname.value = "/fila";
+    render(
+      <ShellStatusProvider
+        initial={{
+          contagens: { ...counts(7, 0), lote_em_andamento: running },
+          plano: undefined,
+        }}
+      >
+        <PanelNav items={LOTE_ITEMS} />
+      </ShellStatusProvider>,
+    );
+  }
+
+  it("while a batch runs, shows nav.lote.running as text, in its accessible name (no spinner)", () => {
+    renderLote(true);
+    const link = screen.getByRole("link", { name: /^Verificar em lote/ });
+    expect(link).toHaveAccessibleName("Verificar em lote Verificando");
+    expect(link.querySelector("[class*='animate-']")).toBeNull();
+  });
+
+  it("without a running batch, just the label", () => {
+    renderLote(false);
+    expect(
+      screen.getByRole("link", { name: /^Verificar em lote/ }),
+    ).toHaveAccessibleName("Verificar em lote");
+  });
+});

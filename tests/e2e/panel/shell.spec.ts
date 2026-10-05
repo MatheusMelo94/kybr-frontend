@@ -55,7 +55,11 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     expect(navBelow).toBe(true);
 
     const nav = page.getByRole("navigation", { name: "Navegação do painel" });
-    await expect(nav.getByRole("link")).toHaveCount(1);
+    // The build's items in the spec's order: M4's Fila, then M5's Lote.
+    await expect(nav.getByRole("link")).toHaveCount(2);
+    await expect(nav.getByRole("link").nth(1)).toHaveAccessibleName(
+      "Verificar em lote",
+    );
     await expect(
       nav.getByRole("link", {
         name: "Fila de revisão 7 casos para decidir, 2 fora do prazo",

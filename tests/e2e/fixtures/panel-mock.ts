@@ -71,10 +71,58 @@ export async function outbox(
 
 export async function seed(
   request: APIRequestContext,
-  scenario: "categorias-falham" | "teste-pausado" | "me-falha",
+  scenario:
+    | "categorias-falham"
+    | "teste-pausado"
+    | "me-falha"
+    | "historico-falha"
+    | "csv-sem-escape"
+    | "queda-de-rede-lote"
+    | "lote-poll-falha",
   email: string,
+  extra: { n?: number } = {},
 ): Promise<void> {
-  await request.post(`${CONTROLS}/seed`, { data: { scenario, email } });
+  await request.post(`${CONTROLS}/seed`, {
+    data: { scenario, email, ...extra },
+  });
+}
+
+/**
+ * M5: a batch made directly for an account (the mock's control; its rows are
+ * charged like a start). `set`: ac16 / tudo-ok / tudo-erro / falha.
+ */
+export async function createBatch(
+  request: APIRequestContext,
+  email: string,
+  set: "ac16" | "tudo-ok" | "tudo-erro" | "falha",
+  options: { finish?: boolean; hold?: boolean } = {},
+): Promise<string> {
+  const response = await request.post(`${CONTROLS}/batches`, {
+    data: { email, set, ...options },
+  });
+  if (response.status() !== 201)
+    throw new Error(`createBatch: ${response.status()}`);
+  return ((await response.json()) as { id: string }).id;
+}
+
+/** PB1: hold a batch (no progress on reads), or let it go. */
+export async function holdBatch(
+  request: APIRequestContext,
+  id: string,
+  hold = true,
+): Promise<void> {
+  await request.post(`${CONTROLS}/batches/${id}/hold`, { data: { hold } });
+}
+
+/** PB1: move a batch to `processados`, or one step. */
+export async function advanceBatch(
+  request: APIRequestContext,
+  id: string,
+  processados?: number,
+): Promise<void> {
+  await request.post(`${CONTROLS}/batches/${id}/advance`, {
+    data: processados === undefined ? {} : { processados },
+  });
 }
 
 /** PA12: ends every session of an account. */

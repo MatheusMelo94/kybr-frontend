@@ -24,13 +24,14 @@ function isActive(pathname: string, href: string): boolean {
 
 /**
  * The panel's nav (AC 9): the build's items, the active one marked, the
- * Fila's count from the shell's live status (missing hides it, AC 11).
+ * Fila's count from the shell's live status (missing hides it, AC 11), and
+ * Lote's nav.lote.running while a batch runs (S5).
  */
 export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
   // The external path: the ADR-0008 spike proved usePathname() sees it under the rewrite.
   const pathname = usePathname();
   const tabs = variant === "tabs";
-  const counts = useShellStatus().contagens;
+  const { contagens: counts, loteRunning } = useShellStatus();
   const activeLink = useRef<HTMLAnchorElement>(null);
 
   // The active tab in view on load, inside the row only (instant under reduced motion).
@@ -80,6 +81,12 @@ export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
                     vencidos={counts.fila_vencidos}
                     active={active}
                   />
+                )}
+                {/* S5 "batch running": text, not a spinner, in the link's name. */}
+                {item.key === "lote" && loteRunning && (
+                  <span className="text-secondary text-ink-muted">
+                    {shellCopy["nav.lote.running"]}
+                  </span>
                 )}
               </Link>
             </li>

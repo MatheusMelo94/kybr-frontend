@@ -18,7 +18,7 @@ import type { Contagens, Plano } from "@/lib/api/schemas/panel/me";
 type Status = { contagens: Contagens | undefined; plano: Plano | undefined };
 
 type Value = Status & {
-  /** contagens.lote_em_andamento: the Lote item's nav.lote.running (rendered once M5 adds it). */
+  /** contagens.lote_em_andamento: the Lote item's nav.lote.running (S5). */
   loteRunning: boolean;
   update: (next: Status) => void;
 };

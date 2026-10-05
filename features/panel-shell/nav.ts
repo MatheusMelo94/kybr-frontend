@@ -18,7 +18,7 @@ export const NAV_ITEMS: readonly Entry[] = [
     label: shellCopy["nav.monitor"],
     shipped: false,
   },
-  { key: "lote", href: "/lote", label: shellCopy["nav.lote"], shipped: false },
+  { key: "lote", href: "/lote", label: shellCopy["nav.lote"], shipped: true },
   {
     key: "vendedores",
     href: "/vendedores",
@@ -51,7 +51,7 @@ export const NAV_ITEMS: readonly Entry[] = [
   },
 ];
 
-/** The items whose screens this build has (M4: the Fila). */
+/** The items whose screens this build has (M4: the Fila; M5: Lote). */
 export function navItemsInBuild(): NavItem[] {
   return NAV_ITEMS.filter((item) => item.shipped).map(
     ({ key, href, label }) => ({ key, href, label }),
