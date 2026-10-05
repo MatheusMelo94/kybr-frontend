@@ -117,7 +117,12 @@ export async function sessionCookie(page: Page): Promise<string | undefined> {
   return cookies.find((cookie) => cookie.name === "kybr_session")?.value;
 }
 
-/** Logs in through /entrar (the UI) and waits to leave it. */
+/**
+ * Logs in through /entrar (the UI) and returns on the final landing screen:
+ * past /entrar and any "/" hop, with the page (an onboarding gate's
+ * /fila → /comecar included) rendered and the network quiet. A navigation
+ * started before that races the router's in Firefox (NS_BINDING_ABORTED).
+ */
 export async function logIn(
   page: Page,
   email: string,
@@ -128,9 +133,11 @@ export async function logIn(
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/entrar"));
-  // "/" redirects again (to /fila or /comecar): let that settle, or the next
-  // navigation aborts it (Firefox: NS_BINDING_ABORTED).
+  await page.waitForURL(
+    (url) => !url.pathname.startsWith("/entrar") && url.pathname !== "/",
+  );
+  // Any heading: an error boundary's is an h2.
+  await page.getByRole("heading").first().waitFor();
   await page.waitForLoadState("networkidle");
 }
 

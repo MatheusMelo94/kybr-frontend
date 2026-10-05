@@ -127,10 +127,7 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     const email = uniqueEmail("pular", testInfo);
     await createAccount(request, email);
     await logIn(page, email);
-    // A fresh load: the document is where the first Tab starts. Only once
-    // the post-login "/" → /fila client redirect has landed: in Firefox a
-    // load started before it gets NS_BINDING_ABORTED.
-    await page.waitForURL(/\/fila$/);
+    // A fresh load: the document is where the first Tab starts.
     await page.reload();
     await page.keyboard.press("Tab");
 
