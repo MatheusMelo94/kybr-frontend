@@ -449,12 +449,81 @@ export const AC16 = (() => {
   };
 })();
 
-/** PB4 / PB18 keys: a batch with FALHA stops halfway; TUDO-OK / TUDO-ERRO sets. */
+const roots = (prefix: string, n: number): string[] =>
+  Array.from({ length: n }, (_, i) =>
+    cnpjWithRoot(`${prefix}${String(i + 1).padStart(12 - prefix.length, "0")}`),
+  );
+
+/**
+ * PB4 / PB18 keys: a batch with FALHA stops halfway; TUDO-OK / TUDO-ERRO
+ * sets. QA G5: misto-sem-erro (40 rows: 30 ok, 6 warn, 4 bad, no erro;
+ * motivos_contagem 2 / 1 / 5) and um-atencao (3 ok + 1 warn) end
+ * `concluido`. QA G7: hostil carries hostile backend strings.
+ */
 export const BATCH_SETS = {
   falha: cnpjWithRoot("FALHA0000001"),
   tudoOk: ["TUDOOK000001", "TUDOOK000002", "TUDOOK000003"].map(cnpjWithRoot),
   tudoErro: ["TUDOERRO0001", "TUDOERRO0002"].map(cnpjWithRoot),
+  mistoSemErro: roots("MISTO", 40),
+  umAtencao: roots("UMATENCAO", 4),
+  hostil: roots("HOSTIL", 4),
 } as const;
+
+/** QA G7: the hostile razão social (rendered as text, never markup). */
+export const HOSTILE_RAZAO = "<img src=x onerror=alert(1)>";
+/** QA G7 / C9: ext_id values a spreadsheet would treat as formulas. */
+export const HOSTILE_EXT_IDS = ["=1+1", "+x", "-x", "@x"] as const;
+
+// G5: 4 bad + 6 warn with tags giving inapta_baixada 2, sem_ie 1, cnae_fora 5.
+const MISTO: BatchOutcome[] = [
+  { status: "bad", motivos: [MOTIVOS.inapta], tags: ["inapta_baixada"] },
+  {
+    status: "bad",
+    motivos: [MOTIVOS.baixada, MOTIVOS.cnae],
+    tags: ["inapta_baixada", "cnae_fora"],
+  },
+  { status: "bad", motivos: [MOTIVOS.cnae], tags: ["cnae_fora"] },
+  { status: "bad", motivos: [MOTIVOS.cnae], tags: ["cnae_fora"] },
+  { status: "warn", motivos: [MOTIVOS.sem_ie], tags: ["sem_ie"] },
+  { status: "warn", motivos: [MOTIVOS.cnae], tags: ["cnae_fora"] },
+  { status: "warn", motivos: [MOTIVOS.cnae], tags: ["cnae_fora"] },
+  { status: "warn", motivos: ["Endereço divergente"], tags: [] },
+  { status: "warn", motivos: ["Endereço divergente"], tags: [] },
+  { status: "warn", motivos: ["Endereço divergente"], tags: [] },
+];
+
+// G7: hostile strings, as the backend may send them.
+const HOSTIL: BatchOutcome[] = [
+  {
+    status: "warn",
+    razao_social: HOSTILE_RAZAO,
+    motivos: [
+      "Motivo um",
+      "Motivo dois, com vírgula",
+      "Motivo três",
+      "Motivo quatro",
+      "Motivo cinco",
+      "Motivo seis",
+    ],
+    tags: [],
+  },
+  {
+    status: "ok",
+    razao_social: `Empresa ${"Muito Longa ".repeat(20)}Ltda`.slice(0, 200),
+    motivos: [],
+    tags: [],
+  },
+  { status: "ok", motivos: [], tags: [] },
+  {
+    status: "ok",
+    razao_social: "JOAO CARLOS SILVA ***.***.***-**",
+    motivos: [],
+    tags: [],
+  },
+];
+
+/** QA G8: pago@exemplo.test's batch, seeded at mock boot (PB10's foreign id). */
+export const FOREIGN_BATCH_ID = "f0e1d2c3-b4a5-4968-8a7b-6c5d4e3f2a10";
 
 const ERRO: BatchOutcome = { status: "erro", motivos: [], tags: [] };
 const OUTCOMES: ReadonlyMap<string, BatchOutcome> = new Map<
@@ -466,6 +535,35 @@ const OUTCOMES: ReadonlyMap<string, BatchOutcome> = new Map<
     ac16Outcome(index),
   ]),
   ...BATCH_SETS.tudoErro.map((cnpj): [string, BatchOutcome] => [cnpj, ERRO]),
+  ...BATCH_SETS.mistoSemErro.map((cnpj, i): [string, BatchOutcome] => [
+    cnpj,
+    MISTO[i] ?? {
+      status: "ok",
+      razao_social: `Empresa Mista ${i + 1} Ltda`,
+      motivos: [],
+      tags: [],
+    },
+  ]),
+  ...BATCH_SETS.umAtencao.map((cnpj, i): [string, BatchOutcome] => [
+    cnpj,
+    i === 0
+      ? {
+          status: "warn",
+          razao_social: "Empresa Atenção Ltda",
+          motivos: [MOTIVOS.sem_ie],
+          tags: ["sem_ie"],
+        }
+      : {
+          status: "ok",
+          razao_social: `Empresa Certa ${i} Ltda`,
+          motivos: [],
+          tags: [],
+        },
+  ]),
+  ...BATCH_SETS.hostil.map((cnpj, i): [string, BatchOutcome] => [
+    cnpj,
+    HOSTIL[i] ?? ERRO,
+  ]),
 ]);
 
 /** Each CNPJ's fixed outcome (PB3, PB18); any other CNPJ is ok. */

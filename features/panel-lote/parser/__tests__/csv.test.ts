@@ -163,3 +163,17 @@ describe("readCsv: empty files and the caps (AC 15, Security C6, C7)", () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 });
+
+describe("readCsv: QA G2 fixtures", () => {
+  it("UTF-8 with one invalid byte falls back to Windows-1252: every row survives", () => {
+    const parsed = rows(fixture("utf8-byte-invalido.csv"));
+    // The header, the 5 rows, and the stray byte as a last one-cell row ("ÿ").
+    expect(parsed).toHaveLength(7);
+    expect(parsed[1]?.[0]).toBe(AC16.rows[0]?.cnpj);
+    expect(parsed[6]).toEqual(["ÿ"]);
+  });
+
+  it("markup in a cell is just text", () => {
+    expect(rows(fixture("marcacao.csv"))[1]?.[1]).toBe("<img src=x onerror=alert(1)>");
+  });
+});

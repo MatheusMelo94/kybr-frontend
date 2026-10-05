@@ -80,6 +80,20 @@ const files = {
   // AC 15: empty, and a header with no data.
   "vazio.csv": "",
   "so-cabecalho.csv": BOM + csv([]),
+  // QA G2 / Q5: UTF-16LE with a BOM (unreadable); UTF-8 with one invalid
+  // byte (read as Windows-1252, so the row survives).
+  "utf16le.csv": Buffer.concat([
+    Buffer.from([0xff, 0xfe]),
+    Buffer.from(csv(ac16.slice(0, 5)), "utf16le"),
+  ]),
+  "utf8-byte-invalido.csv": Buffer.concat([
+    Buffer.from(csv(ac16.slice(0, 5))),
+    Buffer.from([0xff]),
+  ]),
+  // T79: spreadsheet text is React text only.
+  "marcacao.csv":
+    BOM +
+    csv([[ac16[1][0], "<img src=x onerror=alert(1)>", "<b>id</b>"], ...ac16.slice(2, 6)]),
   // AC 15: a PDF picked by mistake.
   "documento.pdf": Buffer.concat([
     Buffer.from("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", "latin1"),
@@ -233,6 +247,8 @@ const xlsxFiles = {
   "aba-oculta.xlsx": write(hiddenFirst, "xlsx"),
   "formulas.xlsx": write(book(["Vendedores", formulas]), "xlsx"),
   "cientifico.xlsx": write(book(["Vendedores", scientific]), "xlsx"),
+  // QA G2 / Q5: a password-protected XLSX (OOXML encryption is a CFB file).
+  "protegido.xlsx": write(book(["Vendedores", XLSX.utils.aoa_to_sheet([["CNPJ"]])]), "biff8"),
   // A truncated download.
   "corrupt.xlsx": ac16Xlsx.subarray(0, Math.floor(ac16Xlsx.length / 2)),
   // A macro-enabled workbook named .xlsx (its content type says so) → type.

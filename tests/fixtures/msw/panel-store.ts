@@ -1,6 +1,7 @@
 import {
   BATCH_DURATION_MS,
   BATCH_SETS,
+  FOREIGN_BATCH_ID,
   CODE_TTL_MS,
   IDLE_TTL_MS,
   PANEL_EMAILS,
@@ -50,6 +51,40 @@ export type CallRecord = {
   /** D-B1: the row count and the Idempotency-Key, never the rows (T69). */
   rows?: number;
   idempotencyKey?: string;
+  /** QA G1: the keys seen across linhas, and how many rows carry each optional field. */
+  rowKeys?: string[];
+  withResponsavel?: number;
+  withExtId?: number;
+  /** QA G6: the request carried X-Kybr-Poll: 1. */
+  poll?: boolean;
+};
+
+/** QA G4: a per-account fault on one batch endpoint. */
+export type BatchEndpoint =
+  | "start"
+  | "status"
+  | "rows"
+  | "to-queue"
+  | "monitor"
+  | "resume"
+  | "result.csv"
+  | "errors.csv"
+  | "history"
+  | "me";
+export type BatchFault = {
+  kind:
+    | "delay"
+    | "500"
+    | "drop"
+    | "csv-grande"
+    | "csv-html"
+    | "csv-aspas"
+    | "csv-virgula"
+    | "csv-irregular"
+    | "processados-acima";
+  ms?: number;
+  /** How many requests it applies to (unlimited when missing). */
+  times?: number;
 };
 
 /** A batch in the mock (D-B1–D-B7). */
@@ -65,6 +100,8 @@ export type BatchRecord = {
   /** PB1: a held batch doesn't advance on status reads. */
   held: boolean;
   startedAt: number;
+  /** QA G11: concluido_em = startedAt + durationMs (41 s by default). */
+  durationMs: number;
   finishedAt: number | undefined;
   monitorado: boolean;
   enviado_para_fila: boolean;
@@ -114,6 +151,8 @@ type Store = {
   batchKeys: Map<string, { fingerprint: string; reply: unknown }>;
   /** PB11: status reads still to fail, per e-mail ("*" = everyone). */
   pollFailures: Map<string, number>;
+  /** QA G4: "e-mail|endpoint" → its fault. */
+  faults: Map<string, BatchFault>;
   /** Scenario → the e-mails it applies to, or "all". */
   scenarios: Map<Scenario, Set<string> | "all">;
 };
@@ -200,6 +239,27 @@ function accountFor(
   };
 }
 
+/** QA G8: pago@'s finished batch, there from boot (PB10's foreign id). */
+function foreignBatch(): BatchRecord {
+  const startedAt = Date.parse("2026-10-01T13:00:00Z");
+  return {
+    id: FOREIGN_BATCH_ID,
+    email: PANEL_EMAILS.pago,
+    linhas: BATCH_SETS.tudoOk.map((cnpj) => ({ cnpj })),
+    estado: "concluido",
+    processados: BATCH_SETS.tudoOk.length,
+    failAt: undefined,
+    held: false,
+    startedAt,
+    durationMs: BATCH_DURATION_MS,
+    finishedAt: startedAt + BATCH_DURATION_MS,
+    monitorado: false,
+    enviado_para_fila: false,
+    criados: undefined,
+    monitorados: undefined,
+  };
+}
+
 function createStore(): Store {
   const accounts = new Map<string, Account>();
   for (const preset of PRESETS) {
@@ -237,9 +297,10 @@ function createStore(): Store {
     signups: new Map(),
     logouts: [],
     calls: [],
-    batches: new Map(),
+    batches: new Map([[FOREIGN_BATCH_ID, foreignBatch()]]),
     batchKeys: new Map(),
     pollFailures: new Map(),
+    faults: new Map(),
     scenarios: new Map(),
   };
 }
@@ -436,6 +497,7 @@ export function newBatch(email: string, linhas: BatchLinha[]): BatchRecord {
     held: false,
     // Whole seconds, like the API's timestamps.
     startedAt: Math.floor(batchClock() / 1000) * 1000,
+    durationMs: BATCH_DURATION_MS,
     finishedAt: undefined,
     monitorado: false,
     enviado_para_fila: false,
@@ -465,7 +527,46 @@ export function hasRunningBatch(email: string): boolean {
 }
 
 export function finishBatchAt(batch: BatchRecord): number {
-  return batch.startedAt + BATCH_DURATION_MS;
+  return batch.startedAt + batch.durationMs;
+}
+
+/** QA G4: sets (or, with kind "none", clears) a per-account fault. */
+export function setFault(
+  email: string,
+  endpoint: BatchEndpoint,
+  fault: BatchFault | undefined,
+): void {
+  const key = `${email.toLowerCase()}|${endpoint}`;
+  if (fault === undefined) store.faults.delete(key);
+  else store.faults.set(key, fault);
+}
+
+/** The fault for this request, if any (one fewer left when it's counted). */
+export function takeFault(
+  email: string,
+  endpoint: BatchEndpoint,
+): BatchFault | undefined {
+  const key = `${email}|${endpoint}`;
+  const fault = store.faults.get(key);
+  if (fault === undefined) return undefined;
+  if (fault.times !== undefined) {
+    if (fault.times <= 1) store.faults.delete(key);
+    else store.faults.set(key, { ...fault, times: fault.times - 1 });
+  }
+  return fault;
+}
+
+/** QA G6: a session's clocks, for proving that a poll doesn't slide idle. */
+export function sessionClock(
+  id: string,
+): { createdAt: number; lastActivity: number } | undefined {
+  const session = store.sessions.get(id);
+  return (
+    session && {
+      createdAt: session.createdAt,
+      lastActivity: session.lastActivity,
+    }
+  );
 }
 
 /** PB11: true (and one fewer left) when this status read must fail. */

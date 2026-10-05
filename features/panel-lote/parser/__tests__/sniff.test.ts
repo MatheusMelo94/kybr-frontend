@@ -107,3 +107,12 @@ describe("sniffFile (ADR-0012 item 2, AC 15 type)", () => {
     },
   );
 });
+
+describe("QA G2 fixtures", () => {
+  it.each(["utf16le.csv", "protegido.xlsx"])("%s → unreadable", (name) => {
+    const bytes = readFileSync(join(FILES, name));
+    expect(
+      sniffFile(file(name, bytes.subarray(0, SNIFF_BYTES), bytes.length)),
+    ).toEqual({ ok: false, error: "unreadable" });
+  });
+});

@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   AC16,
   BATCH_SETS,
+  FOREIGN_BATCH_ID,
+  HOSTILE_RAZAO,
   ERROR_SENTINEL,
   PANEL_EMAILS,
   PANEL_PASSWORD,
@@ -568,7 +570,10 @@ describe("PB8: CSVs", () => {
   });
 
   it("the csv-sem-escape seed returns unescaped formula cells", async () => {
-    await control("POST", "/seed", { scenario: "csv-sem-escape" });
+    await control("POST", "/seed", {
+      scenario: "csv-sem-escape",
+      email: PANEL_EMAILS.pago,
+    });
     const token = await login();
     const id = await startOk(token, AC16.linhas);
     await runToEnd(token, id);
@@ -600,7 +605,11 @@ describe("PB9: history", () => {
     const history = await json<{ id: string; estado: string; total: number }[]>(
       await call("GET", "/v1/batches?limit=10", token),
     );
-    expect(history.map((entry) => entry.id)).toEqual([newer, older]);
+    // pago's boot-time batch (G8) is the oldest.
+    expect(history.map((entry) => entry.id).slice(0, 2)).toEqual([
+      newer,
+      older,
+    ]);
     expect(history[0]).toMatchObject({
       estado: "processando",
       total: BATCH_SETS.tudoErro.length,
@@ -662,7 +671,10 @@ describe("PB11: status reads fail n times, then recover", () => {
 
 describe("PB12: the connection drops on start", () => {
   it("queda-de-rede-lote destroys the socket", async () => {
-    await control("POST", "/seed", { scenario: "queda-de-rede-lote" });
+    await control("POST", "/seed", {
+      scenario: "queda-de-rede-lote",
+      email: PANEL_EMAILS.pago,
+    });
     const token = await login();
     await expect(start(token, AC16.linhas)).rejects.toThrow();
   });
@@ -793,11 +805,196 @@ describe("test controls", () => {
     const listed = await json<{ id: string; estado: string }[]>(
       await control("GET", `/batches?email=${PANEL_EMAILS.pago}`),
     );
-    expect(listed).toEqual([
+    // Newest first; pago's boot-time batch (G8) is older.
+    expect(listed[0]).toEqual(
       expect.objectContaining({
         id: created.id,
         estado: "concluido_com_erros",
       }),
+    );
+    expect(listed.at(-1)?.id).toBe(FOREIGN_BATCH_ID);
+  });
+});
+
+describe("QA fixture gaps (M5 test plan G1–G11)", () => {
+  it("G1: a start's call carries the row keys and optional-field counts, never values", async () => {
+    const token = await login();
+    await startOk(token, [
+      { cnpj: BATCH_SETS.tudoOk[0] ?? "", responsavel: "Maria Exemplo" },
+      { cnpj: BATCH_SETS.tudoOk[1] ?? "", ext_id: "loja-1" },
+      { cnpj: BATCH_SETS.tudoOk[2] ?? "" },
     ]);
+    const calls = await json<Record<string, unknown>[]>(
+      await control("GET", `/calls?email=${PANEL_EMAILS.pago}`),
+    );
+    const start = calls.find(
+      (c) => c.path === "/v1/batches" && c.method === "POST",
+    );
+    expect(start).toMatchObject({
+      rows: 3,
+      rowKeys: ["cnpj", "ext_id", "responsavel"],
+      withResponsavel: 1,
+      withExtId: 1,
+    });
+    expect(JSON.stringify(calls)).not.toContain("Maria Exemplo");
+  });
+
+  it("G3: Lote's seeds need an account", async () => {
+    for (const scenario of [
+      "csv-sem-escape",
+      "historico-falha",
+      "queda-de-rede-lote",
+      "lote-poll-falha",
+    ])
+      expect(
+        (await control("POST", "/seed", { scenario })).status,
+        scenario,
+      ).toBe(400);
+  });
+
+  it("G4: per-account faults — delay, 500, drop, oversized / HTML / broken CSVs, processados > total", async () => {
+    const token = await login();
+    const id = await startOk(token, few(BATCH_SETS.tudoOk));
+    const fault = (endpoint: string, kind: string, extra: object = {}) =>
+      control("POST", "/batch-fault", {
+        email: PANEL_EMAILS.pago,
+        endpoint,
+        fault: kind,
+        ...extra,
+      });
+
+    await fault("status", "500", { times: 1 });
+    expect((await call("GET", `/v1/batches/${id}`, token)).status).toBe(500);
+    expect((await call("GET", `/v1/batches/${id}`, token)).status).toBe(200);
+
+    await fault("to-queue", "drop");
+    await runToEnd(token, id);
+    await expect(
+      call(
+        "POST",
+        `/v1/batches/${id}/to-queue`,
+        token,
+        {},
+        { "idempotency-key": ACTION_KEY },
+      ),
+    ).rejects.toThrow();
+    await fault("to-queue", "none");
+
+    await fault("history", "delay", { ms: 300, times: 1 });
+    const started = Date.now();
+    expect((await call("GET", "/v1/batches?limit=10", token)).status).toBe(200);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(290);
+
+    await fault("result.csv", "csv-html");
+    const html = await call("GET", `/v1/batches/${id}/result.csv`, token);
+    expect(html.headers.get("content-type")).toBe("text/html");
+    await fault("result.csv", "csv-grande");
+    expect(
+      (await (await call("GET", `/v1/batches/${id}/result.csv`, token)).text())
+        .length,
+    ).toBe(5 * 1024 * 1024 + 1);
+    await fault("errors.csv", "csv-aspas");
+    expect(
+      await (await call("GET", `/v1/batches/${id}/errors.csv`, token)).text(),
+    ).toContain('"aberta');
+
+    await fault("status", "processados-acima", { times: 1 });
+    const view = await json<BatchView>(
+      await call("GET", `/v1/batches/${id}`, token),
+    );
+    expect(view.processados).toBe(view.total + 1);
+  });
+
+  it("G5: misto-sem-erro ends concluido with motivos_contagem 2 / 1 / 5; um-atencao has one warn", async () => {
+    const token = await login();
+    const misto = await runToEnd(
+      token,
+      await startOk(token, few(BATCH_SETS.mistoSemErro)),
+    );
+    expect(misto.estado).toBe("concluido");
+    expect(misto.contagens).toEqual({ ok: 30, warn: 6, bad: 4, erro: 0 });
+    expect(misto.motivos_contagem).toEqual({
+      inapta_baixada: 2,
+      sem_ie: 1,
+      cnae_fora: 5,
+    });
+    const um = await runToEnd(
+      token,
+      await startOk(token, few(BATCH_SETS.umAtencao), OTHER_KEY),
+    );
+    expect(um.contagens).toEqual({ ok: 3, warn: 1, bad: 0, erro: 0 });
+  });
+
+  it("G6: X-Kybr-Poll is logged, and /__mock/panel/session shows a poll doesn't slide idle", async () => {
+    const token = await login();
+    const id = await startOk(token, few(BATCH_SETS.tudoOk));
+    const before = await json<{ lastActivity: number }>(
+      await control("GET", `/session?id=${token}`),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await call("GET", `/v1/batches/${id}`, token, undefined, {
+      "x-kybr-poll": "1",
+    });
+    const after = await json<{ lastActivity: number }>(
+      await control("GET", `/session?id=${token}`),
+    );
+    expect(after.lastActivity).toBe(before.lastActivity);
+    const calls = await json<Record<string, unknown>[]>(
+      await control("GET", `/calls?email=${PANEL_EMAILS.pago}`),
+    );
+    expect(calls.at(-1)).toMatchObject({
+      path: `/v1/batches/${id}`,
+      poll: true,
+    });
+  });
+
+  it("G7: hostile backend strings reach the rows as given", async () => {
+    const token = await login();
+    const id = await startOk(token, few(BATCH_SETS.hostil));
+    await runToEnd(token, id);
+    const page = await json<{
+      itens: { razao_social?: string; motivos: string[] }[];
+    }>(await call("GET", `/v1/batches/${id}/rows?limit=25`, token));
+    expect(page.itens[0]?.razao_social).toBe(HOSTILE_RAZAO);
+    expect(page.itens[0]?.motivos).toHaveLength(6);
+    expect(page.itens[1]?.razao_social).toHaveLength(200);
+    expect(page.itens[2]?.razao_social).toBeUndefined();
+    expect(page.itens[3]?.razao_social).toContain("***.***.***-**");
+  });
+
+  it("G8: FOREIGN_BATCH_ID is pago's from boot, a 404 for anyone else", async () => {
+    expect((await status(await login(), FOREIGN_BATCH_ID)).estado).toBe(
+      "concluido",
+    );
+    const outro = await login(PANEL_EMAILS.outro);
+    expect(
+      (await call("GET", `/v1/batches/${FOREIGN_BATCH_ID}`, outro)).status,
+    ).toBe(404);
+  });
+
+  it("G10: /__mock/panel/plan sets the plan; G11: a batch's start and duration are fixed", async () => {
+    expect(
+      (
+        await control("POST", "/plan", {
+          email: PANEL_EMAILS.pago,
+          usadas: 4999,
+        })
+      ).status,
+    ).toBe(204);
+    const token = await login();
+    expect((await plano(token)).usadas).toBe(4999);
+
+    const { id } = await json<{ id: string }>(
+      await control("POST", "/batches", {
+        email: PANEL_EMAILS.pago,
+        set: "hostil",
+        finish: true,
+        iniciadoEm: "2026-10-05T23:30:00-03:00",
+        duracaoMs: 3 * 60_000,
+      }),
+    );
+    const view = await status(token, id);
+    expect(view.iniciado_em).toBe("2026-10-06T02:30:00.000Z");
+    expect(view.concluido_em).toBe("2026-10-06T02:33:00.000Z");
   });
 });

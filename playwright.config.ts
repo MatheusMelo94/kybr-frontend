@@ -114,7 +114,10 @@ export default defineConfig({
       },
     },
     {
-      command: "pnpm build && pnpm start",
+      // QA G13 (P16): the server's output is kept for a PII grep after the
+      // run, outside test-results/ (Playwright may clear that at start).
+      command:
+        "pnpm build && mkdir -p e2e-logs && pnpm start 2>&1 | tee e2e-logs/next-server.log",
       port: 3000,
       timeout: 300_000,
       reuseExistingServer: !process.env.CI,

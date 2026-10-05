@@ -165,7 +165,9 @@ describe("listBatchRows (D-B3) and listBatches (D-B6)", () => {
     );
 
     const history = await listBatches();
-    expect(history).toMatchObject({ ok: true, data: [{ id, total: 184 }] });
+    if (!history.ok) throw history.error;
+    // Newest first; pago's boot-time batch (QA G8) is older.
+    expect(history.data[0]).toMatchObject({ id, total: 184 });
   });
 
   it("PB10: rows of a foreign batch → LOTE_NAO_ENCONTRADO", async () => {

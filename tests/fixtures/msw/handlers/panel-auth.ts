@@ -312,6 +312,19 @@ export const panelControlHandlers: RequestHandler[] = [
       string,
       unknown
     >;
+    // QA G3: Lote's seeds are per account, never global (parallel projects
+    // share the store).
+    const accountOnly = [
+      "lote-poll-falha",
+      "csv-sem-escape",
+      "historico-falha",
+      "queda-de-rede-lote",
+    ];
+    if (
+      accountOnly.includes(String(body.scenario)) &&
+      typeof body.email !== "string"
+    )
+      return new HttpResponse(null, { status: 400 });
     // PB11: the next n status reads fail (503), then recover.
     if (body.scenario === "lote-poll-falha") {
       seedPollFailures(

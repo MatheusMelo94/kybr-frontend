@@ -1,8 +1,9 @@
-import { HttpResponse, http, type RequestHandler } from "msw";
+import { HttpResponse, delay, http, type RequestHandler } from "msw";
 
 import {
   AC16,
   BATCH_SETS,
+  HOSTILE_EXT_IDS,
   batchOutcomeFor,
   maskedCnpj,
   type BatchLinha,
@@ -17,8 +18,13 @@ import {
   panelStore,
   scenarioApplies,
   sessionAccount,
+  sessionClock,
+  setFault,
+  takeFault,
   takePollFailure,
   type Account,
+  type BatchEndpoint,
+  type BatchFault,
   type BatchRecord,
 } from "../panel-store.ts";
 import { apiError, incoming, networkDrop, ok } from "./panel-common.ts";
@@ -253,15 +259,22 @@ function csvFile(
   );
 }
 
-/** The session's account (annotating the call log with its e-mail), or a reply to send. */
+/**
+ * The session's account (annotating the call log with its e-mail), or a
+ * reply to send. QA G4: the account's fault for this endpoint applies here:
+ * a delay waits, 500 / drop answer; the CSV and status faults come back in
+ * `fault` for the handler.
+ */
 async function authed(
   request: Request,
+  endpoint: BatchEndpoint,
   touch = true,
 ): Promise<
   | {
       account: Account;
       body: Record<string, unknown>;
       call: Awaited<ReturnType<typeof incoming>>["call"];
+      fault: BatchFault | undefined;
     }
   | { reply: Response }
 > {
@@ -270,16 +283,51 @@ async function authed(
   const account = sessionAccount(token, touch);
   if (!account) return { reply: apiError(401, "SESSAO_EXPIRADA") };
   call.email = account.email;
-  return { account, body, call };
+  const fault = takeFault(account.email, endpoint);
+  if (fault?.kind === "delay") await delay(fault.ms ?? 1_000);
+  if (fault?.kind === "500") return { reply: apiError(500, "ERRO_INTERNO") };
+  if (fault?.kind === "drop") return { reply: networkDrop() };
+  return { account, body, call, fault };
 }
 
 const notFound = (): Response => apiError(404, "LOTE_NAO_ENCONTRADO");
+
+const CSV_HEADERS = {
+  "Content-Type": "text/csv; charset=utf-8",
+};
+
+/** QA G4 / C9: a CSV the download handler must refuse (502, no partial body). */
+function csvFault(fault: BatchFault | undefined): Response | undefined {
+  const reply = (body: string, type = CSV_HEADERS["Content-Type"]) =>
+    new HttpResponse(body, {
+      status: 200,
+      headers: { "Content-Type": type, "X-Request-Id": crypto.randomUUID() },
+    });
+  switch (fault?.kind) {
+    case "csv-grande":
+      return reply("x".repeat(5 * 1024 * 1024 + 1));
+    case "csv-html":
+      return reply("<html><body>erro</body></html>", "text/html");
+    case "csv-aspas":
+      return reply(
+        '\uFEFF"CNPJ";"Situação"\r\n"11.222.333/0001-81";"aberta\r\n',
+      );
+    case "csv-virgula":
+      return reply(
+        '\uFEFF"CNPJ","Situação"\r\n"11.222.333/0001-81","Tudo certo"\r\n',
+      );
+    case "csv-irregular":
+      return reply('\uFEFF"CNPJ";"Situação"\r\n"11.222.333/0001-81"\r\n');
+    default:
+      return undefined;
+  }
+}
 
 function batchAction(action: "to-queue" | "monitor"): RequestHandler {
   return http.post(
     `*/v1/batches/:id/${action}`,
     async ({ request, params }) => {
-      const auth = await authed(request);
+      const auth = await authed(request, action);
       if ("reply" in auth) return auth.reply;
       const { account } = auth;
       const batch = ownBatch(String(params.id), account.email);
@@ -322,7 +370,7 @@ function batchAction(action: "to-queue" | "monitor"): RequestHandler {
 export const panelBatchHandlers: RequestHandler[] = [
   // D-B1
   http.post("*/v1/batches", async ({ request }) => {
-    const auth = await authed(request);
+    const auth = await authed(request, "start");
     if ("reply" in auth) return auth.reply;
     const { account, body, call } = auth;
     if (scenarioApplies("queda-de-rede-lote", account.email))
@@ -338,6 +386,19 @@ export const panelBatchHandlers: RequestHandler[] = [
       return apiError(422, "VALOR_INVALIDO", { field: "linhas" });
     const linhas = body.linhas as unknown[];
     call.rows = linhas.length;
+    // QA G1: shapes only, never values.
+    const keys = new Set<string>();
+    let withResponsavel = 0;
+    let withExtId = 0;
+    for (const linha of linhas) {
+      if (typeof linha !== "object" || linha === null) continue;
+      for (const key of Object.keys(linha)) keys.add(key);
+      if ("responsavel" in linha) withResponsavel++;
+      if ("ext_id" in linha) withExtId++;
+    }
+    call.rowKeys = [...keys].sort();
+    call.withResponsavel = withResponsavel;
+    call.withExtId = withExtId;
     if (linhas.length > MAX_ROWS) return apiError(422, "MUITAS_LINHAS");
     if (!hasValidCnpj(linhas)) return apiError(422, "SEM_CNPJ_VALIDO");
     const field = invalidField(linhas);
@@ -361,7 +422,7 @@ export const panelBatchHandlers: RequestHandler[] = [
   }),
   // D-B6
   http.get("*/v1/batches", async ({ request }) => {
-    const auth = await authed(request);
+    const auth = await authed(request, "history");
     if ("reply" in auth) return auth.reply;
     if (scenarioApplies("historico-falha", auth.account.email))
       return apiError(500, "ERRO_INTERNO");
@@ -384,6 +445,7 @@ export const panelBatchHandlers: RequestHandler[] = [
   http.get("*/v1/batches/:id", async ({ request, params }) => {
     const auth = await authed(
       request,
+      "status",
       request.headers.get("x-kybr-poll") !== "1",
     );
     if ("reply" in auth) return auth.reply;
@@ -392,11 +454,15 @@ export const panelBatchHandlers: RequestHandler[] = [
     if (takePollFailure(auth.account.email))
       return apiError(503, "INDISPONIVEL");
     if (!batch.held) advanceBatch(batch);
-    return ok(batchView(batch) as never);
+    const view = batchView(batch);
+    // QA G4: a contract violation the schema must refuse.
+    if (auth.fault?.kind === "processados-acima")
+      return ok({ ...view, processados: batch.linhas.length + 1 } as never);
+    return ok(view as never);
   }),
   // D-B3 (+ C2)
   http.get("*/v1/batches/:id/rows", async ({ request, params }) => {
-    const auth = await authed(request);
+    const auth = await authed(request, "rows");
     if ("reply" in auth) return auth.reply;
     const batch = ownBatch(String(params.id), auth.account.email);
     if (!batch) return notFound();
@@ -434,11 +500,13 @@ export const panelBatchHandlers: RequestHandler[] = [
   http.get("*/v1/batches/:id/:file", async ({ request, params }) => {
     const file = String(params.file);
     if (file !== "result.csv" && file !== "errors.csv") return undefined;
-    const auth = await authed(request);
+    const auth = await authed(request, file);
     if ("reply" in auth) return auth.reply;
     const batch = ownBatch(String(params.id), auth.account.email);
     if (!batch) return notFound();
     const escape = !scenarioApplies("csv-sem-escape", auth.account.email);
+    const faulty = csvFault(auth.fault);
+    if (faulty !== undefined) return faulty;
     return new HttpResponse(
       csvFile(batch, file === "result.csv" ? "result" : "errors", escape),
       {
@@ -455,7 +523,7 @@ export const panelBatchHandlers: RequestHandler[] = [
   batchAction("monitor"),
   // D-B7 (+ C6)
   http.post("*/v1/batches/:id/resume", async ({ request, params }) => {
-    const auth = await authed(request);
+    const auth = await authed(request, "resume");
     if ("reply" in auth) return auth.reply;
     const batch = ownBatch(String(params.id), auth.account.email);
     if (!batch) return notFound();
@@ -483,6 +551,15 @@ const SETS: Record<string, () => BatchLinha[]> = {
     [...BATCH_SETS.tudoOk, BATCH_SETS.falha, ...BATCH_SETS.tudoErro].map(
       (cnpj) => ({ cnpj }),
     ),
+  "misto-sem-erro": () => BATCH_SETS.mistoSemErro.map((cnpj) => ({ cnpj })),
+  "um-atencao": () => BATCH_SETS.umAtencao.map((cnpj) => ({ cnpj })),
+  // G7 / C9: hostile ext_ids ride in the rows (the CSVs echo them).
+  hostil: () =>
+    BATCH_SETS.hostil.map((cnpj, i) => ({
+      cnpj,
+      responsavel: "Pessoa Exemplo",
+      ext_id: HOSTILE_EXT_IDS[i] ?? "id",
+    })),
 };
 
 async function controlBody(request: Request): Promise<Record<string, unknown>> {
@@ -533,11 +610,16 @@ export const panelBatchControlHandlers: RequestHandler[] = [
   // charged like a start, so the releases add up): `set` is
   // ac16 / tudo-ok / tudo-erro / falha; `finish` runs it to its end state.
   http.post("*/__mock/panel/batches", async ({ request }) => {
-    const { email, set, finish, hold } = await controlBody(request);
+    const { email, set, finish, hold, iniciadoEm, duracaoMs } =
+      await controlBody(request);
     const linhas = typeof set === "string" ? SETS[set] : undefined;
     if (typeof email !== "string" || !linhas)
       return new HttpResponse(null, { status: 400 });
     const batch = newBatch(email.toLowerCase(), linhas());
+    // QA G11: a fixed start and duration for {duracao}, dates and filenames.
+    if (typeof iniciadoEm === "string" && !Number.isNaN(Date.parse(iniciadoEm)))
+      batch.startedAt = Date.parse(iniciadoEm);
+    if (typeof duracaoMs === "number") batch.durationMs = duracaoMs;
     charge(batch.email, batch.linhas.length);
     if (finish === true)
       for (let i = 0; i < 8 && batch.estado === "processando"; i++)
@@ -545,8 +627,38 @@ export const panelBatchControlHandlers: RequestHandler[] = [
     batch.held = hold === true;
     return HttpResponse.json({ id: batch.id }, { status: 201 });
   }),
-  // PB4 / PB16: sets an account's plan usage (or limit).
-  http.post("*/__mock/panel/plano", async ({ request }) => {
+  // QA G4: a per-account fault on one endpoint ({ fault: "none" } clears it).
+  http.post("*/__mock/panel/batch-fault", async ({ request }) => {
+    const { email, endpoint, fault, ms, times } = await controlBody(request);
+    if (
+      typeof email !== "string" ||
+      typeof endpoint !== "string" ||
+      typeof fault !== "string"
+    )
+      return new HttpResponse(null, { status: 400 });
+    setFault(
+      email,
+      endpoint as BatchEndpoint,
+      fault === "none"
+        ? undefined
+        : {
+            kind: fault as BatchFault["kind"],
+            ...(typeof ms === "number" && { ms }),
+            ...(typeof times === "number" && { times }),
+          },
+    );
+    return new HttpResponse(null, { status: 204 });
+  }),
+  // QA G6: a session's clocks (proves a poll doesn't slide idle, C7).
+  http.get("*/__mock/panel/session", ({ request }) => {
+    const id = new URL(request.url).searchParams.get("id") ?? "";
+    const clock = sessionClock(id);
+    return clock
+      ? HttpResponse.json(clock)
+      : new HttpResponse(null, { status: 404 });
+  }),
+  // PB4 / PB16 (QA G10 calls it /plan): sets an account's plan usage or limit.
+  http.post("*/__mock/panel/plan*", async ({ request }) => {
     const { email, usadas, limite } = await controlBody(request);
     const current =
       typeof email === "string" ? plano(email.toLowerCase()) : undefined;

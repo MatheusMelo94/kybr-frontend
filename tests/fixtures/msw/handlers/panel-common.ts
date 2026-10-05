@@ -84,6 +84,7 @@ export async function incoming(request: Request): Promise<Incoming> {
     ...(typeof body.turnstile === "string" && { turnstile: body.turnstile }),
     ...(ip !== undefined && { ip }),
     ...(bodyKeys.length > 0 && { bodyKeys }),
+    ...(request.headers.get("x-kybr-poll") === "1" && { poll: true }),
     authorized: token !== undefined,
   };
   recordCall(call);
