@@ -1,5 +1,3 @@
-"use client";
-
 import type { JSX } from "react";
 
 import { logoutAction } from "@/features/panel-auth/actions";
@@ -7,17 +5,12 @@ import { shellCopy } from "@/features/panel-shell/copy/shell";
 
 /**
  * "Sair" (AC 8, P15): a POST form to logoutAction, never a link or a GET (a
- * prefetched GET logout is CSRF and self-logout). Afterwards a full page
- * load, which drops the client router cache.
+ * prefetched GET logout is CSRF and self-logout). The action redirects to
+ * /entrar itself; no client navigation races it.
  */
 export function LogoutItem(): JSX.Element {
-  async function logout(): Promise<void> {
-    const { next } = await logoutAction();
-    window.location.assign(next);
-  }
-
   return (
-    <form action={logout}>
+    <form action={logoutAction}>
       <button
         type="submit"
         role="menuitem"

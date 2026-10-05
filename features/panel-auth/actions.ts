@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import {
@@ -351,7 +352,7 @@ export async function resetPasswordAction(
   return commonFailure(error);
 }
 
-/** Where logout lands: a full page load drops the client's router cache (P15). */
+/** Where logout lands (P15). */
 const AFTER_LOGOUT = "/entrar?motivo=saiu";
 
 /**
@@ -359,8 +360,14 @@ const AFTER_LOGOUT = "/entrar?motivo=saiu";
  * a GET). Revokes the session server-side, then deletes the cookie even if
  * that call failed, so this browser is logged out either way. A pending
  * sign-up cookie goes too (ADR-0009 rule 10).
+ *
+ * The server redirects: an action that mutates cookies otherwise re-renders
+ * the current panel route in its response, whose requireSession() — the
+ * cookie now gone — redirects to motivo=sessao and can beat a client-side
+ * navigation (WebKit did). The redirect renders /entrar instead, and the
+ * cookie change makes the client drop its whole router cache.
  */
-export async function logoutAction(): Promise<{ ok: true; next: string }> {
+export async function logoutAction(): Promise<never> {
   await assertPanelHost();
   const token = await readSessionToken();
   if (token !== undefined) {
@@ -374,5 +381,5 @@ export async function logoutAction(): Promise<{ ok: true; next: string }> {
   }
   await deleteSessionCookie();
   await deleteSignupCookie();
-  return { ok: true, next: AFTER_LOGOUT };
+  redirect(AFTER_LOGOUT);
 }

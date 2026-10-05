@@ -26,14 +26,14 @@ describe("LogoutItem (AC 8, P15)", () => {
     expect(item.closest("form")).not.toBeNull();
   });
 
-  it("logs out, then a full page load to /entrar?motivo=saiu", async () => {
-    logoutAction.mockResolvedValue({ ok: true, next: "/entrar?motivo=saiu" });
+  it("posts straight to logoutAction, which owns the redirect: no client navigation races it", async () => {
+    logoutAction.mockResolvedValue(undefined);
     render(<LogoutItem />);
     await act(async () => {
       fireEvent.click(screen.getByRole("menuitem", { name: "Sair" }));
     });
 
     expect(logoutAction).toHaveBeenCalledOnce();
-    expect(assign).toHaveBeenCalledWith("/entrar?motivo=saiu");
+    expect(assign).not.toHaveBeenCalled();
   });
 });

@@ -24,6 +24,13 @@ async function confirm(page: Page, code: string): Promise<void> {
     ),
     page.getByRole("button", { name: "Confirmar" }).click(),
   ]);
+  // The response lands before the form handles it: until the busy label
+  // "Confirmando…" is gone, the submit guard is still set and drops the next
+  // press. Waiting for the label to go (not for "Confirmar" to come back) also
+  // holds when a right code navigates away from this screen.
+  await expect(
+    page.getByRole("button", { name: "Confirmando…" }),
+  ).toHaveCount(0);
 }
 
 test.describe("/cadastro/confirmar @feature-ops-panel @panel-access @panel-phone", () => {
