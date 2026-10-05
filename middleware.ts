@@ -56,6 +56,11 @@ function wantsFlight(request: NextRequest): boolean {
   return (request.headers.get("accept") ?? "").includes("text/x-component");
 }
 
+/** A Server Action request (Next's own header, kept through middleware). */
+function isServerAction(request: NextRequest): boolean {
+  return request.headers.has("next-action");
+}
+
 /** The internal path this request renders, or undefined to pass it through. */
 function internalPath(
   kind: "panel" | "link",
@@ -96,7 +101,15 @@ export function middleware(request: NextRequest): NextResponse {
   // locally that origin is the link host. A plain 404 (not a Flight payload)
   // makes Next fall back to a client navigation, which the panel host routes
   // (ADR-0008 spike, T41). A link page never needs a payload from off /v/*.
-  if (kind === "link" && !isLinkPath(pathname) && wantsFlight(request))
+  // Nor a Server Action, whatever its Accept: Next forwards an action a page
+  // doesn't own to the owning page on the same host, and off /v/* the link
+  // host would rewrite that to the not-found page, which forwards it again,
+  // without end (one request exhausted the server's memory).
+  if (
+    kind === "link" &&
+    !isLinkPath(pathname) &&
+    (wantsFlight(request) || isServerAction(request))
+  )
     return new NextResponse(null, { status: 404 });
 
   const panel = kind === "panel";

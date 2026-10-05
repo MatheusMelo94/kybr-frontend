@@ -285,5 +285,27 @@ test.describe("loginAction off the panel host @feature-ops-panel @panel-access",
     });
     expect(response.status()).toBe(404);
     expect(await callsFor(request, email)).toEqual([]);
+
+    // On a link path middleware passes it on, and Next forwards the action
+    // to the page that owns it. With any Accept, that ends at once with no
+    // API call and no cookie, and the server stays up (it once looped).
+    for (const accept of ["text/x-component", "text/html"]) {
+      const started = Date.now();
+      const replay = await request.post(`${LINK_URL}/v/loja-exemplo`, {
+        headers: {
+          "next-action": headers["next-action"] ?? "",
+          "content-type": headers["content-type"] ?? "text/plain;charset=UTF-8",
+          accept,
+          origin: LINK_URL,
+        },
+        data: body,
+        timeout: 10_000,
+      });
+      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(replay.headers()["set-cookie"]).toBeUndefined();
+      expect(await replay.text()).not.toContain("sessao");
+    }
+    expect(await callsFor(request, email)).toEqual([]);
+    expect((await request.get(`${LINK_URL}/api/health`)).status()).toBe(200);
   });
 });

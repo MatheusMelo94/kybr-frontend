@@ -87,3 +87,30 @@ describe("middleware: shared paths (P4-001)", () => {
     });
   }
 });
+
+describe("middleware: Server Actions on the link host (action-forwarding loop)", () => {
+  const action = (path: string, accept: string) =>
+    new NextRequest(`http://localhost:3000${path}`, {
+      method: "POST",
+      headers: {
+        host: "kybr.test",
+        "next-action": "40c0cdc082a5712b05ef1d53a1fa2ee96d4ccc7b9f",
+        accept,
+      },
+    });
+
+  for (const accept of ["text/x-component", "text/html", "*/*"]) {
+    it(`a POST with next-action off /v/* is a plain 404 (Accept: ${accept})`, () => {
+      for (const path of ["/entrar", "/painel/entrar", "/_kybr/nao-encontrado"]) {
+        const response = middleware(action(path, accept));
+        expect(response.status).toBe(404);
+        expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+      }
+    });
+  }
+
+  it("a POST with next-action on /v/* goes on (the link's own actions)", () => {
+    const response = middleware(action("/v/loja-exemplo", "text/x-component"));
+    expect(response.status).not.toBe(404);
+  });
+});
