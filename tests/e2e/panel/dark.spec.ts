@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { actionId } from "../fixtures/actions.ts";
 import {
   PANEL_URL,
   callsFor,
@@ -95,5 +96,28 @@ test.describe("PANEL_HOST unset @feature-ops-panel @panel-dark", () => {
       const response = await request.get(`${origin}/api/health`);
       expect(response.status()).toBe(200);
     }
+  });
+
+  test("a panel action id POSTed with an HTML Accept to the dark link host ends at once, with no API call", async ({
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("dark-encaminhada", testInfo);
+    for (const path of ["/v/loja-exemplo", "/entrar"]) {
+      const started = Date.now();
+      const response = await request.post(`${DARK_LINK}${path}`, {
+        headers: {
+          "next-action": actionId("loginAction"),
+          "content-type": "text/plain;charset=UTF-8",
+          accept: "text/html",
+          origin: DARK_LINK,
+        },
+        data: JSON.stringify([{ email, senha: "senha-correta-123" }]),
+        timeout: 10_000,
+      });
+      expect(Date.now() - started).toBeLessThan(3_000);
+      expect([200, 404]).toContain(response.status());
+    }
+    expect(await callsFor(request, email)).toEqual([]);
+    expect((await request.get(`${DARK_LINK}/api/health`)).status()).toBe(200);
   });
 });

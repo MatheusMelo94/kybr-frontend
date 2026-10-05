@@ -101,7 +101,11 @@ describe("middleware: Server Actions on the link host (action-forwarding loop)",
 
   for (const accept of ["text/x-component", "text/html", "*/*"]) {
     it(`a POST with next-action off /v/* is a plain 404 (Accept: ${accept})`, () => {
-      for (const path of ["/entrar", "/painel/entrar", "/_kybr/nao-encontrado"]) {
+      for (const path of [
+        "/entrar",
+        "/painel/entrar",
+        "/_kybr/nao-encontrado",
+      ]) {
         const response = middleware(action(path, accept));
         expect(response.status).toBe(404);
         expect(response.headers.get("x-middleware-rewrite")).toBeNull();
@@ -112,5 +116,54 @@ describe("middleware: Server Actions on the link host (action-forwarding loop)",
   it("a POST with next-action on /v/* goes on (the link's own actions)", () => {
     const response = middleware(action("/v/loja-exemplo", "text/x-component"));
     expect(response.status).not.toBe(404);
+  });
+});
+
+describe("middleware: Next's action forwarding never chains (HIGH, branch-introduced)", () => {
+  const post = (
+    path: string,
+    host: string,
+    headers: Record<string, string> = {},
+  ) =>
+    new NextRequest(`http://localhost:3000${path}`, {
+      method: "POST",
+      headers: { host, accept: "text/html", ...headers },
+    });
+
+  for (const host of ["app.kybr.test", "kybr.test", "evil.example"])
+    for (const path of [
+      "/entrar",
+      "/v/loja-exemplo",
+      "/painel/entrar",
+      "/api/health",
+    ])
+      it(`a forwarded action (x-action-forwarded) is a plain 404 on ${host}${path}`, () => {
+        const response = middleware(
+          post(path, host, {
+            "next-action": "40c0cdc082a5712b05ef1d53a1fa2ee96d4ccc7b9f",
+            "x-action-forwarded": "1",
+          }),
+        );
+        expect(response.status).toBe(404);
+        expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+      });
+
+  it("the panel host refuses next-action on a /painel path (never an external one)", () => {
+    for (const path of ["/painel", "/painel/entrar", "/painel/painel/x"]) {
+      const response = middleware(
+        post(path, "app.kybr.test", { "next-action": "ab".repeat(21) }),
+      );
+      expect(response.status).toBe(404);
+    }
+  });
+
+  it("the panel host still routes its own actions on external paths", () => {
+    const response = middleware(
+      post("/entrar", "app.kybr.test", { "next-action": "ab".repeat(21) }),
+    );
+    expect(response.status).not.toBe(404);
+    expect(response.headers.get("x-middleware-rewrite")).toMatch(
+      /\/painel\/entrar$/,
+    );
   });
 });
