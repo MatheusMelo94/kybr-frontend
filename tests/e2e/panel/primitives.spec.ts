@@ -111,7 +111,7 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
 
   test("FormAlert is danger ink; a focusable Notice (info) has the line border and the focus ring", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.goto("/entrar?motivo=sessao");
     const notice = page.getByRole("status").filter({ hasText: /sessão/i });
     await expect(notice).toBeFocused();
@@ -119,7 +119,7 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
       await tokenValue(page, "--color-line", "borderColor"),
     );
 
-    await page.getByLabel("E-mail").fill("ninguem@exemplo.test");
+    await page.getByLabel("E-mail").fill(uniqueEmail("ninguem", testInfo));
     await page.getByLabel("Senha").fill("senha-errada-000");
     await page.getByRole("button", { name: "Entrar" }).click();
     const alert = page.getByRole("main").getByRole("alert");
