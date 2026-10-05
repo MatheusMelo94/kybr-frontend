@@ -43,12 +43,13 @@
   --color-success: #1f9d55;
   --color-success-ink: #157a45;
   --color-danger-ink: #c4302a;
-  /* The panel's status colors (spec § Design Handoff 6). Text uses the -ink
-     tokens; --color-badge-monitor is the product's only blue. */
-  --color-warning: #b8820f;
+  /* The status colors (spec § Design Handoff 6; brand v1, DDR-0003): a
+     signal shows as a dot or a bar with ink text next to it, never as a text
+     colour or a fill. --color-monitor is the product's only blue. */
+  --color-warning: #d99a1b;
   --color-warning-ink: #8a6000;
   --color-danger: #d6372f;
-  --color-badge-monitor: #0066ff;
+  --color-monitor: #0066ff;
   --color-badge-monitor-ink: #ffffff;
   /* White on --color-danger in both themes (4.72:1): the late Fila badge. */
   --color-danger-badge-ink: #ffffff;
@@ -131,7 +132,6 @@
       --color-success: #1f9d55;
       --color-success-ink: #1f9d55;
       --color-danger-ink: #e5534b;
-      --color-warning: #d99a1b;
       --color-warning-ink: #e9b64a;
     }
   }
@@ -151,7 +151,6 @@
     --color-success: #1f9d55;
     --color-success-ink: #1f9d55;
     --color-danger-ink: #e5534b;
-    --color-warning: #d99a1b;
     --color-warning-ink: #e9b64a;
   }
 
