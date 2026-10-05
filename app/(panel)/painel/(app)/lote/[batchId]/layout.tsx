@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { JSX, ReactNode } from "react";
 
+import { BatchFocusKeeper } from "@/features/panel-lote/components/batch-focus-keeper";
 import { loadBatch } from "@/features/panel-lote/data";
 import { isBatchId } from "@/features/panel-lote/validation";
 import { requireSession } from "@/lib/api/panel/session";
@@ -14,7 +15,8 @@ type Props = {
 // outside A-X3/C10 → not found with no API call; unknown or foreign (PB10) →
 // the same not found. Other failures fall through to the page, whose
 // error.tsx shows error.load.* (the read is cached, so it isn't repeated).
-// T81 adds BatchFocusKeeper here.
+// BatchFocusKeeper keeps "focus was in the progress region" across the
+// router.refresh() that swaps the progress for the result (T81, T82).
 export default async function BatchLayout({
   children,
   params,
@@ -24,5 +26,5 @@ export default async function BatchLayout({
   await requireSession();
   const result = await loadBatch(batchId);
   if (!result.ok && result.error.code === "LOTE_NAO_ENCONTRADO") notFound();
-  return <>{children}</>;
+  return <BatchFocusKeeper>{children}</BatchFocusKeeper>;
 }

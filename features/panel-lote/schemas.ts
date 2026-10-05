@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   MAX_ROWS,
+  isBatchId,
   isValidExtId,
   isValidResponsavel,
   isWireCnpj,
@@ -36,3 +37,8 @@ export const startBatchSchema = z
   .strict();
 
 export type StartBatchInput = z.infer<typeof startBatchSchema>;
+
+/** A batch action's input (poll, to-queue, monitor, resume): an A-X3/C10 id only. */
+export const batchRefSchema = z
+  .object({ batchId: z.string().refine(isBatchId) })
+  .strict();

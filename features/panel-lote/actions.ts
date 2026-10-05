@@ -2,8 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { startBatchSchema } from "@/features/panel-lote/schemas";
-import { startBatch } from "@/lib/api/panel/batches";
+import {
+  batchRefSchema,
+  startBatchSchema,
+} from "@/features/panel-lote/schemas";
+import { POLL_TIMEOUT_MS } from "@/features/panel-shell/polling";
+import { getBatch, startBatch } from "@/lib/api/panel/batches";
+import type { Batch } from "@/lib/api/schemas/panel/batches";
 import { assertPanelHost } from "@/lib/api/panel/host";
 import { requireSession } from "@/lib/api/panel/session";
 import { panelPath } from "@/lib/panel-paths";
@@ -52,4 +57,35 @@ export async function startBatchAction(input: unknown): Promise<StartResult> {
   // MUITAS_LINHAS, SEM_CNPJ_VALIDO, VALOR_INVALIDO: the worker already
   // filtered, so these are unexpected; like a network failure, retryable.
   return { ok: false, code: "NETWORK" };
+}
+
+export type PollResult =
+  | { ok: true; batch: Pick<Batch, "estado" | "total" | "processados"> }
+  | { ok: false; code: "NOT_FOUND" | "SESSAO_EXPIRADA" | "FAILED" };
+
+/**
+ * A read-only action for BatchProgress, from /lote/[batchId] (ADR-0011 rule
+ * 3): the batch's progress, nothing else. requireSession() and the batch
+ * read both carry X-Kybr-Poll, so a poll never slides the idle session
+ * (M4-02, C7), with the poll's 4 s timeout. A bad, unknown or foreign id is
+ * NOT_FOUND; any other failure is FAILED (the leaf shows it as stale).
+ */
+export async function pollBatchAction(input: unknown): Promise<PollResult> {
+  await assertPanelHost();
+  const parsed = batchRefSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "NOT_FOUND" };
+  await requireSession({ pollTimeoutMs: POLL_TIMEOUT_MS });
+
+  const result = await getBatch(parsed.data.batchId, {
+    pollTimeoutMs: POLL_TIMEOUT_MS,
+  });
+  if (result.ok) {
+    const { estado, total, processados } = result.data;
+    return { ok: true, batch: { estado, total, processados } };
+  }
+  if (result.error.code === "LOTE_NAO_ENCONTRADO")
+    return { ok: false, code: "NOT_FOUND" };
+  if (result.error.code === "SESSAO_EXPIRADA")
+    return { ok: false, code: "SESSAO_EXPIRADA" };
+  return { ok: false, code: "FAILED" };
 }
