@@ -24,6 +24,11 @@ async function confirm(page: Page, code: string): Promise<void> {
     ),
     page.getByRole("button", { name: "Confirmar" }).click(),
   ]);
+  // The response lands before the form handles it: until the button reads
+  // "Confirmar" again the submit guard is still set and drops the next press.
+  await expect(
+    page.getByRole("button", { name: "Confirmar", exact: true }),
+  ).toBeVisible();
 }
 
 test.describe("/cadastro/confirmar @feature-ops-panel @panel-access @panel-phone", () => {

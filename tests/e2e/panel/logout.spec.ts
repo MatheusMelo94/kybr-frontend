@@ -14,7 +14,7 @@ import {
 test.use({ viewport: { width: 1280, height: 800 } });
 
 test.describe("Sair @feature-ops-panel @panel-access @panel-smoke", () => {
-  test("a POST that revokes the session, deletes the cookie and lands on /entrar with a full load; Back never shows the shell; the old token gets 401", async ({
+  test("a POST that revokes the session, deletes the cookie and redirects from the server to /entrar, dropping the router cache; Back never shows the shell; the old token gets 401", async ({
     page,
     request,
   }, testInfo) => {
@@ -29,24 +29,28 @@ test.describe("Sair @feature-ops-panel @panel-access @panel-smoke", () => {
     const shell = await page.request.get(shellUrl);
     expect(shell.headers()["cache-control"]).toMatch(/\bno-store\b/);
 
-    const logoutRequest = page.waitForRequest(
-      (req) =>
-        req.method() === "POST" && req.headers()["next-action"] !== undefined,
+    const logoutResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.request().headers()["next-action"] !== undefined,
     );
     await page.getByRole("button", { name: "Conta" }).click();
     await page.getByRole("menuitem", { name: "Sair" }).click();
-    expect((await logoutRequest).method()).toBe("POST");
+    const response = await logoutResponse;
+    expect(response.request().method()).toBe("POST");
+    // The server picks the destination; the cookie flag (the tuple's third
+    // element) makes the client router drop its whole cache.
+    expect(await response.headerValue("x-action-redirect")).toMatch(
+      /^\/entrar\?motivo=saiu;/,
+    );
+    expect(
+      JSON.parse((await response.headerValue("x-action-revalidated")) ?? "[]"),
+    ).toEqual([[], 0, 1]);
 
     await expect(page).toHaveURL(/\/entrar\?motivo=saiu$/);
     await expect(
       page.getByRole("status").filter({ hasText: "Você saiu do painel." }),
     ).toBeFocused();
-    // A full page load, not a client-side push: the navigation entry is new.
-    expect(
-      await page.evaluate(
-        () => performance.getEntriesByType("navigation").length,
-      ),
-    ).toBe(1);
     expect(await sessionCookie(page)).toBeUndefined();
     expect(await logoutsFor(request, email)).toBe(1);
 
