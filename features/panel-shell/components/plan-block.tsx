@@ -3,6 +3,7 @@ import type { JSX } from "react";
 import { StatusDot } from "@/components/ui/status-dot";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
 import { fill, formatDate, formatNumber } from "@/features/panel-shell/format";
+import { planTitle } from "@/features/panel-shell/plan-title";
 import type { Plano } from "@/lib/api/schemas/panel/me";
 
 type Props = {
@@ -29,11 +30,7 @@ export function PlanBlock({ plano, contratarHref }: Props): JSX.Element | null {
 
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-line p-3">
-      <p className="text-secondary font-strong text-ink">
-        {plano.tipo === "pago" && plano.nome !== undefined
-          ? fill(shellCopy["plan.paid.title"], { nome: plano.nome })
-          : shellCopy["plan.trial.title"]}
-      </p>
+      <p className="text-secondary font-strong text-ink">{planTitle(plano)}</p>
       {none ? (
         <>
           <p className="text-secondary text-ink-muted">

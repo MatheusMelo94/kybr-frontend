@@ -105,6 +105,17 @@ describe("WorkspaceBlock, the sidebar top (AC 9, brand v1)", () => {
 describe("PlanBlock (AC 12, S5)", () => {
   const trial = { tipo: "teste", usadas: 40, limite: 200 } as const;
 
+  it("a paid plan without nome is titled plan.unnamed, never Teste grátis (AC 12, P4-007)", () => {
+    render(
+      <PlanBlock
+        plano={{ tipo: "pago", usadas: 1240, limite: 5000 }}
+        contratarHref={undefined}
+      />,
+    );
+    expect(screen.getByText("Seu plano")).toBeVisible();
+    expect(screen.queryByText("Teste grátis")).not.toBeInTheDocument();
+  });
+
   it("trial: plan.trial.*, no Contratar while the commercial address is unset (P-U4)", () => {
     render(<PlanBlock plano={trial} contratarHref={undefined} />);
     expect(screen.getByText("Teste grátis")).toBeInTheDocument();
