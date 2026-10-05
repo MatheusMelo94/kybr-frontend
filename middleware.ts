@@ -33,13 +33,15 @@ const LINK_NOT_FOUND_PATH = "/_kybr/nao-encontrado";
 
 /**
  * Paths both hosts serve as they are (ADR-0008 rule 5). /favicon.ico is the
- * empty 204 route: browsers ask for it on every page (P4-001).
+ * icon browsers ask for on every page (P4-001); /brand/* are the static
+ * icons in public/ (brand v1).
  */
 function isShared(pathname: string): boolean {
   return (
     pathname.startsWith("/_next/") ||
     pathname === CSP_REPORT_PATH ||
-    pathname === "/favicon.ico"
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/brand/")
   );
 }
 
