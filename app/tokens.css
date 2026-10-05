@@ -41,17 +41,13 @@
   --color-accent-ink: #ffffff;
   --color-focus: #141414;
   --color-success: #1f9d55;
-  --color-success-ink: #157a45;
   --color-danger-ink: #c4302a;
-  /* The panel's status colors (spec § Design Handoff 6). Text uses the -ink
-     tokens; --color-badge-monitor is the product's only blue. */
-  --color-warning: #b8820f;
-  --color-warning-ink: #8a6000;
+  /* The status colors (spec § Design Handoff 6; brand v1, DDR-0003): a
+     signal shows as a dot or a bar with ink text next to it, never as a text
+     colour or a fill. --color-monitor is the product's only blue. */
+  --color-warning: #d99a1b;
   --color-danger: #d6372f;
-  --color-badge-monitor: #0066ff;
-  --color-badge-monitor-ink: #ffffff;
-  /* White on --color-danger in both themes (4.72:1): the late Fila badge. */
-  --color-danger-badge-ink: #ffffff;
+  --color-monitor: #0066ff;
 
   /* Type: Inter variable via next/font (--font-inter on <html>) */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -59,6 +55,14 @@
   --text-secondary: 0.8125rem;
   --text-title: 2rem;
   --text-title--line-height: 1.15;
+  /* Brand v1 (identity.md › Typography): Lead 20 / 300, h2 20, the panel's
+     verdict 26, Label 12, and 16 px input text (no iOS zoom on focus). */
+  --text-lead: 1.25rem;
+  --text-lead--line-height: 1.4;
+  --text-h2: 1.25rem;
+  --text-verdict: 1.625rem;
+  --text-label: 0.75rem;
+  --text-input: 1rem;
   --font-weight-title: 652;
   --font-weight-body: 456;
   --font-weight-strong: 600;
@@ -121,10 +125,7 @@
       --color-accent-ink: #141414;
       --color-focus: #f5f5f5;
       --color-success: #1f9d55;
-      --color-success-ink: #1f9d55;
       --color-danger-ink: #e5534b;
-      --color-warning: #d99a1b;
-      --color-warning-ink: #e9b64a;
     }
   }
 
@@ -141,10 +142,7 @@
     --color-accent-ink: #141414;
     --color-focus: #f5f5f5;
     --color-success: #1f9d55;
-    --color-success-ink: #1f9d55;
     --color-danger-ink: #e5534b;
-    --color-warning: #d99a1b;
-    --color-warning-ink: #e9b64a;
   }
 
   body {

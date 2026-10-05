@@ -10,7 +10,6 @@ import { LivePlanBlock } from "@/features/panel-shell/components/live-plan-block
 import { ShellStatusPoller } from "@/features/panel-shell/components/shell-status-poller";
 import { TopBar } from "@/features/panel-shell/components/top-bar";
 import { WorkspaceBlock } from "@/features/panel-shell/components/workspace-block";
-import { globalCopy } from "@/features/panel-shell/copy/global";
 import { navItemsInBuild } from "@/features/panel-shell/nav";
 import { ShellStatusProvider } from "@/features/panel-shell/shell-status-context";
 import type { Contagens, Plano } from "@/lib/api/schemas/panel/me";
@@ -51,14 +50,9 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
             </div>
           </header>
           <aside className="hidden w-(--size-sidebar) shrink-0 flex-col gap-6 border-r border-line p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
-            <p className="px-3 text-body font-title text-ink">
-              {globalCopy.brand}
-            </p>
-            <div className="px-3">
-              <WorkspaceBlock
-                nome={shell.workspaceNome}
-                vendedores={shell.contagens?.vendedores}
-              />
+            {/* The sidebar top, then a hairline before the nav (Aplicações board). */}
+            <div className="border-b border-line px-3 pb-4">
+              <WorkspaceBlock nome={shell.workspaceNome} plano={shell.plano} />
             </div>
             <PanelNav items={items} />
             <div className="mt-auto flex flex-col gap-3">

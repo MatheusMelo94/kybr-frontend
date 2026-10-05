@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+import { BRAND_FILES } from "./lib/brand-assets";
 import { parseServerEnv } from "./lib/env-schema";
 
 // Fail `next build` / `next start` on a missing or invalid variable, so a bad
@@ -39,6 +40,29 @@ const nextConfig: NextConfig = {
         source: "/v/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
+      // Static SVG art: it renders nothing active even when opened directly
+      // (Security 0002). The page CSP comes from middleware, which these
+      // shared files skip.
+      ...BRAND_FILES.filter((file) => file.endsWith(".svg")).map((source) => ({
+        source,
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+          },
+        ],
+      })),
+      // The brand icons (public/): a day in the browser and on the CDN, as
+      // the old 204 route was (review 0023).
+      ...["/favicon.ico", ...BRAND_FILES].map((source) => ({
+        source,
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, s-maxage=86400",
+          },
+        ],
+      })),
     ];
   },
 };

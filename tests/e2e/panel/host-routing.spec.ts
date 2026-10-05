@@ -73,11 +73,7 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     ).toBeVisible();
   });
 
-  for (const path of [
-    "/painel/x",
-    "/painel",
-    "/v/loja-exemplo",
-  ]) {
+  for (const path of ["/painel/x", "/painel", "/v/loja-exemplo"]) {
     test(`the panel host answers ${path} with the panel's not-found`, async ({
       page,
     }) => {
@@ -90,12 +86,34 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     });
   }
 
-  test("/favicon.ico is the shared 204 on both hosts, and /entrar logs no console error (P4-001)", async ({
+  test("both hosts serve the Kybr icons, cached, and /entrar logs no console error (P4-001, AC 41 / 75)", async ({
     page,
   }) => {
+    for (const host of ["127.0.0.1:3000", "localhost:3000"])
+      for (const path of [
+        "/favicon.ico",
+        "/brand/kybr-icon.svg",
+        "/brand/apple-touch-icon.png",
+      ]) {
+        const response = await rawGet(path, host);
+        expect(response.status).toBe(200);
+        expect(response.headers["cache-control"]).toContain("max-age=86400");
+      }
+
+    // The SVG is sandboxed on its own (Security 0002).
     for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
-      const response = await rawGet("/favicon.ico", host);
-      expect(response.status).toBe(204);
+      const svg = await rawGet("/brand/kybr-icon.svg", host);
+      expect(svg.headers["content-security-policy"]).toBe(
+        "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      );
+    }
+
+    // Only those exact files pass through (Security 0001): any other /brand/
+    // path is the host's normal 404, with its CSP.
+    for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
+      const nope = await rawGet("/brand/nope", host);
+      expect(nope.status).toBe(404);
+      expect(nope.headers["content-security-policy"]).toContain("default-src");
     }
 
     const errors: string[] = [];
@@ -105,6 +123,26 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     await page.goto("/entrar");
     await page.waitForLoadState("networkidle");
     expect(errors).toEqual([]);
+
+    // S1–S4 open with the 80 px wordmark, named Kybr (AC 75).
+    const wordmark = page.getByRole("main").getByRole("img", { name: "Kybr" });
+    expect((await wordmark.boundingBox())?.width).toBe(80);
+    // B-004: the glyphs (not the lockup's clear space) line up with the h1.
+    const [glyphLeft, h1Left] = await page.evaluate(() => [
+      document.querySelector("main svg path")!.getBoundingClientRect().left,
+      document.querySelector("main h1")!.getBoundingClientRect().left,
+    ]);
+    expect(Math.abs(glyphLeft - h1Left)).toBeLessThanOrEqual(1);
+    await expect(page.getByText("Kybr", { exact: true })).toHaveCount(0);
+
+    // The share image: the panel's, absolute on the panel host (AC 75).
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      "content",
+      "http://127.0.0.1:3000/brand/kybr-og-1200x630.png",
+    );
+    const image = await page.request.get("/brand/kybr-og-1200x630.png");
+    expect(image.status()).toBe(200);
+    expect((await image.body()).length).toBeLessThanOrEqual(80 * 1024);
   });
 
   test("the link host still serves /v/*", async ({ page }) => {

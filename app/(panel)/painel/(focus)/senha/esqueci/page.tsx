@@ -22,7 +22,7 @@ export default async function EsqueciPage(): Promise<JSX.Element> {
         <h1 className="text-title font-title text-ink">
           {resetCopy["reset.h1"]}
         </h1>
-        <p className="text-body font-lead text-ink-muted">
+        <p className="text-lead font-lead text-ink-muted">
           {resetCopy["reset.lead"]}
         </p>
       </div>

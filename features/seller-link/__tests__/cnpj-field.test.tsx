@@ -71,6 +71,8 @@ describe("CnpjField", () => {
     );
   });
 
+  // Tabular figures on the CNPJ: brand.spec checks font-variant-numeric.
+
   it.each([
     ["12abc34501de35", "12.ABC.345/01DE-35"],
     ["11222333000181", "11.222.333/0001-81"],

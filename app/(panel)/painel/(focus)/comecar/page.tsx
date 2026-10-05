@@ -26,7 +26,7 @@ export default async function ComecarPage(): Promise<JSX.Element> {
         <h1 className="text-title font-title text-ink">
           {onboardingCopy["onb.h1"]}
         </h1>
-        <p className="text-body font-lead text-ink-muted">
+        <p className="text-lead font-lead text-ink-muted">
           {onboardingCopy["onb.lead"]}
         </p>
       </div>

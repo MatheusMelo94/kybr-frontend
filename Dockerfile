@@ -41,9 +41,12 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 RUN addgroup -S app && adduser -S app -G app
-# The standalone server and the static assets only. There is no public/ yet.
+# The standalone server (app-owned: Next writes its cache under .next), then
+# the static assets and public/ (the brand icons) root-owned, so the serving
+# user can read but never modify them (Security 0003).
 COPY --from=build --chown=app:app /app/.next/standalone ./
-COPY --from=build --chown=app:app /app/.next/static ./.next/static
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
 USER app
 EXPOSE 3000
 # 127.0.0.1, not localhost: Alpine's busybox wget takes the first address musl

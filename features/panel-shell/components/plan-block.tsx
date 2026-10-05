@@ -1,7 +1,9 @@
 import type { JSX } from "react";
 
+import { StatusDot } from "@/components/ui/status-dot";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
 import { fill, formatDate, formatNumber } from "@/features/panel-shell/format";
+import { planTitle } from "@/features/panel-shell/plan-title";
 import type { Plano } from "@/lib/api/schemas/panel/me";
 
 type Props = {
@@ -12,14 +14,6 @@ type Props = {
 
 const LINK =
   "inline-flex min-h-6 items-center text-secondary font-strong text-ink underline underline-offset-4 hover:decoration-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-11";
-
-/** A paid plan without nome is plan.unnamed, never plan.trial.title (spec v1.3, D-W1). */
-function title(plano: Plano): string {
-  if (plano.tipo === "teste") return shellCopy["plan.trial.title"];
-  return plano.nome === undefined
-    ? shellCopy["plan.unnamed"]
-    : fill(shellCopy["plan.paid.title"], { nome: plano.nome });
-}
 
 /** The plan block (spec S5, AC 12): trial, paid, used up, none granted; hidden when /me lacks it. */
 export function PlanBlock({ plano, contratarHref }: Props): JSX.Element | null {
@@ -36,7 +30,7 @@ export function PlanBlock({ plano, contratarHref }: Props): JSX.Element | null {
 
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-line p-3">
-      <p className="text-secondary font-strong text-ink">{title(plano)}</p>
+      <p className="text-secondary font-strong text-ink">{planTitle(plano)}</p>
       {none ? (
         <>
           <p className="text-secondary text-ink-muted">
@@ -66,7 +60,9 @@ export function PlanBlock({ plano, contratarHref }: Props): JSX.Element | null {
             </p>
           )}
           {exhausted && (
-            <p className="text-secondary text-warning-ink">
+            // DDR-0003: ink text with a warning dot, never amber text.
+            <p className="flex items-baseline gap-2 text-secondary text-ink">
+              <StatusDot tone="warning" />
               {shellCopy["plan.exhausted"]}
             </p>
           )}

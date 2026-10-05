@@ -1,12 +1,13 @@
 import type { JSX } from "react";
 
+import { StatusDot } from "@/components/ui/status-dot";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
 import { fill, formatNumber } from "@/features/panel-shell/format";
+import { navCountClassName } from "@/features/panel-shell/nav-count-styles";
 import { plural } from "@/features/panel-shell/plural";
-import { cn } from "@/lib/utils";
 
-/** The danger dot's exclamation-in-circle: the late state's non-color cue (Q9, WCAG 1.4.1). */
+/** The exclamation-in-circle beside the danger dot: the late state's non-color cue (Q9, WCAG 1.4.1). */
 function AlertGlyph(): JSX.Element {
   return (
     <svg
@@ -30,15 +31,23 @@ function AlertGlyph(): JSX.Element {
 type Props = {
   abertos: number;
   vencidos: number;
+  /** The item is the current page: the count drops its pill (Aplicações board). */
+  active?: boolean;
 };
 
 /**
  * The Fila's count (AC 11): the visible number is aria-hidden, and the
  * link's accessible name carries nav.fila.count_sr.* (or _late). With an
- * overdue case: the danger badge, its glyph, and at 1280 a second line.
- * Zero hides it.
+ * overdue case: the same neutral pill with the danger dot and the glyph, and
+ * at 1280 a second line in ink-muted (brand v1, DDR-0003: the signal is a
+ * dot, never a red fill or red text). On the active item the count has no
+ * pill; the dot and the glyph stay (AC 71). Zero hides it.
  */
-export function NavCount({ abertos, vencidos }: Props): JSX.Element | null {
+export function NavCount({
+  abertos,
+  vencidos,
+  active = false,
+}: Props): JSX.Element | null {
   if (abertos <= 0) return null;
   const late = vencidos > 0;
   const n = formatNumber(abertos);
@@ -53,18 +62,16 @@ export function NavCount({ abertos, vencidos }: Props): JSX.Element | null {
       <span
         data-testid="nav-count"
         aria-hidden="true"
-        className={cn(
-          "ml-auto inline-flex min-w-6 items-center justify-center gap-1 rounded-full px-2 text-secondary font-strong tabular-nums",
-          late ? "bg-danger text-danger-badge-ink" : "bg-field text-ink",
-        )}
+        className={navCountClassName(active)}
       >
+        {late && <StatusDot tone="danger" />}
         {late && <AlertGlyph />}
         {n}
       </span>
       {late && (
         <span
           aria-hidden="true"
-          className="hidden w-full text-secondary text-danger-ink lg:block"
+          className="hidden w-full text-secondary text-ink-muted tabular-nums lg:block"
         >
           {fill(plural(shellCopy, "nav.fila.late", vencidos), { m })}
         </span>

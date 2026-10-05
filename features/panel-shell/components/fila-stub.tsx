@@ -10,7 +10,7 @@ export function FilaStub(): JSX.Element {
   return (
     <div className="flex flex-col gap-2">
       <h1 className="text-title font-title text-ink">{shellCopy["fila.h1"]}</h1>
-      <p className="text-body font-lead text-ink-muted">
+      <p className="text-lead font-lead text-ink-muted">
         {shellCopy["fila.lead"]}
       </p>
     </div>

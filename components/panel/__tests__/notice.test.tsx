@@ -33,14 +33,5 @@ describe("Notice", () => {
     expect(notice).toHaveFocus();
   });
 
-  // The info tone's colours: primitives.spec (Playwright).
-  it("each tone renders its own way (the text carries the meaning)", () => {
-    const looks = (["info", "warning", "danger"] as const).map((tone) => {
-      const { unmount } = render(<Notice tone={tone}>Texto</Notice>);
-      const look = screen.getByRole("status").className;
-      unmount();
-      return look;
-    });
-    expect(new Set(looks).size).toBe(3);
-  });
+  // Each tone's computed colours and bar: primitives.spec (Playwright).
 });

@@ -2,14 +2,21 @@ import type { JSX } from "react";
 
 import { cn } from "@/lib/utils";
 
+export type StatusTone =
+  "success" | "warning" | "danger" | "monitor" | "neutral";
+
 type Props = {
-  tone: "success" | "neutral";
+  tone: StatusTone;
 };
 
-const TONES = {
+// Brand v1 (DDR-0003): green, amber and red are answers; blue is monitoring.
+const TONES: Record<StatusTone, string> = {
   success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  monitor: "bg-monitor",
   neutral: "bg-ink-muted",
-} as const;
+};
 
 /** A decorative dot. Always pair it with text: color is never the only signal. */
 export function StatusDot({ tone }: Props): JSX.Element {

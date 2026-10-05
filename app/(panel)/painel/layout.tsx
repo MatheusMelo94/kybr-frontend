@@ -2,14 +2,30 @@ import type { Metadata } from "next";
 import type { JSX, ReactNode } from "react";
 
 import { assertPanelHost } from "@/lib/api/panel/host";
+import { panelOrigin } from "@/lib/panel-config";
 
 import "./panel.css";
 
 // The panel's root segment (ADR-0008): every panel-host path is rewritten
-// under it. Panel pages are never indexed (P03.5).
+// under it. Panel pages are never indexed (P03.5). The share image (brand
+// v1, DDR-0002; panel AC 75) is the panel's only: never on /v/*.
 export const metadata: Metadata = {
   title: { template: "%s · Kybr", default: "Kybr" },
   robots: { index: false, follow: false },
+  metadataBase: panelOrigin(),
+  openGraph: {
+    title: "Kybr",
+    description: "Verificação de empresas por link.",
+    images: [
+      {
+        url: "/brand/kybr-og-1200x630.png",
+        width: 1200,
+        height: 630,
+        alt: "Kybr. Saiba com quem você vende.",
+      },
+    ],
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 type Props = {

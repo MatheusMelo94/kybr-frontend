@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import RootLayout, { viewport } from "@/app/layout";
+import RootLayout, { metadata, viewport } from "@/app/layout";
 
 // next/font is a build-time transform; record how the layout configures it.
 const fontCalls = vi.hoisted((): unknown[] => []);
@@ -59,6 +59,16 @@ describe("RootLayout", () => {
     await RootLayout({ children: null });
 
     expect(connection).toHaveBeenCalledTimes(1);
+  });
+
+  it("links one icon set for both hosts: the .ico, the SVG and the apple-touch icon (link AC 41, panel AC 75)", () => {
+    expect(metadata.icons).toEqual({
+      icon: [
+        { url: "/favicon.ico", sizes: "48x48" },
+        { url: "/brand/kybr-icon.svg", type: "image/svg+xml" },
+      ],
+      apple: "/brand/apple-touch-icon.png",
+    });
   });
 
   it("declares both color schemes", () => {

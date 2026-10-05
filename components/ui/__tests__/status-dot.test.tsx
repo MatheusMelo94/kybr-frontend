@@ -15,8 +15,12 @@ describe("StatusDot", () => {
 
   it.each([
     ["success", "bg-success"],
+    ["warning", "bg-warning"],
+    ["danger", "bg-danger"],
+    ["monitor", "bg-monitor"],
     ["neutral", "bg-ink-muted"],
   ] as const)("uses the %s token color", (tone, token) => {
+    // The dot's colour token is its contract (DDR-0003: signal as a dot).
     const { container } = render(<StatusDot tone={tone} />);
 
     expect(container.firstElementChild).toHaveClass(token);

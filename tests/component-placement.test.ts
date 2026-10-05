@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-// ADR-0010 rule 3 (review P4-005): components/ui holds what the link uses,
-// and link.css scans all of it. A primitive only the panel renders goes in
+// ADR-0010 rule 3 (review P4-005): components/ui holds what the link uses
+// (shared or not yet wired), and link.css scans all of it. A primitive only the panel renders goes in
 // components/panel/, which link.css never scans, so its classes can't leak
 // into /v/* CSS without anyone keeping an exclusion list.
 
@@ -18,6 +18,13 @@ const LINK_SOURCES = [
   "components/ui",
 ];
 
+const PANEL_SOURCES = [
+  "features/panel-auth",
+  "features/panel-onboarding",
+  "features/panel-shell",
+  "app/(panel)",
+];
+
 function files(path: string): string[] {
   if (/\.tsx?$/.test(path)) return [path];
   return readdirSync(path, { withFileTypes: true, recursive: true })
@@ -27,22 +34,27 @@ function files(path: string): string[] {
 }
 
 describe("components/ui is the link's (ADR-0010 rule 3)", () => {
-  it("every components/ui module is imported by link code; panel-only ones live in components/panel", () => {
-    const link = LINK_SOURCES.flatMap(files).map((file) => ({
-      file,
-      text: readFileSync(file, "utf8"),
-    }));
-    const unused = files("components/ui")
-      .map((file) => file.replace(/^components\/ui\/|\.tsx?$/g, ""))
-      .filter(
-        (name) =>
-          !link.some(
-            ({ file, text }) =>
-              !file.endsWith(`/${name}.tsx`) &&
-              text.includes(`@/components/ui/${name}"`),
-          ),
+  it("no components/ui module is used by the panel alone: those live in components/panel", () => {
+    const read = (paths: string[]) =>
+      paths.flatMap(files).map((file) => ({
+        file,
+        text: readFileSync(file, "utf8"),
+      }));
+    const link = read(LINK_SOURCES);
+    const panel = read(PANEL_SOURCES);
+    const imports = (
+      sources: { file: string; text: string }[],
+      name: string,
+    ): boolean =>
+      sources.some(
+        ({ file, text }) =>
+          !file.endsWith(`/${name}.tsx`) &&
+          text.includes(`@/components/ui/${name}"`),
       );
-    expect(unused).toEqual([]);
+    const panelOnly = files("components/ui")
+      .map((file) => file.replace(/^components\/ui\/|\.tsx?$/g, ""))
+      .filter((name) => imports(panel, name) && !imports(link, name));
+    expect(panelOnly).toEqual([]);
   });
 
   it("link.css keeps no hand-kept exclusion list", () => {

@@ -34,7 +34,7 @@ export default async function CadastroPage(): Promise<JSX.Element> {
         <h1 className="text-title font-title text-ink">
           {signupCopy["signup.h1"]}
         </h1>
-        <p className="text-body font-lead text-ink-muted">
+        <p className="text-lead font-lead text-ink-muted">
           {signupCopy["signup.lead"]}
         </p>
       </div>

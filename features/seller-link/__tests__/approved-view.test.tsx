@@ -43,11 +43,19 @@ function rows(): string[] {
 }
 
 describe("ApprovedView (tudo certo)", () => {
-  it("AC 19: the seal is a dot plus text, and the h1 uses the first name as typed", () => {
+  it("AC 19: the seal reads 'Vendedor verificado por Kybr' (a dot, ink text, the inline wordmark), and the h1 uses the first name as typed", () => {
     render(<ApprovedView resultado={S4} marketplace="Loja Exemplo" />);
 
-    const seal = screen.getByText("Vendedor verificado");
-    expect(seal.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    // Found by its words, not a test id (review B-006: none ships).
+    const seal = screen.getByText("Vendedor verificado")
+      .parentElement as HTMLElement;
+    expect(seal.closest("[data-testid]")).toBeNull();
+    expect(seal.querySelector('[aria-hidden="true"]')).toBeEmptyDOMElement();
+    expect(within(seal).getByText("Vendedor verificado")).toBeVisible();
+    expect(within(seal).getByText("por")).toBeVisible();
+    expect(within(seal).getByRole("img", { name: "Kybr" })).toBeVisible();
+    // Words separated by real spaces, so it reads "… verificado por Kybr".
+    expect(seal.textContent).toBe("Vendedor verificado por ");
     expect(
       screen.getByRole("heading", { level: 1, name: "Tudo certo, Maria." }),
     ).toBeInTheDocument();

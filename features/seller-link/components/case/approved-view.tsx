@@ -74,9 +74,8 @@ export function ApprovedView({ resultado, marketplace }: Props): JSX.Element {
         </p>
       </div>
       {confirmations.length > 0 && (
-        // Outlined, not raised: the success pills keep the contrast the spec
-        // measured on surface (axe: success-ink on its tint over
-        // surface-raised falls under 4.5:1).
+        // Outlined, not raised: the rows' StatusPills are raised, so they
+        // need the surface behind them to read as pills.
         <ul className="divide-y divide-line rounded-xl border border-line px-4">
           {confirmations.map((confirmation) => (
             <ConfirmationRow

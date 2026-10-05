@@ -354,18 +354,20 @@ test.describe("accessibility and breakpoints @feature-seller-link", () => {
     });
   }
 
-  // The axe-heavy sweep (6 axe passes per test) runs one test at a time per
-  // project: in parallel with everything else it ran a renderer out of
-  // memory once under full load (review 0029). Other tests stay parallel.
+  // The axe-heavy sweep runs one test at a time per project: in parallel
+  // with everything else it ran a renderer out of memory once under full
+  // load (review 0029). Other tests stay parallel. One test per state and
+  // width (2 axe passes each, light and dark): a test covering all three
+  // widths ran close to the 30 s timeout under parallel load (QA-M4-001).
   test.describe("axe sweep", () => {
     test.describe.configure({ mode: "default" });
 
-    for (const [name, open] of STATES) {
-      test(`AC 34 / AC 35: ${name} at 360, 768 and 1280: axe in light and dark, no horizontal scroll, 44 px targets, a focus ring at every Tab stop`, async ({
-        page,
-        request,
-      }) => {
-        for (const width of WIDTHS) {
+    for (const [name, open] of STATES)
+      for (const width of WIDTHS)
+        test(`AC 34 / AC 35: ${name} at ${width}: axe in light and dark, no horizontal scroll, 44 px targets, a focus ring at every Tab stop`, async ({
+          page,
+          request,
+        }) => {
           await page.setViewportSize({ width, height: 900 });
           await open(page, request);
 
@@ -376,9 +378,7 @@ test.describe("accessibility and breakpoints @feature-seller-link", () => {
           expect(await smallTargets(page), `${width}px`).toEqual([]);
           await expectNoAxeViolations(page);
           expect(await stopsWithoutRing(page), `${width}px`).toEqual([]);
-        }
-      });
-    }
+        });
   });
 
   for (const [name, open] of STATES) {

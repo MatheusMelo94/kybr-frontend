@@ -36,7 +36,7 @@ export default async function FormPage({
       <StepIndicator step={1} />
       <div className="flex flex-col gap-3">
         <h1 className="text-title font-title">{formCopy["form.h1"]}</h1>
-        <p className="text-body font-lead text-ink-muted">
+        <p className="text-lead font-lead text-ink-muted">
           {formCopy["form.lead"]}
         </p>
       </div>

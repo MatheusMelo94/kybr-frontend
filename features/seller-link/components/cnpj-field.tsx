@@ -128,6 +128,7 @@ export function CnpjField({
       hint={formCopy["form.cnpj.hint"]}
       placeholder={formCopy["form.cnpj.placeholder"]}
       {...CNPJ_KEYBOARD}
+      tabularNums
       value={masked}
       onChange={(event: ChangeEvent<HTMLInputElement>) =>
         accept(

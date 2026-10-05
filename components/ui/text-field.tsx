@@ -34,6 +34,8 @@ type Props = {
   /** IME / dead-key composition: lets a filtering field leave the value alone while composing. */
   onCompositionStart?: (event: CompositionEvent<HTMLInputElement>) => void;
   onCompositionEnd?: (event: CompositionEvent<HTMLInputElement>) => void;
+  /** Tabular figures, for numbers that must not jitter as they're typed (CNPJ). */
+  tabularNums?: boolean;
   className?: string;
   ref?: Ref<HTMLInputElement>;
 };
@@ -58,6 +60,7 @@ export function TextField({
   onBlur,
   onCompositionStart,
   onCompositionEnd,
+  tabularNums = false,
   className,
   ref,
 }: Props): JSX.Element {
@@ -70,7 +73,7 @@ export function TextField({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <label htmlFor={id} className="text-xs font-strong text-ink">
+      <label htmlFor={id} className="text-label font-strong text-ink">
         {label}
       </label>
       <input
@@ -94,12 +97,13 @@ export function TextField({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         className={cn(
-          "h-12 w-full rounded-lg border border-field-line bg-field px-4 text-base text-ink",
+          "h-12 w-full rounded-lg border border-field-line bg-field px-4 text-input text-ink",
           // hover: applies to fine pointers only (Tailwind 4: @media (hover: hover)).
           "hover:border-ink-muted",
           "placeholder:text-ink-muted",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           "aria-invalid:border-danger-ink",
+          tabularNums && "tabular-nums",
         )}
       />
       {hint && (

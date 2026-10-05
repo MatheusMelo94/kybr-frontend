@@ -23,7 +23,7 @@ export function LoadError({ reset }: Props): JSX.Element {
     <div role="alert" className="flex flex-col gap-3">
       {/* An error boundary can't export metadata: React 19 hoists this title. */}
       <title>{globalCopy["error.load.title"]}</title>
-      <h2 ref={heading} tabIndex={-1} className="text-xl font-title text-ink">
+      <h2 ref={heading} tabIndex={-1} className="text-h2 font-title text-ink">
         {globalCopy["error.load.title"]}
       </h2>
       <p className="text-body text-ink-muted">

@@ -29,9 +29,30 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
 
     const sidebar = page.locator("aside");
     expect((await sidebar.boundingBox())?.width).toBe(240);
-    await expect(sidebar.getByText("Kybr", { exact: true })).toBeVisible();
+    // The sidebar top (brand v1): the symbol, the workspace, the plan title.
+    const symbol = sidebar.getByRole("img", { name: "Kybr" });
+    expect((await symbol.boundingBox())?.width).toBe(32);
+    await expect(sidebar.getByText("Kybr", { exact: true })).toHaveCount(0);
     await expect(sidebar.getByText("Loja Exemplo")).toBeVisible();
-    await expect(sidebar.getByText("1.240 vendedores")).toBeVisible();
+    await expect(sidebar.getByText("1.240 vendedores")).toHaveCount(0);
+    // B-005: a hairline in --color-line separates the top block from the nav.
+    const [border, line, navBelow] = await symbol.evaluate((element) => {
+      const block = element.closest("aside > div") as HTMLElement;
+      const probe = document.createElement("div");
+      probe.style.color = "var(--color-line)";
+      document.body.append(probe);
+      const lineColor = getComputedStyle(probe).color;
+      probe.remove();
+      const style = getComputedStyle(block);
+      const nav = block.parentElement!.querySelector("nav")!;
+      return [
+        `${style.borderBottomWidth} ${style.borderBottomStyle} ${style.borderBottomColor}`,
+        lineColor,
+        nav.getBoundingClientRect().top >= block.getBoundingClientRect().bottom,
+      ];
+    });
+    expect(border).toBe(`1px solid ${line}`);
+    expect(navBelow).toBe(true);
 
     const nav = page.getByRole("navigation", { name: "Navegação do painel" });
     await expect(nav.getByRole("link")).toHaveCount(1);
@@ -44,7 +65,8 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
       nav.getByText("2 fora do prazo", { exact: true }),
     ).toBeVisible();
 
-    await expect(sidebar.getByText("Teste grátis")).toBeVisible();
+    // Twice: the sidebar top's plan title and the plan block's.
+    await expect(sidebar.getByText("Teste grátis")).toHaveCount(2);
     await expect(sidebar.getByText("40 de 200 verificações")).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Contratar" })).toHaveCount(
       0,
@@ -84,7 +106,7 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
       await page.context().clearCookies();
       await logIn(page, email);
       for (const text of expected)
-        await expect(page.locator("aside").getByText(text)).toBeVisible();
+        await expect(page.locator("aside").getByText(text).last()).toBeVisible();
     }
 
     const partial = uniqueEmail("parcial", testInfo);
