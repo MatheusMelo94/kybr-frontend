@@ -16,7 +16,12 @@ export function AuthColumn({ children }: Props): JSX.Element {
   return (
     <main className="mx-auto flex w-full max-w-auth flex-col gap-8 px-4 pt-8 pb-12 md:pt-16">
       <div className="text-ink">
-        <Wordmark variant="lockup" width={80} aria-label={globalCopy.brand} />
+        <Wordmark
+          variant="lockup"
+          width={80}
+          alignGlyphs
+          aria-label={globalCopy.brand}
+        />
       </div>
       {children}
     </main>

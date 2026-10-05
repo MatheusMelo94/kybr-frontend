@@ -27,6 +27,14 @@ describe("Wordmark", () => {
     expect(screen.getByRole("img")).not.toHaveAttribute("height");
   });
 
+  it("lockup can hang its clear space outside, so the glyphs align with the text (B-004)", () => {
+    render(<Wordmark variant="lockup" width={80} alignGlyphs />);
+    // 409.6 / 4964 of 80 px.
+    expect(
+      Number.parseFloat(screen.getByRole("img").style.marginLeft),
+    ).toBeCloseTo(-6.6, 1);
+  });
+
   it("lockup keeps the source viewBox, clear space included", () => {
     render(<Wordmark variant="lockup" />);
     expect(screen.getByRole("img")).toHaveAttribute("viewBox", "0 0 4964 2727");

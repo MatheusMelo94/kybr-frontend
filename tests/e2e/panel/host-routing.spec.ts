@@ -127,6 +127,12 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     // S1–S4 open with the 80 px wordmark, named Kybr (AC 75).
     const wordmark = page.getByRole("main").getByRole("img", { name: "Kybr" });
     expect((await wordmark.boundingBox())?.width).toBe(80);
+    // B-004: the glyphs (not the lockup's clear space) line up with the h1.
+    const [glyphLeft, h1Left] = await page.evaluate(() => [
+      document.querySelector("main svg path")!.getBoundingClientRect().left,
+      document.querySelector("main h1")!.getBoundingClientRect().left,
+    ]);
+    expect(Math.abs(glyphLeft - h1Left)).toBeLessThanOrEqual(1);
     await expect(page.getByText("Kybr", { exact: true })).toHaveCount(0);
 
     // The share image: the panel's, absolute on the panel host (AC 75).
