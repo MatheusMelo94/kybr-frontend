@@ -20,7 +20,7 @@ describe("the share image", () => {
           url: "/brand/kybr-og-1200x630.png",
           width: 1200,
           height: 630,
-          alt: "kybr. Saiba com quem você vende.",
+          alt: "Kybr. Saiba com quem você vende.",
         },
       ],
     });
