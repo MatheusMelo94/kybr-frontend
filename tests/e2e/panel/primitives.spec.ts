@@ -216,6 +216,13 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
         "color",
       ),
     ).toBe(await tokenValue(page, "--color-ink-muted", "color"));
+    // Panel AC 76 (QA-BR-001): counts in tabular figures, the late line too.
+    expect(
+      await page
+        .locator("aside")
+        .getByText("2 fora do prazo", { exact: true })
+        .evaluate((element) => getComputedStyle(element).fontVariantNumeric),
+    ).toContain("tabular-nums");
     // AC 71 (B-007): the late state differs from an on-time one in more
     // than colour: the glyph and the late line are there only when late.
     await expect(badge.locator("svg")).toHaveCount(1);

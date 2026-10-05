@@ -66,7 +66,7 @@ export function NavCount({ abertos, vencidos }: Props): JSX.Element | null {
       {late && (
         <span
           aria-hidden="true"
-          className="hidden w-full text-secondary text-ink-muted lg:block"
+          className="hidden w-full text-secondary text-ink-muted tabular-nums lg:block"
         >
           {fill(plural(shellCopy, "nav.fila.late", vencidos), { m })}
         </span>
