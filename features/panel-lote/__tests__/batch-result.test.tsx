@@ -1,5 +1,14 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/panel-lote/actions", () => ({
+  sendToQueueAction: vi.fn(),
+  monitorBatchAction: vi.fn(),
+}));
+vi.mock("@/features/panel-shell/use-session-expiry", () => ({
+  useSessionExpiry: () => vi.fn(),
+}));
 
 import { BatchDonut } from "@/features/panel-lote/components/batch-donut";
 import { BatchLegend } from "@/features/panel-lote/components/batch-legend";
@@ -10,7 +19,9 @@ import {
 } from "@/features/panel-lote/components/batch-focus-keeper";
 import { ResultHeading } from "@/features/panel-lote/components/result-heading";
 import { WhyCard } from "@/features/panel-lote/components/why-card";
+import { ToastProvider } from "@/components/panel/toast";
 import { formatDuration } from "@/features/panel-shell/format";
+import { ShellStatusProvider } from "@/features/panel-shell/shell-status-context";
 import type { Batch } from "@/lib/api/schemas/panel/batches";
 
 const BATCH: Batch = {
@@ -90,12 +101,23 @@ describe("BatchDonut", () => {
   });
 });
 
+/** BatchResult holds BatchActions (T84): the shell and toast providers. */
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <ShellStatusProvider initial={{ contagens: undefined, plano: undefined }}>
+      <ToastProvider closeLabel="Fechar">{children}</ToastProvider>
+    </ShellStatusProvider>
+  );
+}
+
 describe("BatchResult (AC 20, 21; QA Q4)", () => {
   it("the summary counts the consulted rows: {total} = total − erro, with the duration", () => {
     render(
-      <BatchFocusKeeper>
-        <BatchResult batch={BATCH} />
-      </BatchFocusKeeper>,
+      <Shell>
+        <BatchFocusKeeper>
+          <BatchResult batch={BATCH} />
+        </BatchFocusKeeper>
+      </Shell>,
     );
     expect(screen.getByRole("heading", { name: "Resultado" })).toBeVisible();
     expect(
@@ -110,15 +132,17 @@ describe("BatchResult (AC 20, 21; QA Q4)", () => {
 
   it("no errors line without erro rows", () => {
     render(
-      <BatchFocusKeeper>
-        <BatchResult
-          batch={{
-            ...BATCH,
-            estado: "concluido",
-            contagens: { ok: 184, warn: 0, bad: 0, erro: 0 },
-          }}
-        />
-      </BatchFocusKeeper>,
+      <Shell>
+        <BatchFocusKeeper>
+          <BatchResult
+            batch={{
+              ...BATCH,
+              estado: "concluido",
+              contagens: { ok: 184, warn: 0, bad: 0, erro: 0 },
+            }}
+          />
+        </BatchFocusKeeper>
+      </Shell>,
     );
     expect(
       screen.queryByText(/não foram consultados|não foi consultado/),

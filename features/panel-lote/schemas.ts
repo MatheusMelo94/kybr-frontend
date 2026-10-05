@@ -42,3 +42,8 @@ export type StartBatchInput = z.infer<typeof startBatchSchema>;
 export const batchRefSchema = z
   .object({ batchId: z.string().refine(isBatchId) })
   .strict();
+
+/** to-queue / monitor (D-B5): the batch and the button's Idempotency-Key (A-X7). */
+export const batchWriteSchema = z
+  .object({ batchId: z.string().refine(isBatchId), idempotencyKey: z.uuid() })
+  .strict();

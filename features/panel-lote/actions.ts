@@ -4,10 +4,16 @@ import { revalidatePath } from "next/cache";
 
 import {
   batchRefSchema,
+  batchWriteSchema,
   startBatchSchema,
 } from "@/features/panel-lote/schemas";
 import { POLL_TIMEOUT_MS } from "@/features/panel-shell/polling";
-import { getBatch, startBatch } from "@/lib/api/panel/batches";
+import {
+  getBatch,
+  monitorBatch,
+  sendToQueue,
+  startBatch,
+} from "@/lib/api/panel/batches";
 import type { Batch } from "@/lib/api/schemas/panel/batches";
 import { assertPanelHost } from "@/lib/api/panel/host";
 import { requireSession } from "@/lib/api/panel/session";
@@ -88,4 +94,55 @@ export async function pollBatchAction(input: unknown): Promise<PollResult> {
   if (result.error.code === "SESSAO_EXPIRADA")
     return { ok: false, code: "SESSAO_EXPIRADA" };
   return { ok: false, code: "FAILED" };
+}
+
+export type BatchWriteResult =
+  | { ok: true; count: number }
+  | { ok: false; code: "SESSAO_EXPIRADA" | "FAILED" };
+
+type Write = (
+  id: string,
+  key: string,
+) => ReturnType<typeof sendToQueue> | ReturnType<typeof monitorBatch>;
+
+async function batchWrite(
+  input: unknown,
+  write: Write,
+  layout: boolean,
+): Promise<BatchWriteResult> {
+  await assertPanelHost();
+  const parsed = batchWriteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "FAILED" };
+  await requireSession();
+
+  const { batchId, idempotencyKey } = parsed.data;
+  const result = await write(batchId, idempotencyKey);
+  if (result.ok) {
+    revalidatePath(panelPath(`/lote/${batchId}`));
+    if (layout) revalidatePath(panelPath("/"), "layout");
+    const data = result.data as { criados?: number; monitorados?: number };
+    return { ok: true, count: data.criados ?? data.monitorados ?? 0 };
+  }
+  if (result.error.code === "SESSAO_EXPIRADA")
+    return { ok: false, code: "SESSAO_EXPIRADA" };
+  // Not found, LOTE_EM_ANDAMENTO (C5), a network failure: lote.action.error.
+  return { ok: false, code: "FAILED" };
+}
+
+/**
+ * D-B5 to-queue, from /lote/[batchId]: one case per Atenção + Crítico row,
+ * once (the button's key, A-X7, and the backend's per-batch idempotency).
+ * Revalidates the batch page and the layout (the shell's Fila count).
+ */
+export async function sendToQueueAction(
+  input: unknown,
+): Promise<BatchWriteResult> {
+  return batchWrite(input, sendToQueue, true);
+}
+
+/** D-B5 monitor, from /lote/[batchId]: weekly monitoring for the successful rows, once. */
+export async function monitorBatchAction(
+  input: unknown,
+): Promise<BatchWriteResult> {
+  return batchWrite(input, monitorBatch, false);
 }

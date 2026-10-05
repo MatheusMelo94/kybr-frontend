@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { BatchActions } from "@/features/panel-lote/components/batch-actions";
 import { BatchDonut } from "@/features/panel-lote/components/batch-donut";
 import { BatchLegend } from "@/features/panel-lote/components/batch-legend";
 import { ResultHeading } from "@/features/panel-lote/components/result-heading";
@@ -46,6 +47,12 @@ export function BatchResult({ batch }: { batch: Batch }): JSX.Element {
           })}
         </p>
       )}
+      <BatchActions
+        batchId={batch.id}
+        contagens={batch.contagens}
+        enviadoParaFila={batch.enviado_para_fila}
+        monitorado={batch.monitorado}
+      />
     </div>
   );
 }

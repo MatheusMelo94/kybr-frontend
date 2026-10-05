@@ -78,7 +78,7 @@ test.describe("Lote: the result @feature-ops-panel @panel-lote", () => {
         .filter(
           (el) =>
             (el.textContent ?? "").trim() !== "" &&
-            !el.closest("[aria-hidden]"),
+            !el.closest("[aria-hidden], button, a"),
         )
         .map((el) => getComputedStyle(el).color),
     );
