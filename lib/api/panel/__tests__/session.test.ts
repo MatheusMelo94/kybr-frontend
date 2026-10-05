@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { http, HttpResponse } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { meSchema } from "@/lib/api/schemas/panel/me";
 import { server } from "@/tests/fixtures/msw/server";
@@ -89,6 +89,14 @@ async function freshSession(): Promise<
   vi.resetModules();
   return import("@/lib/api/panel/session");
 }
+
+// Each test re-imports the module (vi.resetModules). Under a loaded full run
+// the first, cold import (the whole module graph's transform) alone can pass
+// the 5 s test timeout, and its late getSession() then lands in the next
+// test. Warm the transform once, with room, before any test starts.
+beforeAll(async () => {
+  await import("@/lib/api/panel/session");
+}, 30_000);
 
 beforeEach(() => {
   state.headers = new Headers({ "x-kybr-panel-path": "/fila?aba=x" });
