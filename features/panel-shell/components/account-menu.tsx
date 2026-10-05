@@ -16,6 +16,11 @@ import { cn } from "@/lib/utils";
 type Props = {
   /** The menu's items: elements with role="menuitem" ("Sair"; "Configurações" from M8). */
   children: ReactNode;
+  /**
+   * Text shown above the items and read when the menu opens (aria-describedby):
+   * the plan variant below lg (AC 10). It is never a menu item.
+   */
+  description?: ReactNode;
   /** "up" from the sidebar's foot; "down" from the top bar. */
   placement?: "up" | "down";
   className?: string;
@@ -33,6 +38,7 @@ function menuItems(menu: HTMLElement | null): HTMLElement[] {
  */
 export function AccountMenu({
   children,
+  description,
   placement = "up",
   className,
 }: Props): JSX.Element {
@@ -41,6 +47,7 @@ export function AccountMenu({
   const menu = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const id = useId();
+  const descriptionId = `${id}-descricao`;
 
   useEffect(() => {
     if (!open) return;
@@ -110,21 +117,37 @@ export function AccountMenu({
       </button>
       {open && (
         <div
-          ref={menu}
-          id={id}
-          role="menu"
-          // Focus lives on the items; the menu itself takes none from Tab.
-          tabIndex={-1}
-          aria-label={shellCopy["account.menu"]}
-          onKeyDown={onMenuKey}
           className={cn(
             "absolute z-10 flex min-w-40 flex-col rounded-lg border border-line bg-surface p-1",
             placement === "up"
               ? "bottom-full left-0 mb-2"
               : "top-full right-0 mt-2",
+            description !== undefined && "w-64",
           )}
         >
-          {children}
+          {description !== undefined && (
+            <div
+              id={descriptionId}
+              className="mb-1 flex flex-col gap-1 border-b border-line px-3 pt-2 pb-3"
+            >
+              {description}
+            </div>
+          )}
+          <div
+            ref={menu}
+            id={id}
+            role="menu"
+            // Focus lives on the items; the menu itself takes none from Tab.
+            tabIndex={-1}
+            aria-label={shellCopy["account.menu"]}
+            aria-describedby={
+              description !== undefined ? descriptionId : undefined
+            }
+            onKeyDown={onMenuKey}
+            className="flex flex-col"
+          >
+            {children}
+          </div>
         </div>
       )}
     </div>

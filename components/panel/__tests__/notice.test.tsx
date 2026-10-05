@@ -33,5 +33,19 @@ describe("Notice", () => {
     expect(notice).toHaveFocus();
   });
 
+  it("is no live region with role none (a banner read in place, T66)", () => {
+    render(
+      <Notice role="none" tone="warning">
+        As verificações do plano acabaram.
+      </Notice>,
+    );
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("As verificações do plano acabaram.")).not.toHaveAttribute(
+      "role",
+    );
+  });
+
   // Each tone's computed colours and bar: primitives.spec (Playwright).
 });

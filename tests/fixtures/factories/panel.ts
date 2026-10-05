@@ -93,7 +93,8 @@ export type Preset =
   | "tres-abertos"
   | "um-aberto"
   | "zerado"
-  | "um-vendedor";
+  | "um-vendedor"
+  | "semverificacoes";
 
 export const PRESETS: readonly Preset[] = [
   "renata",
@@ -106,6 +107,7 @@ export const PRESETS: readonly Preset[] = [
   "um-aberto",
   "zerado",
   "um-vendedor",
+  "semverificacoes",
 ];
 
 export type Plano = {
@@ -241,6 +243,14 @@ export function workspaceFor(preset: Preset, nome: string): WorkspaceRecord {
         ...ONBOARDED,
         plano: TRIAL,
         contagens: { ...COUNTS, vendedores: 1 },
+      };
+    // PB16 / AC 12: no checks granted (limite 0).
+    case "semverificacoes":
+      return {
+        ...common,
+        ...ONBOARDED,
+        plano: { tipo: "teste", usadas: 0, limite: 0 },
+        contagens: { ...COUNTS, fila_vencidos: 0 },
       };
     case "pago":
       return {

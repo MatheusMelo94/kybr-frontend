@@ -133,6 +133,11 @@ const SEEDED: Record<
     nome: "Zerado Exemplo",
     workspace: "Plataforma Zerada",
   },
+  semverificacoes: {
+    email: "semverificacoes@exemplo.test",
+    nome: "Sem Exemplo",
+    workspace: "Plataforma Sem Verificações",
+  },
   "um-vendedor": {
     email: "um-vendedor@exemplo.test",
     nome: "Vendedor Exemplo",

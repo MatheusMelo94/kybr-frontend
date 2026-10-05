@@ -33,6 +33,12 @@ export function commercialContactEmail(): string | undefined {
   return env.COMMERCIAL_CONTACT_EMAIL;
 }
 
+/** "Contratar"'s mailto: (the plan block, the Conta menu, PlanBanner); unset → hidden. */
+export function contratarHref(): string | undefined {
+  const email = commercialContactEmail();
+  return email === undefined ? undefined : `mailto:${email}`;
+}
+
 /**
  * The panel's own origin, for absolute metadata URLs (the share image):
  * https:, or http: on loopback behind the local-only flag (ADR-0009 rule 3).

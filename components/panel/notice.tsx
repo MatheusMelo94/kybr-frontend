@@ -5,8 +5,11 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   children: ReactNode;
-  /** "status" is polite; "alert" interrupts (only for what needs action now). */
-  role?: "status" | "alert";
+  /**
+   * "status" is polite; "alert" interrupts (only for what needs action now);
+   * "none" is no live region, for a banner read in place (T66's PlanBanner).
+   */
+  role?: "status" | "alert" | "none";
   /** The text carries the meaning, in ink; warning and danger add a coloured left bar (DDR-0003). */
   tone?: "info" | "warning" | "danger";
   /** Lets a client leaf move focus here (tabIndex -1), e.g. a banner read on load. */
@@ -30,7 +33,7 @@ export function Notice({
     <div
       ref={ref}
       id={id}
-      role={role}
+      role={role === "none" ? undefined : role}
       tabIndex={focusable ? -1 : undefined}
       className={cn(NOTICE_BASE, NOTICE_TONES[tone], className)}
     >

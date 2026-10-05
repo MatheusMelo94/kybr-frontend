@@ -44,7 +44,10 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
         <SkipLink />
         <div className="lg:flex">
           <header className="border-b border-line lg:hidden">
-            <TopBar workspaceNome={shell.workspaceNome} />
+            <TopBar
+              workspaceNome={shell.workspaceNome}
+              contratarHref={shell.contratarHref}
+            />
             <div className="pb-2">
               <PanelNav items={items} variant="tabs" />
             </div>
