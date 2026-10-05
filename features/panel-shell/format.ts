@@ -47,3 +47,18 @@ export function formatDate(iso: string): string {
   );
   return `${parts.day}/${parts.month}/${parts.year}`;
 }
+
+/**
+ * `{duracao}` (spec § Content & Copy › Durations): "41 s", "3 min", "2 h",
+ * "2 dias", each unit rounded down from the one below it.
+ */
+export function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "1 dia" : `${days} dias`;
+}

@@ -125,7 +125,14 @@ export async function batchesFor(
 export async function createBatch(
   request: APIRequestContext,
   email: string,
-  set: "ac16" | "tudo-ok" | "tudo-erro" | "falha",
+  set:
+    | "ac16"
+    | "tudo-ok"
+    | "tudo-erro"
+    | "falha"
+    | "misto-sem-erro"
+    | "um-atencao"
+    | "hostil",
   options: { finish?: boolean; hold?: boolean } = {},
 ): Promise<string> {
   const response = await request.post(`${CONTROLS}/batches`, {

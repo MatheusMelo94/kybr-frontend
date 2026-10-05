@@ -25,6 +25,12 @@ type Props = {
 };
 
 const TERMINAL = new Set(["concluido", "concluido_com_erros", "falhou"]);
+/**
+ * A router.refresh() issued as the poll's Server Action settles can be
+ * dropped by the router's queue; while this progress is still on screen
+ * after the end, it asks again at the next tick, up to this many times.
+ */
+const MAX_REFRESHES = 5;
 
 function step(processados: number, total: number): number {
   return total === 0 ? 10 : Math.floor((processados / total) * 10);
@@ -35,9 +41,9 @@ function step(processados: number, total: number): number {
  * the tab is visible and online (once on becoming so; never overlapping).
  * Announces the start, then at most once per 10 % step crossed. A failed
  * poll, or being offline (QA Q18), shows lote.progress.stale with the last
- * numbers. On the end: one router.refresh() (the server renders the result
- * or the stopped batch), the shell's running flag cleared and its plan
- * re-polled, and whether focus was here recorded for the result (T82).
+ * numbers. On the end: the shell's running flag cleared, whether focus was
+ * here recorded for the result (T82), and one router.refresh(): the server
+ * renders the result or the stopped batch, and the shell takes its fresh /me.
  */
 export function BatchProgress({ batchId, initial }: Props): JSX.Element {
   const [progress, setProgress] = useState(initial);
@@ -51,12 +57,15 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
   const router = useRouter();
   const expire = useSessionExpiry();
   const focus = useBatchFocus();
-  const { setLoteRunning, pollNow } = useShellStatus();
+  const { setLoteRunning } = useShellStatus();
   const done = useRef(false);
+  const refreshes = useRef(0);
 
-  // QA Q6: after the start, focus lands on this heading.
+  // QA Q6: after the start, focus lands on this heading, once per view.
   useEffect(() => {
-    headingRef.current?.focus();
+    if (focus.claimArrivalFocus()) headingRef.current?.focus();
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -67,10 +76,11 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
         if (result.code === "SESSAO_EXPIRADA") {
           // Once: the page is leaving for /entrar.
           done.current = true;
+          refreshes.current = MAX_REFRESHES;
           expire();
         } else if (result.code === "NOT_FOUND") {
           done.current = true;
-          router.refresh();
+          refresh();
         } else setStale(true);
         return;
       }
@@ -91,13 +101,26 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
         done.current = true;
         focus.record(region.current?.contains(document.activeElement) ?? false);
         setLoteRunning(false);
-        pollNow();
-        router.refresh();
+        // The refresh re-renders the panel layout too: the shell takes its
+        // fresh /me (the plan's usage) from it. A second action here would
+        // race the refresh.
+        refresh();
       }
     }
 
+    function refresh(): void {
+      if (refreshes.current >= MAX_REFRESHES) return;
+      refreshes.current += 1;
+      router.refresh();
+    }
+
     async function poll(): Promise<void> {
-      if (inFlight || done.current) return;
+      // Ended, yet still here: the refresh didn't take; ask again.
+      if (done.current) {
+        refresh();
+        return;
+      }
+      if (inFlight) return;
       if (!canPoll()) {
         if (!navigator.onLine) setStale(true);
         return;
@@ -128,7 +151,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [batchId, expire, focus, pollNow, router, setLoteRunning]);
+  }, [batchId, expire, focus, router, setLoteRunning]);
 
   const ratio =
     progress.total === 0

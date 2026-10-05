@@ -86,7 +86,9 @@ describe("BatchProgress (AC 19)", () => {
       name: "Verificando 200 CNPJs",
     });
     expect(heading).toHaveFocus();
-    expect(screen.getByText("50 de 200", { selector: "p" })).toHaveClass("tabular-nums");
+    expect(screen.getByText("50 de 200", { selector: "p" })).toHaveClass(
+      "tabular-nums",
+    );
     const bar = screen.getByRole("progressbar", {
       name: "Verificando 200 CNPJs",
     });
@@ -104,6 +106,26 @@ describe("BatchProgress (AC 19)", () => {
         "Pode sair desta tela. A verificação continua e o resultado fica aqui.",
       ),
     ).toBeVisible();
+  });
+
+  it("a re-mount doesn't take focus back (it moved elsewhere)", () => {
+    const { rerender } = renderProgress(50);
+    (document.activeElement as HTMLElement | null)?.blur();
+    rerender(
+      <ShellStatusProvider initial={{ contagens: COUNTS, plano: undefined }}>
+        <BatchFocusKeeper>
+          <BatchProgress
+            key="again"
+            batchId={ID}
+            initial={{ processados: 60, total: 200 }}
+          />
+          <Probe />
+        </BatchFocusKeeper>
+      </ShellStatusProvider>,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Verificando 200 CNPJs" }),
+    ).not.toHaveFocus();
   });
 
   it("polls every 2 s, never overlapping", async () => {
@@ -196,18 +218,27 @@ describe("BatchProgress (AC 19)", () => {
   });
 
   it.each(["concluido", "concluido_com_erros", "falhou"])(
-    "%s: one refresh, the shell's running flag cleared, the plan re-polled; focus recorded",
+    "%s: one refresh, the shell's running flag cleared, no other action; focus recorded",
     async (estado) => {
       renderProgress();
       answer(200, 200, estado);
       await tick();
-      await tick();
       expect(router.refresh).toHaveBeenCalledTimes(1);
+      expect(poll).toHaveBeenCalledTimes(1);
       expect(shell?.loteRunning).toBe(false);
-      expect(shell?.pollRequests).toBe(1);
+      // The refresh brings the shell's fresh /me; no second action races it.
+      expect(shell?.pollRequests).toBe(0);
       expect(focus?.wasInProgress()).toBe(true);
     },
   );
+
+  it("if the result hasn't replaced it by the next tick, it refreshes again, at most 5 times, with no more polls", async () => {
+    renderProgress();
+    answer(200, 200, "concluido");
+    for (let i = 0; i < 8; i++) await tick();
+    expect(router.refresh).toHaveBeenCalledTimes(5);
+    expect(poll).toHaveBeenCalledTimes(1);
+  });
 
   it("focus outside the region at the end is recorded too", async () => {
     renderProgress();

@@ -14,6 +14,14 @@ type Value = {
   record: (inside: boolean) => void;
   /** The result reads it once (T82): focus moves to its heading only if so. */
   wasInProgress: () => boolean;
+  /** True once BatchProgress saw the end live (the result then announces it). */
+  endedLive: () => boolean;
+  /**
+   * True the first time only: the progress heading takes focus on arrival
+   * (QA Q6), and never again if the progress re-mounts (it would pull focus
+   * from wherever Renata moved it).
+   */
+  claimArrivalFocus: () => boolean;
 };
 
 const BatchFocusContext = createContext<Value | null>(null);
@@ -29,12 +37,21 @@ export function BatchFocusKeeper({
   children: ReactNode;
 }): JSX.Element {
   const inside = useRef(false);
+  const ended = useRef(false);
+  const arrived = useRef(false);
   const value = useMemo<Value>(
     () => ({
       record: (wasInside) => {
         inside.current = wasInside;
+        ended.current = true;
       },
       wasInProgress: () => inside.current,
+      endedLive: () => ended.current,
+      claimArrivalFocus: () => {
+        if (arrived.current) return false;
+        arrived.current = true;
+        return true;
+      },
     }),
     [],
   );
@@ -45,7 +62,12 @@ export function BatchFocusKeeper({
   );
 }
 
-const NONE: Value = { record: () => undefined, wasInProgress: () => false };
+const NONE: Value = {
+  record: () => undefined,
+  wasInProgress: () => false,
+  endedLive: () => false,
+  claimArrivalFocus: () => true,
+};
 
 export function useBatchFocus(): Value {
   return useContext(BatchFocusContext) ?? NONE;

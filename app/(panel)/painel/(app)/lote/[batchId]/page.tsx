@@ -3,6 +3,7 @@ import type { JSX } from "react";
 
 import { BatchState } from "@/features/panel-lote/components/batch-state";
 import { HistoryList } from "@/features/panel-lote/components/history-list";
+import { WhyCard } from "@/features/panel-lote/components/why-card";
 import { loteCopy } from "@/features/panel-lote/copy";
 import { batchOrExit, historyOrError } from "@/features/panel-lote/data";
 import { requireSession } from "@/lib/api/panel/session";
@@ -28,6 +29,9 @@ export default async function BatchPage({
           <BatchState batch={batch} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
+          {batch.estado.startsWith("concluido") && (
+            <WhyCard motivos={batch.motivos_contagem} />
+          )}
           <HistoryList history={history} />
         </div>
       </div>

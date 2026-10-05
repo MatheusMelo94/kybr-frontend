@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type JSX,
@@ -39,6 +40,12 @@ type Props = {
 export function ShellStatusProvider({ initial, children }: Props): JSX.Element {
   const [status, setStatus] = useState<Status>(initial);
   const [pollRequests, setPollRequests] = useState(0);
+  // A server render (a router.refresh(), a revalidated action) brings a fresh
+  // /me: take it, so the counts and the plan never wait for the next poll.
+  const snapshot = JSON.stringify(initial);
+  useEffect(() => {
+    setStatus(JSON.parse(snapshot) as Status);
+  }, [snapshot]);
   const value = useMemo<Value>(
     () => ({
       ...status,
