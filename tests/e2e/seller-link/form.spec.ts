@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("form screen @feature-seller-link", () => {
-  test("AC 1: at 360 px it shows the name, h1, lead and privacy footer, with no Kybr mark", async ({
+  test("AC 1: at 360 px it shows the name, h1, lead and privacy footer; the only Kybr mark is the footer", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 360, height: 780 });
@@ -22,7 +22,10 @@ test.describe("form screen @feature-seller-link", () => {
     await expect(
       page.getByRole("link", { name: "Como tratamos seus dados" }),
     ).toHaveAttribute("href", "/v/loja-exemplo/privacidade");
-    expect(await page.locator("body").innerText()).not.toMatch(/kybr/i);
+    expect(await page.getByRole("main").innerHTML()).not.toMatch(/kybr/i);
+    await expect(
+      page.getByRole("contentinfo").getByRole("img", { name: "Kybr" }),
+    ).toBeVisible();
     await expect(page).toHaveTitle("Cadastro de vendedor");
   });
 

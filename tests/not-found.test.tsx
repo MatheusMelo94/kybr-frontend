@@ -20,10 +20,12 @@ describe("app/not-found", () => {
     ).toBeInTheDocument();
   });
 
-  it("never mentions Kybr", () => {
-    const { container } = render(<NotFound />);
+  it("ends with the Kybr footer, like every /v/* screen (link AC 40)", () => {
+    render(<NotFound />);
 
-    expect(container.textContent).not.toMatch(/kybr/i);
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent("Verificação por");
+    expect(screen.getByRole("img", { name: "Kybr" })).toBeInTheDocument();
   });
 
   it("uses notfound.h1 as the page title", () => {
