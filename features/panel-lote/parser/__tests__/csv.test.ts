@@ -174,6 +174,8 @@ describe("readCsv: QA G2 fixtures", () => {
   });
 
   it("markup in a cell is just text", () => {
-    expect(rows(fixture("marcacao.csv"))[1]?.[1]).toBe("<img src=x onerror=alert(1)>");
+    expect(rows(fixture("marcacao.csv"))[1]?.[1]).toBe(
+      "<img src=x onerror=alert(1)>",
+    );
   });
 });
