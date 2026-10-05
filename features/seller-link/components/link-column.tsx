@@ -15,11 +15,16 @@ type Props = {
  * screen ends with the Kybr footer (link AC 40), outside main.
  */
 export function LinkColumn({ children }: Props): JSX.Element {
+  // At least a viewport tall before the footer, so it starts below the first
+  // screen: a screen whose height changes after it paints (skeleton → form,
+  // verificando → result) can't move it inside the viewport (CLS 0, AC 2 /
+  // AC 32).
   return (
     <>
-      <LinkMain>{children}</LinkMain>
+      <div className="min-h-dvh">
+        <LinkMain>{children}</LinkMain>
+      </div>
       <KybrFooter />
     </>
   );
 }
-
