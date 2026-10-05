@@ -13,6 +13,14 @@ type Props = {
 const LINK =
   "inline-flex min-h-6 items-center text-secondary font-strong text-ink underline underline-offset-4 hover:decoration-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-11";
 
+/** A paid plan without nome is plan.unnamed, never plan.trial.title (spec v1.3, D-W1). */
+function title(plano: Plano): string {
+  if (plano.tipo === "teste") return shellCopy["plan.trial.title"];
+  return plano.nome === undefined
+    ? shellCopy["plan.unnamed"]
+    : fill(shellCopy["plan.paid.title"], { nome: plano.nome });
+}
+
 /** The plan block (spec S5, AC 12): trial, paid, used up, none granted; hidden when /me lacks it. */
 export function PlanBlock({ plano, contratarHref }: Props): JSX.Element | null {
   if (plano === undefined) return null;
@@ -28,11 +36,7 @@ export function PlanBlock({ plano, contratarHref }: Props): JSX.Element | null {
 
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-line p-3">
-      <p className="text-secondary font-strong text-ink">
-        {plano.tipo === "pago" && plano.nome !== undefined
-          ? fill(shellCopy["plan.paid.title"], { nome: plano.nome })
-          : shellCopy["plan.trial.title"]}
-      </p>
+      <p className="text-secondary font-strong text-ink">{title(plano)}</p>
       {none ? (
         <>
           <p className="text-secondary text-ink-muted">

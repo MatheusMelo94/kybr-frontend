@@ -108,6 +108,20 @@ describe("PlanBlock (AC 12, S5)", () => {
     expect(screen.getByText("Ciclo até 04/11/2026")).toBeInTheDocument();
   });
 
+  it("paid without nome (T65, spec v1.3): titled plan.unnamed over the cycle's usage, never Teste grátis", () => {
+    render(
+      <PlanBlock
+        plano={{ tipo: "pago", usadas: 10, limite: 5000 }}
+        contratarHref={undefined}
+      />,
+    );
+    expect(screen.getByText("Seu plano")).toBeInTheDocument();
+    expect(
+      screen.getByText("10 de 5.000 verificações neste ciclo"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Teste grátis")).not.toBeInTheDocument();
+  });
+
   it("allowance used up: plan.exhausted in warning ink", () => {
     render(
       <PlanBlock
