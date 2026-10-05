@@ -100,6 +100,14 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
         expect(response.headers["cache-control"]).toContain("max-age=86400");
       }
 
+    // The SVG is sandboxed on its own (Security 0002).
+    for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
+      const svg = await rawGet("/brand/kybr-icon.svg", host);
+      expect(svg.headers["content-security-policy"]).toBe(
+        "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      );
+    }
+
     // Only those exact files pass through (Security 0001): any other /brand/
     // path is the host's normal 404, with its CSP.
     for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
