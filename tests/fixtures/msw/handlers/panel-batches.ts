@@ -373,12 +373,13 @@ export const panelBatchHandlers: RequestHandler[] = [
     const auth = await authed(request, "start");
     if ("reply" in auth) return auth.reply;
     const { account, body, call } = auth;
+    // The key is logged first, even for a dropped call (a retry is compared to it).
+    const key = request.headers.get("idempotency-key") ?? "";
+    call.idempotencyKey = key;
     if (scenarioApplies("queda-de-rede-lote", account.email))
       return networkDrop();
-    const key = request.headers.get("idempotency-key") ?? "";
     if (!UUID.test(key))
       return apiError(422, "VALOR_INVALIDO", { field: "Idempotency-Key" });
-    call.idempotencyKey = key;
     const extra = Object.keys(body).find((name) => name !== "linhas");
     if (extra !== undefined)
       return apiError(422, "VALOR_INVALIDO", { field: extra });

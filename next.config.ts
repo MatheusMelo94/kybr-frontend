@@ -31,6 +31,12 @@ const nextConfig: NextConfig = {
   // Portable deploy artifact (§ Stack Baseline › Containerization).
   output: "standalone",
   poweredByHeader: false,
+  experimental: {
+    // ADR-0012 item 8 + Security C2: startBatchAction's worst case is 5,000
+    // rows at the caps with 3-byte letters (2.28 MiB). The limit is
+    // app-wide, so middleware caps every other action at 1 MiB (C1).
+    serverActions: { bodySizeLimit: "2.5mb" },
+  },
   productionBrowserSourceMaps: false,
   async headers() {
     return [

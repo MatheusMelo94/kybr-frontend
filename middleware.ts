@@ -78,6 +78,9 @@ function internalPath(
   return isLinkPath(pathname) ? undefined : LINK_NOT_FOUND_PATH;
 }
 
+/** Security C1: a Server Action's body cap outside the panel's /lote (Next's old default). */
+const ACTION_BODY_LIMIT = 1_048_576;
+
 /** The header carrying the external path + query to the DAL (for `volta`). Never trusted from the client. */
 const PANEL_PATH_HEADER = "x-kybr-panel-path";
 
@@ -110,6 +113,20 @@ export function middleware(request: NextRequest): NextResponse {
   const kind = classifyHost(request.headers.get("host"), hosts);
   // Unknown hosts (production *.vercel.app aliases, raw IPs): nothing (P03.1).
   if (kind === "unknown") return new NextResponse(null, { status: 404 });
+  // Security C1 (M5P-01): Next's action body limit is app-wide (2.5 MB, for
+  // startBatchAction). Every other Server Action keeps today's 1 MiB, on both
+  // hosts; only the panel host's /lote, exactly, may carry more. A missing
+  // Content-Length → 411 (browsers always send it for an action's body).
+  if (isServerAction(request)) {
+    const length = request.headers.get("content-length");
+    if (length === null || !/^\d+$/.test(length))
+      return new NextResponse(null, { status: 411 });
+    if (
+      Number(length) > ACTION_BODY_LIMIT &&
+      !(kind === "panel" && pathname === "/lote")
+    )
+      return new NextResponse(null, { status: 413 });
+  }
   if (isShared(pathname)) return NextResponse.next();
 
   // After a panel Server Action's redirect('/x'), Next re-renders /x in

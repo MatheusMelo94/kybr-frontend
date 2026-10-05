@@ -1,8 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import { LiveRegion } from "@/components/ui/live-region";
+import { startBatchAction } from "@/features/panel-lote/actions";
 import { BatchPreview } from "@/features/panel-lote/components/batch-preview";
 import {
   DropZone,
@@ -14,9 +16,12 @@ import type {
   Preview,
 } from "@/features/panel-lote/parser/protocol";
 import { useBatchFile } from "@/features/panel-lote/use-batch-file";
+import { globalCopy } from "@/features/panel-shell/copy/global";
 import { fill, formatNumber } from "@/features/panel-shell/format";
 import { planGate } from "@/features/panel-shell/plan-variant";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
+import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
+import type { BatchLinha } from "@/lib/panel-api-values";
 
 type Props = {
   /** A mailto: from COMMERCIAL_CONTACT_EMAIL; unset hides "Contratar" (P-U4). */
@@ -27,11 +32,28 @@ type Props = {
  * S7's upload (T79): pick or drop → reading → an error in the zone, or the
  * preview. The sheet is parsed in the worker (ADR-0012); nothing is sent and
  * nothing is spent before the CTA. The plan comes from the shell's live
- * status. T80 wires the CTA to startBatchAction.
+ * status. The CTA (T80) builds the rows in the worker and posts them with the
+ * preview's Idempotency-Key (one per file and column, reused on a retry, so
+ * a double click or a retry starts one batch, A-X7), then opens /lote/{id}.
  */
 export function BatchUpload({ contratarHref }: Props): JSX.Element {
-  const { state, parse, reset } = useBatchFile();
-  const { plano } = useShellStatus();
+  const { state, parse, build, reset } = useBatchFile();
+  const { plano, contagens, update } = useShellStatus();
+  const router = useRouter();
+  const expire = useSessionExpiry();
+  const [busy, setBusy] = useState(false);
+  const [startError, setStartError] = useState(false);
+  const [serverLeft, setServerLeft] = useState<number | undefined>(undefined);
+  // The rows and key for this file + column (dropped after the start, C8).
+  const attempt = useRef<
+    | {
+        preview: Preview;
+        column: number;
+        key: string;
+        linhas?: BatchLinha[] | undefined;
+      }
+    | undefined
+  >(undefined);
   const [folderError, setFolderError] = useState(false);
   // Renata's pick, for the preview it was made on; otherwise the detected column.
   const [choice, setChoice] = useState<
@@ -78,7 +100,46 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
   }, [state.status, error, preview]);
 
   const left =
-    plano === undefined ? undefined : Math.max(0, plano.limite - plano.usadas);
+    serverLeft ??
+    (plano === undefined
+      ? undefined
+      : Math.max(0, plano.limite - plano.usadas));
+
+  async function onStart(): Promise<void> {
+    if (busy || preview === undefined || column === undefined) return;
+    if (
+      attempt.current?.preview !== preview ||
+      attempt.current.column !== column
+    )
+      attempt.current = { preview, column, key: crypto.randomUUID() };
+    const current = attempt.current;
+    setBusy(true);
+    setStartError(false);
+    try {
+      current.linhas ??= await build(column);
+      if (current.linhas === undefined) return;
+      const result = await startBatchAction({
+        idempotencyKey: current.key,
+        linhas: current.linhas,
+      });
+      if (result.ok) {
+        attempt.current = undefined;
+        // The nav says "Verificando" now, not at the next 60 s poll (S5).
+        if (contagens !== undefined)
+          update({
+            contagens: { ...contagens, lote_em_andamento: true },
+            plano,
+          });
+        router.push(`/lote/${result.id}`);
+        return;
+      }
+      if (result.code === "SESSAO_EXPIRADA") expire();
+      else if (result.code === "SEM_SALDO") setServerLeft(result.disponiveis);
+      else setStartError(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -105,14 +166,23 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
           left={left}
           gate={planGate(plano)}
           contratarHref={contratarHref}
-          onStart={() => undefined}
+          busy={busy}
+          onStart={() => void onStart()}
           onChangeFile={() => {
+            attempt.current = undefined;
+            setServerLeft(undefined);
+            setStartError(false);
             reset();
             setAnnouncement("");
             // Back to the empty zone, focus on its button.
             requestAnimationFrame(() => dropButton.current?.focus());
           }}
         />
+      )}
+      {startError && (
+        <p role="alert" className="text-secondary text-danger-ink">
+          {globalCopy["error.network"]}
+        </p>
       )}
     </div>
   );

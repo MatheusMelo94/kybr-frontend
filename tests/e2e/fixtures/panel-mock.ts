@@ -37,6 +37,9 @@ export type MockCall = {
   email?: string;
   turnstile?: string;
   authorized: boolean;
+  rows?: number;
+  idempotencyKey?: string;
+  poll?: boolean;
 };
 
 /** The mock's request log for one e-mail. */
@@ -85,6 +88,34 @@ export async function seed(
   await request.post(`${CONTROLS}/seed`, {
     data: { scenario, email, ...extra },
   });
+}
+
+/** Turns an account's seed off again. */
+export async function unseed(
+  request: APIRequestContext,
+  scenario: string,
+  email: string,
+): Promise<void> {
+  await request.post(`${CONTROLS}/unseed`, { data: { scenario, email } });
+}
+
+/** QA G10: sets an account's plan usage or limit. */
+export async function setPlan(
+  request: APIRequestContext,
+  email: string,
+  plan: { usadas?: number; limite?: number },
+): Promise<void> {
+  await request.post(`${CONTROLS}/plan`, { data: { email, ...plan } });
+}
+
+/** An account's batches, newest first (ids from the mock). */
+export async function batchesFor(
+  request: APIRequestContext,
+  email: string,
+): Promise<{ id: string; estado: string; processados: number; total: number }[]> {
+  return (await (
+    await request.get(`${CONTROLS}/batches?email=${encodeURIComponent(email)}`)
+  ).json()) as { id: string; estado: string; processados: number; total: number }[];
 }
 
 /**
