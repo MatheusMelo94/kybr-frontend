@@ -50,7 +50,8 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
             </div>
           </header>
           <aside className="hidden w-(--size-sidebar) shrink-0 flex-col gap-6 border-r border-line p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
-            <div className="px-3">
+            {/* The sidebar top, then a hairline before the nav (Aplicações board). */}
+            <div className="border-b border-line px-3 pb-4">
               <WorkspaceBlock nome={shell.workspaceNome} plano={shell.plano} />
             </div>
             <PanelNav items={items} />
