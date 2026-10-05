@@ -112,6 +112,11 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     await page.waitForLoadState("networkidle");
     expect(errors).toEqual([]);
 
+    // S1–S4 open with the 80 px wordmark, named Kybr (AC 75).
+    const wordmark = page.getByRole("main").getByRole("img", { name: "Kybr" });
+    expect((await wordmark.boundingBox())?.width).toBe(80);
+    await expect(page.getByText("Kybr", { exact: true })).toHaveCount(0);
+
     // The share image: the panel's, absolute on the panel host (AC 75).
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
       "content",

@@ -20,6 +20,8 @@ const VIEW_BOX = {
 type Props = {
   variant: "lockup" | "inline";
   "aria-label"?: string;
+  /** lockup only: the rendered width in px (at least 64); the height follows the viewBox. */
+  width?: number;
   className?: string;
 };
 
@@ -33,6 +35,7 @@ type Props = {
 export function Wordmark({
   variant,
   "aria-label": label = "Kybr",
+  width,
   className,
 }: Props): JSX.Element {
   return (
@@ -42,6 +45,7 @@ export function Wordmark({
       role="img"
       aria-label={label}
       focusable="false"
+      width={width}
       className={cn(
         variant === "inline" && "inline-block h-[0.93em] w-auto align-[-0.2em]",
         className,

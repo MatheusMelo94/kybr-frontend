@@ -21,6 +21,12 @@ describe("Wordmark", () => {
     expect(screen.getByRole("img", { name: "Marca Kybr" })).toBeInTheDocument();
   });
 
+  it("lockup takes a width (the height follows the viewBox)", () => {
+    render(<Wordmark variant="lockup" width={80} />);
+    expect(screen.getByRole("img")).toHaveAttribute("width", "80");
+    expect(screen.getByRole("img")).not.toHaveAttribute("height");
+  });
+
   it("lockup keeps the source viewBox, clear space included", () => {
     render(<Wordmark variant="lockup" />);
     expect(screen.getByRole("img")).toHaveAttribute("viewBox", "0 0 4964 2727");
