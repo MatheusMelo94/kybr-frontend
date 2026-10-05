@@ -53,15 +53,46 @@ describe("NavCount (AC 11, Q9)", () => {
   });
 });
 
-describe("WorkspaceBlock", () => {
-  it("shows the workspace name and ws.sellers.* in pt-BR numbers", () => {
-    render(<WorkspaceBlock nome="Loja Exemplo" vendedores={1240} />);
-    expect(screen.getByText("Loja Exemplo")).toBeInTheDocument();
-    expect(screen.getByText("1.240 vendedores")).toBeInTheDocument();
+describe("WorkspaceBlock, the sidebar top (AC 9, brand v1)", () => {
+  const trial = { tipo: "teste", usadas: 40, limite: 200 } as const;
+
+  it("the 32 px dotless Kybr symbol (named, no visible 'Kybr'), the workspace name, the plan title", () => {
+    const { container } = render(
+      <WorkspaceBlock nome="Loja Exemplo" plano={trial} />,
+    );
+
+    const symbol = screen.getByRole("img", { name: "Kybr" });
+    expect(symbol).toHaveAttribute("width", "32");
+    expect(symbol.querySelector("circle")).toBeNull();
+    expect(screen.getByText("Loja Exemplo")).toBeVisible();
+    expect(screen.getByText("Teste grátis")).toBeVisible();
+    expect(container.textContent).not.toMatch(/kybr/i);
   });
 
-  it.each([0, undefined])("hides the seller count at %s", (vendedores) => {
-    render(<WorkspaceBlock nome="Loja Exemplo" vendedores={vendedores} />);
+  it.each([
+    [
+      { tipo: "pago", nome: "Essencial", usadas: 1, limite: 9 },
+      "Plano Essencial",
+    ],
+    [{ tipo: "pago", usadas: 1, limite: 9 }, "Seu plano"],
+  ] as const)("a paid plan: %j → %s", (plano, title) => {
+    render(<WorkspaceBlock nome="Loja Exemplo" plano={plano} />);
+    expect(screen.getByText(title)).toBeVisible();
+    expect(screen.queryByText("Teste grátis")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["none (limite 0)", { tipo: "teste", usadas: 0, limite: 0 } as const],
+    ["failed", undefined],
+  ])("no plan line when the plan is %s", (_name, plano) => {
+    const { container } = render(
+      <WorkspaceBlock nome="Loja Exemplo" plano={plano} />,
+    );
+    expect(container.querySelectorAll("p")).toHaveLength(1);
+  });
+
+  it("no longer shows ws.sellers.*", () => {
+    render(<WorkspaceBlock nome="Loja Exemplo" plano={trial} />);
     expect(screen.queryByText(/vendedor/)).not.toBeInTheDocument();
   });
 });

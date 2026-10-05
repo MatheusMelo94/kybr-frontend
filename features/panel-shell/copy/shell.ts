@@ -32,6 +32,8 @@ export const shellCopy = {
   "plan.trial.usage": "{usadas} de {limite} verificações",
   "plan.trial.cta": "Contratar",
   "plan.paid.title": "Plano {nome}",
+  // A paid plan without nome (a fallback; spec v1.4): never "Teste grátis".
+  "plan.unnamed": "Seu plano",
   "plan.paid.usage": "{usadas} de {limite} verificações neste ciclo",
   "plan.paid.cycle": "Ciclo até {data}",
   "plan.exhausted":
