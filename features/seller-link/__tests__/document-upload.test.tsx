@@ -134,7 +134,9 @@ describe("DocumentUpload: happy path (T30, AC 21)", () => {
     expect(
       screen.queryByRole("button", { name: "Enviar documento" }),
     ).toBeNull();
-    expect(router.refresh).toHaveBeenCalledTimes(1);
+    // useCommittedRefresh refreshes from a passive effect after the commit
+    // that renders "Recebido", which React may flush after findByText resolves.
+    await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
   });
 
   it("several photos: upload.received.many and upload.add; adding a page sends only the new photo", async () => {
