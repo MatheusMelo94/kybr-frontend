@@ -9,6 +9,7 @@ import { emailCopy } from "@/features/seller-link/copy/email";
 import { blockedCopy } from "@/features/seller-link/copy/blocked";
 import { privacyCopy } from "@/features/seller-link/copy/privacy";
 import { sharedCopy } from "@/features/seller-link/copy/shared";
+import { brandCopy } from "@/features/seller-link/copy/brand";
 
 const MODULES = {
   form: formCopy,
@@ -20,6 +21,7 @@ const MODULES = {
   blocked: blockedCopy,
   privacy: privacyCopy,
   shared: sharedCopy,
+  brand: brandCopy,
 };
 
 // Spec v3 § Content & Copy, verbatim, grouped by the per-screen module that holds
@@ -95,6 +97,7 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
   results: {
     "results.consulted": "Dados consultados em {data}.",
     "approved.seal": "Vendedor verificado",
+    "approved.seal.by": "por",
     "approved.h1": "Tudo certo, {primeiro_nome}.",
     "approved.body": "A empresa {razao_social} está liberada para vender.",
     "approved.body.nodata": "Sua empresa está liberada para vender.",
@@ -232,6 +235,11 @@ const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {
     "privacy.link": "Como tratamos seus dados",
     "external.sr": "(abre em outra aba)",
     "a11y.cpf_masked": "CPF oculto",
+  },
+  // Link spec v4 (brand v1, 2026-10-04) [DDR-0002].
+  brand: {
+    "brand.footer": "Verificação por",
+    "brand.name": "Kybr",
   },
 };
 

@@ -5,6 +5,8 @@
 export const resultsCopy = {
   "results.consulted": "Dados consultados em {data}.",
   "approved.seal": "Vendedor verificado",
+  // Link spec v4 (brand v1) [DDR-0002]: followed by the inline wordmark.
+  "approved.seal.by": "por",
   "approved.h1": "Tudo certo, {primeiro_nome}.",
   "approved.body": "A empresa {razao_social} está liberada para vender.",
   "approved.body.nodata": "Sua empresa está liberada para vender.",
