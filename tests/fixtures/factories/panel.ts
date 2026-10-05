@@ -1,4 +1,4 @@
-import { ERROR_SENTINEL } from "./seller-link.ts";
+import { ERROR_SENTINEL, cnpjCheckDigits } from "./seller-link.ts";
 
 // Synthetic data for the panel's Pre-Contract mock (ops-panel
 // contract-request.md § MSW handler contract, M4 scenarios PA1–PA19). Every
@@ -94,7 +94,8 @@ export type Preset =
   | "um-aberto"
   | "zerado"
   | "um-vendedor"
-  | "semverificacoes";
+  | "semverificacoes"
+  | "cem";
 
 export const PRESETS: readonly Preset[] = [
   "renata",
@@ -108,6 +109,7 @@ export const PRESETS: readonly Preset[] = [
   "zerado",
   "um-vendedor",
   "semverificacoes",
+  "cem",
 ];
 
 export type Plano = {
@@ -244,6 +246,14 @@ export function workspaceFor(preset: Preset, nome: string): WorkspaceRecord {
         plano: TRIAL,
         contagens: { ...COUNTS, vendedores: 1 },
       };
+    // PB15 / AC 18: 100 checks left.
+    case "cem":
+      return {
+        ...common,
+        ...ONBOARDED,
+        plano: { tipo: "teste", usadas: 100, limite: 200 },
+        contagens: { ...COUNTS, fila_vencidos: 0 },
+      };
     // PB16 / AC 12: no checks granted (limite 0).
     case "semverificacoes":
       return {
@@ -284,3 +294,191 @@ export function randomCode(): string {
     if (code !== CODES.wrong && code !== CODES.expired) return code;
   }
 }
+
+// --- Batches (M5, contract-request.md § MSW handler contract, PB1–PB18) -------
+
+/** A check-digit-valid wire CNPJ from its first 12 characters. */
+export function cnpjWithRoot(root: string): string {
+  return `${root}${cnpjCheckDigits(root)}`;
+}
+
+/** `00.000.000/0000-00`, as a spreadsheet or the CSVs carry it (both formats). */
+export function maskedCnpj(cnpj: string): string {
+  return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12)}`;
+}
+
+export type BatchRowStatus = "ok" | "warn" | "bad" | "erro";
+export type BatchTag = "inapta_baixada" | "sem_ie" | "cnae_fora";
+export type BatchOutcome = {
+  status: BatchRowStatus;
+  razao_social?: string;
+  motivos: string[];
+  /** What the row counts toward in D-B2's motivos_contagem (C1). */
+  tags: BatchTag[];
+};
+
+export type BatchLinha = {
+  cnpj: string;
+  responsavel?: string;
+  ext_id?: string;
+};
+
+/** A spreadsheet row as the AC 16 file holds it (CNPJs masked or not). */
+export type SheetRow = { cnpj: string; responsavel: string; ext_id: string };
+
+const FIRST_NAMES = [
+  "Ana",
+  "Bruno",
+  "Carla",
+  "Diego",
+  "Elisa",
+  "Fábio",
+  "Gabriela",
+  "Heitor",
+];
+const LAST_NAMES = ["Exemplo", "Teste", "Modelo", "Amostra"];
+
+/** The AC 16 set's 184 distinct valid CNPJs: numeric ones start with 0 (a 13-digit number in Excel); every 4th is alphanumeric. */
+function ac16Cnpj(index: number): string {
+  const n = String(index).padStart(6, "0");
+  return cnpjWithRoot(
+    index % 4 === 3 ? `AB${n}0001` : `0${String(4_000_000 + index)}0001`,
+  );
+}
+
+const MOTIVOS = {
+  inapta: "Situação cadastral inapta na Receita",
+  baixada: "Empresa baixada na Receita",
+  sem_ie: "Sem inscrição estadual ativa",
+  cnae: "CNAE principal fora da categoria",
+} as const;
+
+// The AC 16 set's outcomes by position (precedence erro > bad > warn > ok).
+const AC16_ERRO = new Set([50, 120, 170]);
+/** The one razão social that starts with a formula (CR-P8 / P08 escaping). */
+export const FORMULA_RAZAO = '=HYPERLINK("http://exemplo.test")';
+
+function ac16Outcome(index: number): BatchOutcome {
+  if (AC16_ERRO.has(index)) return { status: "erro", motivos: [], tags: [] };
+  const razao_social =
+    index === 10 ? FORMULA_RAZAO : `Empresa Exemplo ${index + 1} Ltda`;
+  if (index % 15 === 7)
+    return index % 2 === 0
+      ? {
+          status: "bad",
+          razao_social,
+          motivos: [MOTIVOS.inapta],
+          tags: ["inapta_baixada"],
+        }
+      : {
+          status: "bad",
+          razao_social,
+          motivos: [MOTIVOS.baixada, MOTIVOS.cnae],
+          tags: ["inapta_baixada", "cnae_fora"],
+        };
+  if (index % 9 === 4)
+    return index % 2 === 0
+      ? {
+          status: "warn",
+          razao_social,
+          motivos: [MOTIVOS.sem_ie],
+          tags: ["sem_ie"],
+        }
+      : {
+          status: "warn",
+          razao_social,
+          motivos: [MOTIVOS.cnae],
+          tags: ["cnae_fora"],
+        };
+  return { status: "ok", razao_social, motivos: [], tags: [] };
+}
+
+function ac16Linha(index: number): BatchLinha & SheetRow {
+  return {
+    cnpj: ac16Cnpj(index),
+    responsavel: `${FIRST_NAMES[index % FIRST_NAMES.length]} ${LAST_NAMES[index % LAST_NAMES.length]}`,
+    ext_id: `loja-${String(index + 1).padStart(4, "0")}`,
+  };
+}
+
+/**
+ * The AC 16 set (spec AC 16): 190 file rows → 184 valid (numeric and
+ * alphanumeric), 4 duplicates (every repeat after the first, each with another
+ * responsável: the first wins), 2 invalid (a bad check digit, and an empty
+ * CNPJ cell in a non-blank row). `linhas` is the payload the worker builds:
+ * the 184, de-duplicated, in file order, in the wire format.
+ */
+export const AC16 = (() => {
+  const linhas = Array.from({ length: 184 }, (_, index) => ac16Linha(index));
+  const sheet = (linha: BatchLinha & SheetRow, index: number): SheetRow => ({
+    // Every third CNPJ is masked, as people paste them.
+    cnpj: index % 3 === 0 ? maskedCnpj(linha.cnpj) : linha.cnpj,
+    responsavel: linha.responsavel,
+    ext_id: linha.ext_id,
+  });
+  const duplicate = (index: number): SheetRow => ({
+    cnpj: maskedCnpj(ac16Cnpj(index)),
+    responsavel: "Outra Pessoa",
+    ext_id: `dup-${index}`,
+  });
+  const extras: Record<number, SheetRow> = {
+    30: duplicate(5),
+    60: {
+      cnpj: "04000999000100",
+      responsavel: "Digito Errado",
+      ext_id: "inv-1",
+    },
+    90: duplicate(17),
+    120: { cnpj: "", responsavel: "Sem Cnpj", ext_id: "inv-2" },
+    150: duplicate(40),
+    183: duplicate(99),
+  };
+  const rows: SheetRow[] = [];
+  linhas.forEach((linha, index) => {
+    rows.push(sheet(linha, index));
+    const extra = extras[index];
+    if (extra) rows.push(extra);
+  });
+  return {
+    rows,
+    linhas: linhas.map(({ cnpj, responsavel, ext_id }) => ({
+      cnpj,
+      responsavel,
+      ext_id,
+    })),
+  };
+})();
+
+/** PB4 / PB18 keys: a batch with FALHA stops halfway; TUDO-OK / TUDO-ERRO sets. */
+export const BATCH_SETS = {
+  falha: cnpjWithRoot("FALHA0000001"),
+  tudoOk: ["TUDOOK000001", "TUDOOK000002", "TUDOOK000003"].map(cnpjWithRoot),
+  tudoErro: ["TUDOERRO0001", "TUDOERRO0002"].map(cnpjWithRoot),
+} as const;
+
+const ERRO: BatchOutcome = { status: "erro", motivos: [], tags: [] };
+const OUTCOMES: ReadonlyMap<string, BatchOutcome> = new Map<
+  string,
+  BatchOutcome
+>([
+  ...AC16.linhas.map((linha, index): [string, BatchOutcome] => [
+    linha.cnpj,
+    ac16Outcome(index),
+  ]),
+  ...BATCH_SETS.tudoErro.map((cnpj): [string, BatchOutcome] => [cnpj, ERRO]),
+]);
+
+/** Each CNPJ's fixed outcome (PB3, PB18); any other CNPJ is ok. */
+export function batchOutcomeFor(cnpj: string): BatchOutcome {
+  return (
+    OUTCOMES.get(cnpj) ?? {
+      status: "ok",
+      razao_social: "Empresa Exemplo Ltda",
+      motivos: [],
+      tags: [],
+    }
+  );
+}
+
+/** PB1: a status read advances ceil(total / 4); the clock gives this duration. */
+export const BATCH_DURATION_MS = 41_000;

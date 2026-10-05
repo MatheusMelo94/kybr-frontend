@@ -27,6 +27,7 @@ import {
   resetPanelMock,
   revokeSessionsOf,
   scenarioApplies,
+  seedPollFailures,
   seedScenario,
   sessionAccount,
   unseedScenario,
@@ -264,6 +265,9 @@ const SCENARIOS: readonly Scenario[] = [
   "categorias-falham",
   "teste-pausado",
   "me-falha",
+  "csv-sem-escape",
+  "historico-falha",
+  "queda-de-rede-lote",
 ];
 
 function isPreset(value: unknown): value is Preset {
@@ -308,6 +312,14 @@ export const panelControlHandlers: RequestHandler[] = [
       string,
       unknown
     >;
+    // PB11: the next n status reads fail (503), then recover.
+    if (body.scenario === "lote-poll-falha") {
+      seedPollFailures(
+        typeof body.n === "number" ? body.n : 1,
+        typeof body.email === "string" ? body.email : undefined,
+      );
+      return new HttpResponse(null, { status: 204 });
+    }
     if (!SCENARIOS.includes(body.scenario as Scenario))
       return new HttpResponse(null, { status: 400 });
     seedScenario(

@@ -1,4 +1,6 @@
 import {
+  BATCH_DURATION_MS,
+  BATCH_SETS,
   CODE_TTL_MS,
   IDLE_TTL_MS,
   PANEL_EMAILS,
@@ -9,6 +11,7 @@ import {
   randomCode,
   randomToken,
   workspaceFor,
+  type BatchLinha,
   type Preset,
   type WorkspaceRecord,
 } from "../factories/panel.ts";
@@ -44,6 +47,29 @@ export type CallRecord = {
   /** The JSON body's keys, sorted (never the values). */
   bodyKeys?: string[];
   authorized: boolean;
+  /** D-B1: the row count and the Idempotency-Key, never the rows (T69). */
+  rows?: number;
+  idempotencyKey?: string;
+};
+
+/** A batch in the mock (D-B1–D-B7). */
+export type BatchRecord = {
+  id: string;
+  /** The owner's e-mail: another account's read is a 404 (A-X3, PB10). */
+  email: string;
+  linhas: BatchLinha[];
+  estado: "processando" | "concluido" | "concluido_com_erros" | "falhou";
+  processados: number;
+  /** PB4: a body with the FALHA CNPJ stops here (ceil(total / 2)) until resumed. */
+  failAt: number | undefined;
+  /** PB1: a held batch doesn't advance on status reads. */
+  held: boolean;
+  startedAt: number;
+  finishedAt: number | undefined;
+  monitorado: boolean;
+  enviado_para_fila: boolean;
+  criados: number | undefined;
+  monitorados: number | undefined;
 };
 
 type Session = { email: string; createdAt: number; lastActivity: number };
@@ -57,7 +83,11 @@ export type Scenario =
   | "workspace-falha"
   | "workspace-queda"
   | "workspace-invalido"
-  | "logout-falha";
+  | "logout-falha"
+  // M5 batches (PB8, PB9, PB12; PB11 counts in pollFailures)
+  | "csv-sem-escape"
+  | "historico-falha"
+  | "queda-de-rede-lote";
 
 type Store = {
   accounts: Map<string, Account>;
@@ -79,6 +109,11 @@ type Store = {
   signups: Map<string, number>;
   logouts: string[];
   calls: CallRecord[];
+  batches: Map<string, BatchRecord>;
+  /** A-X7 per workspace: "e-mail|key" → the first reply and its body. */
+  batchKeys: Map<string, { fingerprint: string; reply: unknown }>;
+  /** PB11: status reads still to fail, per e-mail ("*" = everyone). */
+  pollFailures: Map<string, number>;
   /** Scenario → the e-mails it applies to, or "all". */
   scenarios: Map<Scenario, Set<string> | "all">;
 };
@@ -137,6 +172,11 @@ const SEEDED: Record<
     email: "semverificacoes@exemplo.test",
     nome: "Sem Exemplo",
     workspace: "Plataforma Sem Verificações",
+  },
+  cem: {
+    email: "cem@exemplo.test",
+    nome: "Cem Exemplo",
+    workspace: "Plataforma Cem",
   },
   "um-vendedor": {
     email: "um-vendedor@exemplo.test",
@@ -197,6 +237,9 @@ function createStore(): Store {
     signups: new Map(),
     logouts: [],
     calls: [],
+    batches: new Map(),
+    batchKeys: new Map(),
+    pollFailures: new Map(),
     scenarios: new Map(),
   };
 }
@@ -206,6 +249,7 @@ let store = createStore();
 /** Back to the seeded accounts, with no sessions, codes, mail or log. */
 export function resetPanelMock(): void {
   store = createStore();
+  resetBatchClock();
 }
 
 export function panelStore(): Store {
@@ -363,4 +407,79 @@ export function seedScenario(scenario: Scenario, email?: string): void {
 
 export function recordCall(call: CallRecord): void {
   store.calls.push(call);
+}
+
+// --- Batches (M5) -------------------------------------------------------------
+
+let batchClock: () => number = () => Date.now();
+
+/** PB1: the time iniciado_em comes from (concluido_em = it + BATCH_DURATION_MS), so {duracao} is stable. Vitest resets it. */
+export function setBatchClock(clock: () => number): void {
+  batchClock = clock;
+}
+
+export function resetBatchClock(): void {
+  batchClock = () => Date.now();
+}
+
+export function newBatch(email: string, linhas: BatchLinha[]): BatchRecord {
+  const total = linhas.length;
+  const batch: BatchRecord = {
+    id: crypto.randomUUID(),
+    email,
+    linhas,
+    estado: "processando",
+    processados: 0,
+    failAt: linhas.some((linha) => linha.cnpj === BATCH_SETS.falha)
+      ? Math.ceil(total / 2)
+      : undefined,
+    held: false,
+    // Whole seconds, like the API's timestamps.
+    startedAt: Math.floor(batchClock() / 1000) * 1000,
+    finishedAt: undefined,
+    monitorado: false,
+    enviado_para_fila: false,
+    criados: undefined,
+    monitorados: undefined,
+  };
+  store.batches.set(batch.id, batch);
+  return batch;
+}
+
+/** The batch if it exists AND belongs to `email`: otherwise undefined (the same 404). */
+export function ownBatch(id: string, email: string): BatchRecord | undefined {
+  const batch = store.batches.get(id);
+  return batch?.email === email ? batch : undefined;
+}
+
+export function batchesOf(email: string): BatchRecord[] {
+  return [...store.batches.values()]
+    .filter((batch) => batch.email === email)
+    .reverse()
+    .sort((a, b) => b.startedAt - a.startedAt);
+}
+
+/** PB17: contagens.lote_em_andamento. */
+export function hasRunningBatch(email: string): boolean {
+  return batchesOf(email).some((batch) => batch.estado === "processando");
+}
+
+export function finishBatchAt(batch: BatchRecord): number {
+  return batch.startedAt + BATCH_DURATION_MS;
+}
+
+/** PB11: true (and one fewer left) when this status read must fail. */
+export function takePollFailure(email: string): boolean {
+  for (const key of [email, "*"]) {
+    const left = store.pollFailures.get(key) ?? 0;
+    if (left > 0) {
+      store.pollFailures.set(key, left - 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+export function seedPollFailures(n: number, email?: string): void {
+  store.pollFailures.set(email?.toLowerCase() ?? "*", n);
 }

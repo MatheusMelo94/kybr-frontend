@@ -5,7 +5,7 @@ import {
   PANEL_RETRY_AFTER_SECONDS,
   TURNSTILE_TOKENS,
 } from "../../factories/panel.ts";
-import { recordCall } from "../panel-store.ts";
+import { recordCall, type CallRecord } from "../panel-store.ts";
 
 // Replies and request plumbing shared by the panel's handlers (A-X1, A-X2).
 
@@ -28,7 +28,7 @@ export function noContent(): HttpResponse<null> {
 export function apiError(
   status: number,
   code: string,
-  extra: Record<string, string> = {},
+  extra: Record<string, string | number> = {},
 ): HttpResponse<JsonBodyType> {
   return HttpResponse.json(
     { code, message: ERROR_SENTINEL, ...extra },
@@ -56,6 +56,8 @@ export type Incoming = {
   ip: string | undefined;
   /** Set when the request must be refused before any handling. */
   refused?: HttpResponse<JsonBodyType>;
+  /** This request's call-log entry, for a handler to annotate (never with values). */
+  call: CallRecord;
 };
 
 /**
@@ -75,7 +77,7 @@ export async function incoming(request: Request): Promise<Incoming> {
   const token = /^Bearer (\S+)$/.exec(auth)?.[1];
   const ip = request.headers.get("x-kybr-client-ip") ?? undefined;
   const bodyKeys = Object.keys(body).sort();
-  recordCall({
+  const call: CallRecord = {
     method: request.method,
     path: url.pathname + url.search,
     ...(typeof body.email === "string" && { email: body.email.toLowerCase() }),
@@ -83,8 +85,9 @@ export async function incoming(request: Request): Promise<Incoming> {
     ...(ip !== undefined && { ip }),
     ...(bodyKeys.length > 0 && { bodyKeys }),
     authorized: token !== undefined,
-  });
-  const result: Incoming = { body, token, ip };
+  };
+  recordCall(call);
+  const result: Incoming = { body, token, ip, call };
   if (!request.headers.get("x-kybr-bff-key"))
     result.refused = apiError(403, "BFF_KEY_AUSENTE");
   return result;

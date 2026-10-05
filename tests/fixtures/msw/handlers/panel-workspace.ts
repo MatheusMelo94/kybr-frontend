@@ -2,6 +2,7 @@ import { delay, http, type RequestHandler } from "msw";
 
 import { CATEGORIES, type ContatoVendedor } from "../../factories/panel.ts";
 import {
+  hasRunningBatch,
   scenarioApplies,
   sessionAccount,
   type Account,
@@ -15,9 +16,14 @@ const PLAIN_EMAIL = /^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/;
 function workspaceView(account: Account): Record<string, unknown> {
   const { plano, ...workspace } = account.workspace;
   // QA G3: the counts fail alone (the shell hides them), until unseeded.
-  const contagens = scenarioApplies("contagens-falham", account.email)
+  const stored = scenarioApplies("contagens-falham", account.email)
     ? undefined
     : account.workspace.contagens;
+  // PB17: true while a batch of this workspace is processando.
+  const contagens = stored && {
+    ...stored,
+    lote_em_andamento: hasRunningBatch(account.email),
+  };
   delete (workspace as { contagens?: unknown }).contagens;
   return {
     ...workspace,
