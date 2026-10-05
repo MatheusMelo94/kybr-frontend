@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/lib/env";
+import { isLoopbackHostname } from "@/lib/safe-url";
 
 // The panel's runtime config for its pages (ADR-0009). env-schema requires
 // every value whenever PANEL_HOST is set, and a panel page renders only on
@@ -30,4 +31,18 @@ export function legalLinks(): { termsUrl: string; privacyUrl: string } {
 /** "Contratar"'s address (P-U4): unset keeps the button hidden. */
 export function commercialContactEmail(): string | undefined {
   return env.COMMERCIAL_CONTACT_EMAIL;
+}
+
+/**
+ * The panel's own origin, for absolute metadata URLs (the share image):
+ * https:, or http: on loopback behind the local-only flag (ADR-0009 rule 3).
+ * Undefined with the panel off, when no panel page renders.
+ */
+export function panelOrigin(): URL | undefined {
+  const host = env.PANEL_HOST;
+  if (host === undefined) return undefined;
+  const local =
+    env.API_ALLOW_LOOPBACK_HTTP === "true" &&
+    isLoopbackHostname(host.replace(/:\d+$/, ""));
+  return new URL(`${local ? "http" : "https"}://${host}`);
 }

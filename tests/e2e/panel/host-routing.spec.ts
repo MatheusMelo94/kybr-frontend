@@ -111,6 +111,15 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     await page.goto("/entrar");
     await page.waitForLoadState("networkidle");
     expect(errors).toEqual([]);
+
+    // The share image: the panel's, absolute on the panel host (AC 75).
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      "content",
+      "http://127.0.0.1:3000/brand/kybr-og-1200x630.png",
+    );
+    const image = await page.request.get("/brand/kybr-og-1200x630.png");
+    expect(image.status()).toBe(200);
+    expect((await image.body()).length).toBeLessThanOrEqual(80 * 1024);
   });
 
   test("the link host still serves /v/*", async ({ page }) => {
