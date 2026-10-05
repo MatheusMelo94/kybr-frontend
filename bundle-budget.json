@@ -16,6 +16,7 @@
     },
     "panelSentinel": "isolate"
   },
-  "$comment_worker": "ADR-0012 item 6: Lote's parser worker. No route's First Load JS may contain these markers. workerRequired (some client chunk must carry the sentinel) is added in T75, when useBatchFile() creates the worker.",
-  "firstLoadForbidden": ["kybr-lote-parser/1", "SheetJS"]
+  "$comment_worker": "ADR-0012 item 6: Lote's parser worker. No route's First Load JS may contain these markers, and some client chunk must carry workerRequired (the worker was built).",
+  "firstLoadForbidden": ["kybr-lote-parser/1", "SheetJS"],
+  "workerRequired": "kybr-lote-parser/1"
 }

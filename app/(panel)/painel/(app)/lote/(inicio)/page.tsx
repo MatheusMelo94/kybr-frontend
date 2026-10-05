@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import type { JSX } from "react";
 
+import { BatchUpload } from "@/features/panel-lote/components/batch-upload";
 import { CostCard } from "@/features/panel-lote/components/cost-card";
 import { HistoryList } from "@/features/panel-lote/components/history-list";
 import { OnboardingStep2Banner } from "@/features/panel-lote/components/onboarding-step2-banner";
 import { WhyCard } from "@/features/panel-lote/components/why-card";
 import { loteCopy } from "@/features/panel-lote/copy";
 import { historyOrError } from "@/features/panel-lote/data";
+import { PlanBanner } from "@/features/panel-shell/components/plan-banner";
 import { requireSession } from "@/lib/api/panel/session";
+import { contratarHref } from "@/lib/panel-config";
 
 export const metadata: Metadata = { title: loteCopy["lote.h1"] };
 
@@ -22,6 +25,7 @@ export default async function LotePage({
   // Onboarding step 2 (J1.5): only with ?inicio=1; no state behind it.
   const onboarding = (await searchParams).inicio === "1";
   const history = await historyOrError();
+  const contratar = contratarHref();
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,6 +40,8 @@ export default async function LotePage({
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
         <div className="flex min-w-0 flex-col gap-6">
           {onboarding && <OnboardingStep2Banner />}
+          <PlanBanner plano={me.workspace.plano} contratarHref={contratar} />
+          <BatchUpload contratarHref={contratar} />
           <HistoryList history={history} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
