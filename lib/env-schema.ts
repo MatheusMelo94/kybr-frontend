@@ -23,6 +23,23 @@ export const LIST_VALUED_IP_HEADERS: ReadonlySet<string> = new Set([
  */
 const VERCEL_CLIENT_IP_HEADER = "x-vercel-forwarded-for";
 
+/** host[:port], lowercased (ADR-0008 rule 1): what a request's Host header holds. */
+export const HOST_PATTERN = /^[a-z0-9.-]+(:\d+)?$/;
+
+const host = z
+  .string()
+  .transform((value) => value.toLowerCase())
+  .pipe(z.string().regex(HOST_PATTERN, "Must be host[:port]"));
+
+// The panel's settings that production can't go without once PANEL_HOST turns
+// it on (P-U3 legal links, U-P2 Turnstile).
+const PANEL_REQUIRED = [
+  "LEGAL_TERMS_URL",
+  "LEGAL_PRIVACY_URL",
+  "LEGAL_TERMS_VERSION",
+  "TURNSTILE_SITE_KEY",
+] as const;
+
 const serverEnvSchema = z
   .object({
     NODE_ENV: z
@@ -54,8 +71,35 @@ const serverEnvSchema = z
     // Server-side error monitoring (T34a, threat model F10). Optional in every
     // build, production included (QA G12): unset, nothing is sent anywhere.
     SENTRY_DSN: z.url({ protocol: /^https$/ }).optional(),
+    // The seller link's host (ADR-0008): every other host gets no /v/*.
+    // Required in production (kybr.com.br), except on a Vercel Preview, whose
+    // own URLs are link hosts.
+    LINK_HOST: host.optional(),
+    // The panel's host, and its release switch (ADR-0008 rule 7): unset, the
+    // panel answers nowhere.
+    PANEL_HOST: host.optional(),
+    // Cloudflare Turnstile's site key (ADR-0009 rule 13). Public: the panel
+    // passes it to the widget as a prop at runtime.
+    TURNSTILE_SITE_KEY: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/)
+      .optional(),
+    // Where "Contratar" writes to (P-U4). Unset, the button isn't rendered.
+    COMMERCIAL_CONTACT_EMAIL: z.email().optional(),
+    // The sign-up's terms and privacy links (P-U3), and the version its
+    // acceptance records (D-A1). Required with PANEL_HOST.
+    LEGAL_TERMS_URL: httpUrl.optional(),
+    LEGAL_PRIVACY_URL: httpUrl.optional(),
+    LEGAL_TERMS_VERSION: z
+      .string()
+      .regex(/^[\x21-\x7e]{1,32}$/, "Must be 1 to 32 printable characters")
+      .optional(),
     // Set to "1" by Vercel itself at build and run time.
     VERCEL: z.string().optional(),
+    // Set by Vercel: the environment, and this deployment's own URLs (no scheme).
+    VERCEL_ENV: z.string().optional(),
+    VERCEL_URL: host.optional(),
+    VERCEL_BRANCH_URL: host.optional(),
   })
   .superRefine((env, ctx) => {
     if (
@@ -67,6 +111,23 @@ const serverEnvSchema = z
         path: ["CLIENT_IP_HEADER"],
         message: `Must be ${VERCEL_CLIENT_IP_HEADER} on Vercel`,
       });
+    }
+    if (env.PANEL_HOST !== undefined && env.PANEL_HOST === env.LINK_HOST) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["PANEL_HOST"],
+        message: "Must differ from LINK_HOST",
+      });
+    }
+    if (env.PANEL_HOST !== undefined) {
+      for (const name of PANEL_REQUIRED) {
+        if (env[name] === undefined)
+          ctx.addIssue({
+            code: "custom",
+            path: [name],
+            message: "Required when PANEL_HOST is set",
+          });
+      }
     }
   })
   .transform(({ CLIENT_IP_TRUSTED_HOPS, ...env }) =>
@@ -87,6 +148,25 @@ const serverEnvSchema = z
       });
     }
     if (env.NODE_ENV !== "production") return;
+    if (env.LINK_HOST === undefined && env.VERCEL_ENV !== "preview") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["LINK_HOST"],
+        message: "Required in production",
+      });
+    }
+    // Shown on the panel as links: https:, or loopback for local production builds.
+    for (const name of ["LEGAL_TERMS_URL", "LEGAL_PRIVACY_URL"] as const) {
+      const value = env[name];
+      if (value === undefined) continue;
+      const url = new URL(value);
+      if (url.protocol !== "https:" && !isLoopbackHostname(url.hostname))
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message: "Must be an https: URL in production",
+        });
+    }
     if (env.API_BFF_KEY === undefined) {
       ctx.addIssue({
         code: "custom",

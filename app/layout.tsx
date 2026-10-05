@@ -3,8 +3,6 @@ import { Inter } from "next/font/google";
 import { connection } from "next/server";
 import type { JSX, ReactNode } from "react";
 
-import "./globals.css";
-
 // Inter variable, self-hosted at build (Constitution v2 § Brand). Swapping to a
 // licensed Saans later is a next/font/local change in this one place.
 const inter = Inter({
@@ -16,7 +14,7 @@ const inter = Inter({
 export const viewport: Viewport = {
   colorScheme: "light dark",
   // Justified one-off raw hex (§ Styling): the browser UI color must be a literal
-  // here. These mirror --color-surface (light / dark) in app/globals.css; a test
+  // here. These mirror --color-surface (light / dark) in app/tokens.css; a test
   // keeps them in sync.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },

@@ -1,0 +1,10 @@
+@import "tailwindcss" source(none);
+@import "../../tokens.css";
+
+/* The panel's stylesheet (ADR-0010 rule 2): utilities from the panel's files
+   only. The root layout's own classes (on <body>) are scanned too. */
+@source ".";
+@source "../../../features/panel-*/**/*.{ts,tsx}";
+@source "../../../components/ui";
+@source "../../../components/panel";
+@source "../../layout.tsx";

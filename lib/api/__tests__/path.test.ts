@@ -1,7 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { apiPaths, isValidSlug, isValidToken } from "@/lib/api/path";
+import {
+  apiPaths,
+  isValidPanelId,
+  isValidSlug,
+  isValidToken,
+  panelIdSegment,
+} from "@/lib/api/path";
 
 describe("apiPaths", () => {
   it("builds D1, D2 and D3 paths from valid segments", () => {
@@ -99,5 +105,43 @@ describe("X3 identifier checks", () => {
     "a".repeat(65),
   ])("rejects the token %j", (token) => {
     expect(isValidToken(token)).toBe(false);
+  });
+});
+
+describe("apiPaths.panel (A-X1, A-X3)", () => {
+  it("builds the M4 paths under /v1/", () => {
+    expect(apiPaths.panel.me()).toBe("/v1/me");
+    expect(apiPaths.panel.categories()).toBe("/v1/categories");
+    expect(apiPaths.panel.workspace()).toBe("/v1/workspace");
+    expect(apiPaths.panel.signup()).toBe("/v1/auth/signup");
+    expect(apiPaths.panel.confirm()).toBe("/v1/auth/confirm");
+    expect(apiPaths.panel.confirmResend()).toBe("/v1/auth/confirm/resend");
+    expect(apiPaths.panel.login()).toBe("/v1/auth/login");
+    expect(apiPaths.panel.logout()).toBe("/v1/auth/logout");
+    expect(apiPaths.panel.passwordReset()).toBe("/v1/auth/password-reset");
+    expect(apiPaths.panel.passwordResetConfirm()).toBe(
+      "/v1/auth/password-reset/confirm",
+    );
+  });
+
+  it.each(["3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e", "AbcDef_0123456789-xyz"])(
+    "accepts the panel id %s (UUID or opaque, A-X3)",
+    (id) => {
+      expect(isValidPanelId(id)).toBe(true);
+      expect(panelIdSegment(id)).toBe(id);
+    },
+  );
+
+  it.each([
+    "",
+    "123",
+    "../me",
+    "a/b-0123456789abcdef",
+    "abc%2F0123456789abcdef",
+    "x".repeat(65),
+    "3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e?x=1",
+  ])("refuses the panel id %j before any request", (id) => {
+    expect(isValidPanelId(id)).toBe(false);
+    expect(() => panelIdSegment(id)).toThrow(/Refused/);
   });
 });

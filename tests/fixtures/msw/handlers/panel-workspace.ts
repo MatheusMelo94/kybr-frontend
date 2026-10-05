@@ -1,0 +1,108 @@
+import { delay, http, type RequestHandler } from "msw";
+
+import { CATEGORIES, type ContatoVendedor } from "../../factories/panel.ts";
+import {
+  scenarioApplies,
+  sessionAccount,
+  type Account,
+} from "../panel-store.ts";
+import { apiError, incoming, networkDrop, ok } from "./panel-common.ts";
+
+// Pre-Contract handlers for D-W1–D-W3 (ops-panel contract-request.md, M4).
+
+const PLAIN_EMAIL = /^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/;
+
+function workspaceView(account: Account): Record<string, unknown> {
+  const { plano, ...workspace } = account.workspace;
+  // QA G3: the counts fail alone (the shell hides them), until unseeded.
+  const contagens = scenarioApplies("contagens-falham", account.email)
+    ? undefined
+    : account.workspace.contagens;
+  delete (workspace as { contagens?: unknown }).contagens;
+  return {
+    ...workspace,
+    link_url: `https://kybr.com.br/v/${workspace.slug}`,
+    ...(plano && { plano }),
+    ...(contagens && { contagens }),
+  };
+}
+
+/** A valid contato_vendedor (D-W3: a plain e-mail or an https: URL ≤ 2048), or undefined. */
+function contatoFrom(value: unknown): ContatoVendedor | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const { tipo, valor } = value as Record<string, unknown>;
+  if (typeof valor !== "string") return undefined;
+  if (tipo === "email" && PLAIN_EMAIL.test(valor) && valor.length <= 254)
+    return { tipo, valor };
+  if (tipo === "url" && valor.length <= 2048) {
+    try {
+      if (new URL(valor).protocol === "https:") return { tipo, valor };
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+export const panelWorkspaceHandlers: RequestHandler[] = [
+  http.get("*/v1/me", async ({ request }) => {
+    const { token, refused } = await incoming(request);
+    if (refused) return refused;
+    // A poll (X-Kybr-Poll: 1) doesn't keep the session alive (Q decision).
+    const account = sessionAccount(
+      token,
+      request.headers.get("x-kybr-poll") !== "1",
+    );
+    if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    // An unexpected failure, for the panel's fatal-error screen (S16).
+    if (scenarioApplies("me-falha", account.email))
+      return apiError(500, "ERRO_INTERNO");
+    return ok({
+      nome: account.nome,
+      email: account.email,
+      workspace: workspaceView(account),
+    });
+  }),
+  http.get("*/v1/categories", async ({ request }) => {
+    const { token, refused } = await incoming(request);
+    if (refused) return refused;
+    const account = sessionAccount(token);
+    if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    if (scenarioApplies("categorias-falham", account.email))
+      return apiError(500, "ERRO_INTERNO");
+    // QA G3: slow enough for the route's skeleton to show.
+    if (scenarioApplies("categorias-lentas", account.email)) await delay(1_200);
+    return ok([...CATEGORIES]);
+  }),
+  http.put("*/v1/workspace", async ({ request }) => {
+    const { body, token, refused } = await incoming(request);
+    if (refused) return refused;
+    const account = sessionAccount(token);
+    if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    // QA G3: the save fails (500), drops, or is refused with a field.
+    if (scenarioApplies("workspace-falha", account.email))
+      return apiError(500, "ERRO_INTERNO");
+    if (scenarioApplies("workspace-queda", account.email)) return networkDrop();
+    if (scenarioApplies("workspace-invalido", account.email))
+      return apiError(422, "VALOR_INVALIDO", {
+        field: "contato_vendedor.valor",
+      });
+    const workspace = account.workspace;
+    if (body.contato_vendedor !== undefined) {
+      const contato = contatoFrom(body.contato_vendedor);
+      if (!contato)
+        return apiError(422, "VALOR_INVALIDO", {
+          field: "contato_vendedor.valor",
+        });
+      workspace.contato_vendedor = contato;
+    }
+    if (body.categoria !== undefined) {
+      if (!CATEGORIES.some((category) => category.id === body.categoria))
+        return apiError(422, "VALOR_INVALIDO", { field: "categoria" });
+      workspace.categoria = body.categoria as string;
+    }
+    if (workspace.contato_vendedor && workspace.categoria)
+      workspace.onboarding_concluido = true;
+    return ok(workspaceView(account));
+  }),
+];

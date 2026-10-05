@@ -139,3 +139,20 @@ describe("TextField", () => {
     ).toHaveAccessibleDescription("b");
   });
 });
+
+describe("TextField: password (panel auth)", () => {
+  it("can be a password field", async () => {
+    const { render, screen } = await import("@testing-library/react");
+    const { TextField } = await import("@/components/ui/text-field");
+    render(
+      <TextField
+        label="Senha"
+        name="senha"
+        type="password"
+        autoComplete="current-password"
+      />,
+    );
+
+    expect(screen.getByLabelText("Senha")).toHaveAttribute("type", "password");
+  });
+});

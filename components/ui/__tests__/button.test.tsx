@@ -138,4 +138,7 @@ describe("Button", () => {
     expect(button).toHaveAccessibleDescription("Contrato social ou CCMEI");
     expect(button).toHaveClass("w-full");
   });
+
+  // size="panel" (plan § 2.6): 40 px, at least 44 px on a coarse pointer,
+  // secondary included; primitives.spec measures it (Playwright).
 });

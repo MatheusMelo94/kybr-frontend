@@ -6,18 +6,30 @@ export const CSP_REPORT_GROUP = "csp";
 type CspOptions = {
   /** Fresh per request (generateNonce). */
   nonce: string;
-  /** Origin of API_PUBLIC_BASE_URL: the browser uploads there (ADR-0004b). */
-  apiOrigin: string;
+  /** Origin of API_PUBLIC_BASE_URL: the link's browser uploads there
+      (ADR-0004b). The panel passes none: its browser never calls the API. */
+  apiOrigin?: string;
+  /** The panel's auth pages: Cloudflare Turnstile's script and frame (ADR-0009 rule 13). */
+  turnstile?: boolean;
   /** Development only: React Refresh needs eval. */
   isDev: boolean;
   /** Off for loopback hosts, so a local production build over http still loads. */
   upgradeInsecureRequests: boolean;
 };
 
-/** The strict, nonce-based policy from frontend-security-conventions.md § Content Security Policy. */
+/** Turnstile's origin, allowed on the panel's auth pages only (P03.4). */
+export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+
+/**
+ * The strict, nonce-based policy from frontend-security-conventions.md
+ * § Content Security Policy, per host (ADR-0008 rule 9): the link's allows
+ * its API origin in connect-src; the panel's allows 'self' only, plus
+ * Turnstile on the auth pages.
+ */
 export function buildContentSecurityPolicy({
   nonce,
   apiOrigin,
+  turnstile = false,
   isDev,
   upgradeInsecureRequests,
 }: CspOptions): string {
@@ -29,12 +41,16 @@ export function buildContentSecurityPolicy({
       `'nonce-${nonce}'`,
       "'strict-dynamic'",
       ...(isDev ? ["'unsafe-eval'"] : []),
+      // Ignored by CSP3 browsers under strict-dynamic (the nonce loads it);
+      // kept for older ones.
+      ...(turnstile ? [TURNSTILE_ORIGIN] : []),
     ],
     // Tailwind and next/font emit inline styles; tighten with nonces when feasible.
     ["style-src", "'self'", "'unsafe-inline'"],
     ["img-src", "'self'", "data:", "blob:"],
     ["font-src", "'self'"],
-    ["connect-src", "'self'", apiOrigin],
+    ["connect-src", "'self'", ...(apiOrigin !== undefined ? [apiOrigin] : [])],
+    ...(turnstile ? [["frame-src", TURNSTILE_ORIGIN]] : []),
     ["frame-ancestors", "'none'"],
     ["base-uri", "'self'"],
     ["form-action", "'self'"],

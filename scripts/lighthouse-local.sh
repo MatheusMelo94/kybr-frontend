@@ -29,6 +29,15 @@ export API_ALLOW_LOOPBACK_HTTP=true
 export API_BFF_KEY=e2e-only-bff-key-for-the-local-mock-api
 export CLIENT_IP_HEADER=x-forwarded-for
 export CLIENT_IP_TRUSTED_HOPS=1
+# The link on localhost, the panel on 127.0.0.1 (ADR-0008, as in E2E), with
+# placeholder legal pages and Cloudflare's always-pass Turnstile test key.
+export LINK_HOST="localhost:${app_port}"
+export PANEL_HOST="127.0.0.1:${app_port}"
+export LEGAL_TERMS_URL=https://example.invalid/termos
+export LEGAL_PRIVACY_URL=https://example.invalid/privacidade
+export LEGAL_TERMS_VERSION=lhci-1
+export TURNSTILE_SITE_KEY=1x00000000000000000000AA
+panel_url="http://127.0.0.1:${app_port}"
 export NEXT_TELEMETRY_DISABLED=1
 
 pids=""
@@ -62,6 +71,15 @@ node node_modules/next/dist/bin/next start --port "$app_port" &
 pids="$pids $!"
 wait_for "${app_url}/api/health"
 
+# Mobile preset (lighthouserc.json): the link's pages, and /entrar, the
+# panel's phone journey (ADR-0010: the e-mail deep link logs in on a phone).
 pnpm lhci \
   --collect.url="${app_url}${form_path}" \
-  --collect.url="${app_url}${case_path}"
+  --collect.url="${app_url}${case_path}" \
+  --collect.url="${panel_url}/entrar"
+
+# Desktop preset (lighthouserc.panel.json): the panel's desktop-first auth
+# pages, LCP <= 2.5 s blocking (ADR-0010).
+.github/deploy-tools/node_modules/.bin/lhci autorun --config=lighthouserc.panel.json \
+  --collect.url="${panel_url}/entrar" \
+  --collect.url="${panel_url}/cadastro"

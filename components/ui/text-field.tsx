@@ -18,7 +18,7 @@ type Props = {
   error?: string;
   /** Ids of other messages that describe the field (e.g. a form-level error), after the hint and error. */
   describedBy?: string | undefined;
-  type?: "text" | "email";
+  type?: "text" | "email" | "password";
   inputMode?: "text" | "numeric" | "email";
   autoComplete?: string;
   autoCapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";

@@ -183,6 +183,39 @@ test.describe("security headers @feature-seller-link", () => {
     });
   }
 
+  // Zod 4 probes eval with new Function() the first time it compiles a
+  // schema; the strict CSP refuses it and the browser reports a violation.
+  // The link runs zod jitless, so a full form visit raises none.
+  test("the form page, through a full submit, raises no CSP violation", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const store = window as unknown as { __cspViolations: string[] };
+      store.__cspViolations = [];
+      document.addEventListener("securitypolicyviolation", (event) => {
+        store.__cspViolations.push(
+          `${event.violatedDirective} ${event.blockedURI}`,
+        );
+      });
+    });
+    await page.goto("/v/loja-exemplo");
+    await page
+      .getByRole("textbox", { name: "CNPJ da empresa" })
+      .pressSequentially("12abc34501de35");
+    await page
+      .getByRole("textbox", { name: "Nome completo do responsável" })
+      .fill("Maria Exemplo");
+    await page.getByRole("button", { name: "Verificar empresa" }).click();
+    await expect(page).toHaveURL(/\/v\/loja-exemplo\/c\/[A-Za-z0-9_-]{22,64}$/);
+
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __cspViolations: string[] }).__cspViolations,
+      ),
+    ).toEqual([]);
+  });
+
   test("the production build ships no browser source maps", async ({
     page,
     request,

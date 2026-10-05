@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Stable codes from the X1 error envelope (contract-request.md, D7). */
+/** Stable codes from the X1 error envelope (seller-link contract-request.md D7; ops-panel A-X2). */
 export const API_ERROR_CODES = [
   "LINK_NAO_ENCONTRADO",
   "EMPRESA_NAO_ENCONTRADA",
@@ -15,6 +15,21 @@ export const API_ERROR_CODES = [
   "FORMATO_INVALIDO",
   "CASO_DECIDIDO",
   "AUTOFILL_DESATIVADO", // D2 kill switch (contract X6)
+  // The panel's (ops-panel contract-request.md A-X2, M4)
+  "SESSAO_EXPIRADA",
+  "TURNSTILE_REQUERIDO",
+  "TURNSTILE_INVALIDO",
+  "TESTE_INDISPONIVEL",
+  "TESTE_PAUSADO",
+  "CREDENCIAIS_INVALIDAS",
+  "EMAIL_NAO_CONFIRMADO",
+  "EMAIL_EM_USO",
+  "SENHA_FRACA",
+  "VALOR_INVALIDO",
+  "CODIGO_INCORRETO",
+  "CODIGO_EXPIRADO",
+  "TOKEN_INVALIDO",
+  "RECURSO_NAO_ENCONTRADO",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
@@ -41,6 +56,8 @@ type AppErrorInit = {
   requestId?: string | undefined;
   retryAfterSeconds?: number | undefined;
   field?: string | undefined;
+  signupTicket?: string | undefined;
+  reenviarEm?: string | undefined;
 };
 
 /**
@@ -54,6 +71,10 @@ export class AppError extends Error {
   readonly requestId: string | undefined;
   readonly retryAfterSeconds: number | undefined;
   readonly field: string | undefined;
+  /** D-A4 EMAIL_NAO_CONFIRMADO: the pending account's ticket (server-side only). */
+  readonly signupTicket: string | undefined;
+  /** D-A4 EMAIL_NAO_CONFIRMADO: when the next resend unlocks (ISO 8601). */
+  readonly reenviarEm: string | undefined;
 
   constructor({
     code,
@@ -61,6 +82,8 @@ export class AppError extends Error {
     requestId,
     retryAfterSeconds,
     field,
+    signupTicket,
+    reenviarEm,
   }: AppErrorInit) {
     super(`Kybr API error: ${code}`);
     this.code = code;
@@ -68,6 +91,8 @@ export class AppError extends Error {
     this.requestId = requestId;
     this.retryAfterSeconds = retryAfterSeconds;
     this.field = field;
+    this.signupTicket = signupTicket;
+    this.reenviarEm = reenviarEm;
   }
 }
 
@@ -75,6 +100,13 @@ export class AppError extends Error {
 const errorEnvelopeSchema = z.object({
   code: z.string(),
   field: z.string().optional(),
+  // D-A4: the 403 EMAIL_NAO_CONFIRMADO carries the pending account's ticket.
+  signup_ticket: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{16,512}$/)
+    .optional()
+    .catch(undefined),
+  reenviar_em: z.string().max(64).optional().catch(undefined),
 });
 
 function isApiErrorCode(code: string | undefined): code is ApiErrorCode {
@@ -103,5 +135,7 @@ export async function appErrorFromResponse(
     requestId: response.headers.get("x-request-id") ?? undefined,
     retryAfterSeconds: parseRetryAfter(response.headers.get("retry-after")),
     field: envelope.success ? envelope.data.field : undefined,
+    signupTicket: envelope.success ? envelope.data.signup_ticket : undefined,
+    reenviarEm: envelope.success ? envelope.data.reenviar_em : undefined,
   });
 }

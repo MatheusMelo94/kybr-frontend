@@ -16,6 +16,7 @@ const production = {
   CLIENT_IP_HEADER: "x-vercel-forwarded-for",
   ENABLE_EXPERIMENTAL_COREPACK: "1",
   VERCEL: "1",
+  LINK_HOST: "kybr.com.br",
 };
 
 const preview = {
@@ -154,5 +155,98 @@ describe("checkDeployEnv", () => {
       "production",
     );
     expect(problems.join("\n")).not.toContain("leaky-value");
+  });
+});
+
+describe("checkDeployEnv: hosts and the panel (ADR-0008 rule 7, T62)", () => {
+  const panel = {
+    ...production,
+    PANEL_HOST: "app.kybr.com.br",
+    LEGAL_TERMS_URL: "https://kybr.com.br/termos",
+    LEGAL_PRIVACY_URL: "https://kybr.com.br/privacidade",
+    LEGAL_TERMS_VERSION: "2026-10-04",
+    TURNSTILE_SITE_KEY: "0x4AAAAAAAexampleSiteKey",
+  };
+
+  it("requires LINK_HOST=kybr.com.br in Production (the link 404s without it)", () => {
+    const { LINK_HOST: _drop, ...without } = production;
+    void _drop;
+    expect(check(without, "production")).toEqual([
+      "LINK_HOST must be kybr.com.br in production",
+    ]);
+    expect(
+      check({ ...production, LINK_HOST: "www.kybr.com.br" }, "production"),
+    ).toEqual(["LINK_HOST must be kybr.com.br in production"]);
+  });
+
+  it("doesn't require LINK_HOST on a Preview (its own URLs serve the link)", () => {
+    const { LINK_HOST: _drop, ...without } = preview;
+    void _drop;
+    expect(check(without, "preview")).toEqual([]);
+  });
+
+  it("accepts PANEL_HOST unset (the panel is dark) or app.kybr.com.br with its config", () => {
+    expect(check(production, "production")).toEqual([]);
+    expect(check(panel, "production")).toEqual([]);
+  });
+
+  it("refuses any other PANEL_HOST in Production", () => {
+    expect(
+      check({ ...panel, PANEL_HOST: "kybr-x.vercel.app" }, "production"),
+    ).toEqual(["PANEL_HOST must be unset or app.kybr.com.br in production"]);
+  });
+
+  it.each([
+    "LEGAL_TERMS_URL",
+    "LEGAL_PRIVACY_URL",
+    "LEGAL_TERMS_VERSION",
+    "TURNSTILE_SITE_KEY",
+  ])("refuses PANEL_HOST without %s", (name) => {
+    expect(check({ ...panel, [name]: "" }, "production")).toEqual([
+      `${name} is required when PANEL_HOST is set`,
+    ]);
+  });
+
+  it("requires https: legal pages", () => {
+    expect(
+      check(
+        { ...panel, LEGAL_TERMS_URL: "http://kybr.com.br/termos" },
+        "production",
+      ),
+    ).toEqual(["LEGAL_TERMS_URL must be an https: URL"]);
+  });
+
+  it("refuses Cloudflare's test site keys in Production", () => {
+    expect(
+      check(
+        { ...panel, TURNSTILE_SITE_KEY: "1x00000000000000000000AA" },
+        "production",
+      ),
+    ).toEqual([
+      "TURNSTILE_SITE_KEY must not be a Cloudflare test key in production",
+    ]);
+  });
+
+  it("checks a Preview's PANEL_HOST the same way, test keys allowed", () => {
+    expect(
+      check(
+        {
+          ...preview,
+          PANEL_HOST: "app-preview.kybr.com.br",
+          TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+        },
+        "preview",
+      ),
+    ).toEqual([
+      "LEGAL_TERMS_URL is required when PANEL_HOST is set",
+      "LEGAL_PRIVACY_URL is required when PANEL_HOST is set",
+      "LEGAL_TERMS_VERSION is required when PANEL_HOST is set",
+    ]);
+  });
+
+  it("the new variables are plain (CI must read them)", () => {
+    expect(
+      check({ ...panel, PANEL_HOST: "[SENSITIVE]" }, "production")[0],
+    ).toMatch(/^PANEL_HOST is marked Sensitive/);
   });
 });

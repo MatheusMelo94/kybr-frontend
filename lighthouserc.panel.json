@@ -1,0 +1,59 @@
+{
+  "$comment": "Lighthouse CI for the panel's desktop-first auth pages (ADR-0010 § 1): desktop preset, median of 3, on a production build against the local mock API (scripts/lighthouse-local.sh runs it after lighthouserc.json). LCP <= 2.5 s blocking; CLS <= 0.1; category scores from frontend-qa-conventions.md § Accessibility & Performance Gates. /entrar is also measured on the mobile preset in lighthouserc.json (warn > 2500 ms, fail > 3000 ms). Thresholds are the Frontend Architect's: change them only through the plan or an ADR.",
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--headless=new --no-sandbox --disable-dev-shm-usage"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": [
+          "error",
+          {
+            "minScore": 0.85
+          }
+        ],
+        "categories:accessibility": [
+          "error",
+          {
+            "minScore": 0.95
+          }
+        ],
+        "categories:best-practices": [
+          "error",
+          {
+            "minScore": 0.9
+          }
+        ],
+        "largest-contentful-paint": [
+          "error",
+          {
+            "maxNumericValue": 2500,
+            "aggregationMethod": "median-run"
+          }
+        ],
+        "cumulative-layout-shift": [
+          "error",
+          {
+            "maxNumericValue": 0.1,
+            "aggregationMethod": "median-run"
+          }
+        ],
+        "total-blocking-time": [
+          "warn",
+          {
+            "maxNumericValue": 200,
+            "aggregationMethod": "median-run"
+          }
+        ]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci/reports-panel-desktop"
+    }
+  }
+}

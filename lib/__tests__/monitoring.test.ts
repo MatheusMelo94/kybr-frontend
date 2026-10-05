@@ -155,6 +155,53 @@ describe("reportMarker", () => {
   });
 });
 
+describe("M4-08: a per-instance budget per marker", () => {
+  let minute = 0;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // A fresh window for every test: an hour apart.
+    minute += 60;
+    vi.setSystemTime(minute * 60_000);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("logs every marker, sends each marker at most 20 times a minute, then again next minute", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 50; i++) reportMarker("PANEL_HOST_MISMATCH", {});
+    expect(error).toHaveBeenCalledTimes(50);
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(20);
+
+    // Another marker has its own budget, so a flood of one can't mute it.
+    reportMarker("SESSION_REJECTED", { operation: "me" });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(21);
+
+    vi.advanceTimersByTime(60_000);
+    reportMarker("PANEL_HOST_MISMATCH", {});
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(22);
+    error.mockRestore();
+    warn.mockRestore();
+  });
+
+  it("logs one MARKER_BUDGET line per marker when its budget runs out", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 30; i++) reportMarker("TURNSTILE_FAILED", {});
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith("[kybr] MARKER_BUDGET", {
+      marker: "TURNSTILE_FAILED",
+      perMinute: "20",
+    });
+    error.mockRestore();
+    warn.mockRestore();
+  });
+});
+
 describe("reportCspViolations", () => {
   it("sends each violation scrubbed, as a warning", () => {
     const log = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -274,5 +321,77 @@ describe("reportCspViolations", () => {
       });
       log.mockRestore();
     });
+  });
+});
+
+describe("the panel's events (T61, P16)", () => {
+  const SESSION = "sessao-sintetica-AbCdEf0123456789";
+  const PASSWORD = "senha-sintetica-123";
+
+  it("a panel action's event keeps no arguments, cookies, Authorization header or query (volta)", () => {
+    const event = {
+      message: "Action failed",
+      transaction: "POST /entrar",
+      request: {
+        url: `https://app.kybr.test/entrar?volta=%2Ffila%2Fabc&motivo=sessao`,
+        method: "POST",
+        data: JSON.stringify([
+          { email: EMAIL, senha: PASSWORD, turnstile: "tok" },
+        ]),
+        query_string: "volta=%2Ffila%2Fabc",
+        cookies: {
+          "__Host-kybr_session": SESSION,
+          "__Host-kybr_signup": "ticket",
+        },
+        headers: {
+          authorization: `Bearer ${SESSION}`,
+          cookie: `__Host-kybr_session=${SESSION}`,
+        },
+      },
+      extra: { args: [{ email: EMAIL, senha: PASSWORD }] },
+    } as unknown as ErrorEvent;
+
+    const scrubbed = JSON.stringify(scrubEvent(event));
+
+    for (const secret of [
+      SESSION,
+      PASSWORD,
+      EMAIL,
+      "volta",
+      "Bearer",
+      "kybr_signup",
+    ])
+      expect(scrubbed).not.toContain(secret);
+    expect(scrubbed).toContain('"url":"https://app.kybr.test/entrar"');
+  });
+
+  it("knows the panel's marker names", async () => {
+    const { MARKERS } = await import("@/lib/monitoring");
+    expect(MARKERS).toEqual(
+      expect.arrayContaining([
+        "AUTH_RATE_LIMITED",
+        "PANEL_HOST_MISMATCH",
+        "SESSION_REJECTED",
+        "TURNSTILE_FAILED",
+        "REDIRECT_REFUSED",
+      ]),
+    );
+  });
+
+  it("no code sets a Sentry user, anywhere", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { join, resolve } = await import("node:path");
+    const root = resolve(__dirname, "../..");
+    const files = ["app", "features", "lib", "components"].flatMap((dir) =>
+      readdirSync(join(root, dir), { recursive: true })
+        .map(String)
+        .filter(
+          (file) => /\.(ts|tsx)$/.test(file) && !file.includes("__tests__"),
+        )
+        .map((file) => join(root, dir, file)),
+    );
+    expect(
+      files.filter((file) => /\bsetUser\s*\(/.test(readFileSync(file, "utf8"))),
+    ).toEqual([]);
   });
 });

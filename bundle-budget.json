@@ -1,7 +1,19 @@
 {
-  "$comment": "First Load JS budgets in gzip kB (1000 bytes), checked by scripts/check-bundle-budget.mjs. Owned by the Frontend Architect: default from frontend-architecture-conventions.md § Performance Budgets, /v/* from ADR-0003. Change only through the plan or an ADR.",
+  "$comment": "Budgets in gzip kB (1000 bytes), checked by scripts/check-bundle-budget.mjs. Owned by the Frontend Architect: default from frontend-architecture-conventions.md § Performance Budgets, /v/* from ADR-0003, the panel's from ADR-0010. Change only through the plan or an ADR. Route patterns: the first match wins, in this order ('/x/*' = /x and below; '/x*' = prefix).",
   "default": 180,
   "routes": {
-    "/v/*": 130
+    "/v/*": 130,
+    "/painel/entrar": 150,
+    "/painel/cadastro*": 150,
+    "/painel/senha/*": 150,
+    "/painel/*": 180
+  },
+  "css": {
+    "$comment": "ADR-0010: /v/* = its main baseline (5.41 kB gzip: next/font 0.675 + Tailwind 4.736, measured at T40/T42) + 0.5 kB tolerance; every panel route 30. panelSentinel: a class only the panel uses; it must never compile into a /v/* stylesheet.",
+    "routes": {
+      "/v/*": 5.91,
+      "/painel/*": 30
+    },
+    "panelSentinel": "isolate"
   }
 }

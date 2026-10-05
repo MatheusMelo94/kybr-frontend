@@ -20,28 +20,50 @@
 # EXPECT_SINGLE_HSTS=true: the response has exactly one Strict-Transport-
 # Security field, with our value (Security DV-07). For the production domain;
 # Vercel may add its own on *.vercel.app.
+#
+# EXPECT_UNKNOWN_HOST=true: base is a host the app doesn't serve (a staged
+# production build's *.vercel.app URL: ADR-0008 rule 4, P03.1). Health must
+# answer and every page must be a 404; the page headers aren't checked.
+#
+# PANEL_URL=https://app.kybr.com.br: also check the panel host's headers on
+# /entrar (ADR-0008 rule 9: private, no-store; noindex; a CSP whose
+# connect-src is 'self' only). Unset while the panel is dark.
 set -eu
 
 base="${1:?Usage: check-deploy-headers.sh <base-url>}"
 base="${base%/}"
 page_path="${SMOKE_PAGE_PATH:-/v/loja-exemplo}"
 
-fetch() {
-  # $1: curl mode flags, $2: path
+fetch_url() {
+  # $1: curl mode flags, $2: absolute URL
   # shellcheck disable=SC2086 # $1 is a space-separated list of curl flags
   if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
     curl --silent --show-error --max-time 30 $1 \
       -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-      "${base}$2"
+      "$2"
   else
-    curl --silent --show-error --max-time 30 $1 "${base}$2"
+    curl --silent --show-error --max-time 30 $1 "$2"
   fi
+}
+
+fetch() {
+  # $1: curl mode flags, $2: path on base
+  fetch_url "$1" "${base}$2"
 }
 
 failed=0
 fail() {
   echo "  FAIL: $1" >&2
   failed=1
+}
+
+finish() {
+  if [ "$failed" -ne 0 ]; then
+    echo "Smoke FAILED for ${base}" >&2
+    exit 1
+  fi
+  echo "Smoke: ${base} is healthy and sends the expected headers."
+  exit 0
 }
 
 echo "Smoke: ${base}/api/health"
@@ -69,6 +91,15 @@ if [ "${EXPECT_PROTECTED:-}" = "true" ]; then
       ;;
     *) fail "an unauthenticated request got ${anon_status}, not 401/403 or a redirect to Vercel's login: Deployment Protection is off" ;;
   esac
+fi
+
+if [ "${EXPECT_UNKNOWN_HOST:-}" = "true" ]; then
+  echo "Smoke: ${base} is an unknown host (ADR-0008 rule 4): every page answers 404"
+  for path in "$page_path" / /entrar; do
+    status=$(fetch "--output /dev/null --write-out %{http_code}" "$path")
+    [ "$status" = "404" ] || fail "${path} answered ${status} on an unknown host, not 404"
+  done
+  finish
 fi
 
 echo "Smoke: security headers on ${base}${page_path}"
@@ -104,8 +135,22 @@ printf '%s\n' "$headers" | grep -q '^x-powered-by:' && fail "x-powered-by is pre
 printf '%s\n' "$headers" | grep '^cache-control:' | grep -qF "no-store" ||
   fail "cache-control on ${page_path} lacks no-store (F06c)"
 
-if [ "$failed" -ne 0 ]; then
-  echo "Smoke FAILED for ${base}" >&2
-  exit 1
+if [ -n "${PANEL_URL:-}" ]; then
+  panel="${PANEL_URL%/}"
+  echo "Smoke: panel headers on ${panel}/entrar"
+  panel_headers=$(fetch_url "--dump-header - --output /dev/null" "${panel}/entrar" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+  panel_has() {
+    printf '%s\n' "$panel_headers" | grep -qF -- "$1" || fail "panel: missing header: $1"
+  }
+  panel_has "strict-transport-security: max-age=31536000; includesubdomains; preload"
+  panel_has "x-content-type-options: nosniff"
+  panel_has "x-robots-tag: noindex, nofollow"
+  panel_has "cache-control: private, no-store"
+  panel_csp=$(printf '%s\n' "$panel_headers" | grep '^content-security-policy:' || true)
+  [ -n "$panel_csp" ] || fail "panel: missing header: content-security-policy"
+  for directive in "frame-ancestors 'none'" "'nonce-" "'strict-dynamic'" "connect-src 'self';"; do
+    printf '%s' "$panel_csp" | grep -qF -- "$directive" || fail "panel: CSP lacks ${directive} (the panel browser never calls the API)"
+  done
 fi
-echo "Smoke: ${base} is healthy and sends the security headers."
+
+finish
