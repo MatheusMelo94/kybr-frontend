@@ -90,13 +90,19 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     });
   }
 
-  test("/favicon.ico is the shared 204 on both hosts, and /entrar logs no console error (P4-001)", async ({
+  test("both hosts serve the Kybr icons, cached, and /entrar logs no console error (P4-001, AC 41 / 75)", async ({
     page,
   }) => {
-    for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
-      const response = await rawGet("/favicon.ico", host);
-      expect(response.status).toBe(204);
-    }
+    for (const host of ["127.0.0.1:3000", "localhost:3000"])
+      for (const path of [
+        "/favicon.ico",
+        "/brand/kybr-icon.svg",
+        "/brand/apple-touch-icon.png",
+      ]) {
+        const response = await rawGet(path, host);
+        expect(response.status).toBe(200);
+        expect(response.headers["cache-control"]).toContain("max-age=86400");
+      }
 
     const errors: string[] = [];
     page.on("console", (message) => {

@@ -45,25 +45,40 @@ test.describe("form screen @feature-seller-link", () => {
     expect(privacy?.width).toBeGreaterThanOrEqual(44);
   });
 
-  test("AC 1: no favicon and never indexed", async ({ page }) => {
+  test("AC 41: the Kybr icons, no share image, never indexed", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
     await page.goto("/v/loja-exemplo");
 
-    await expect(page.locator('link[rel~="icon"]')).toHaveCount(0);
+    await expect(
+      page.locator('link[rel="icon"][type="image/svg+xml"]'),
+    ).toHaveAttribute("href", "/brand/kybr-icon.svg");
+    await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute(
+      "href",
+      "/brand/apple-touch-icon.png",
+    );
+    await expect(
+      page.locator('meta[property="og:image"], meta[name="twitter:image"]'),
+    ).toHaveCount(0);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       "content",
       /noindex, nofollow/,
     );
+    await page.waitForLoadState("networkidle");
+    expect(errors).toEqual([]);
   });
 
-  test("AC 1: /favicon.ico answers an empty 204, not a 404", async ({
-    request,
-  }) => {
+  test("AC 41: /favicon.ico is the Kybr icon, cached", async ({ request }) => {
     const response = await request.get("/favicon.ico");
 
-    expect(response.status()).toBe(204);
-    expect(await response.body()).toHaveLength(0);
-    // Served as set: the CDN may answer it too (review 0023).
-    expect(response.headers()["cache-control"]).toContain("s-maxage=86400");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toMatch(/icon/);
+    expect((await response.body()).length).toBeGreaterThan(0);
+    expect(response.headers()["cache-control"]).toContain("max-age=86400");
   });
 
   test("the step indicator says Passo 1 de 3", async ({ page }) => {

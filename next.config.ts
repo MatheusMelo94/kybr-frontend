@@ -39,6 +39,17 @@ const nextConfig: NextConfig = {
         source: "/v/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
+      // The brand icons (public/): a day in the browser and on the CDN, as
+      // the old 204 route was (review 0023).
+      ...["/favicon.ico", "/brand/:path*"].map((source) => ({
+        source,
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, s-maxage=86400",
+          },
+        ],
+      })),
     ];
   },
 };

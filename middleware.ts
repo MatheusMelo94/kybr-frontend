@@ -32,9 +32,8 @@ const hosts = hostConfigFromEnv(env);
 const LINK_NOT_FOUND_PATH = "/_kybr/nao-encontrado";
 
 /**
- * Paths both hosts serve as they are (ADR-0008 rule 5). /favicon.ico is the
- * icon browsers ask for on every page (P4-001); /brand/* are the static
- * icons in public/ (brand v1).
+ * Paths both hosts serve as they are (ADR-0008 rule 5). /favicon.ico and
+ * /brand/* are the static Kybr icons in public/ (P4-001, brand v1).
  */
 function isShared(pathname: string): boolean {
   return (

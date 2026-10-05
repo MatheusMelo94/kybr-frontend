@@ -1,4 +1,4 @@
-import type { Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { connection } from "next/server";
 import type { JSX, ReactNode } from "react";
@@ -10,6 +10,19 @@ const inter = Inter({
   display: "swap",
   variable: "--font-inter",
 });
+
+// One icon set for both hosts (DDR-0002; link AC 41, panel AC 75), static
+// files in public/: the 16/32/48 .ico, the dotless "k" SVG, the 180 px
+// apple-touch "k.". No web manifest (no install use case).
+export const metadata: Metadata = {
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/brand/kybr-icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/brand/apple-touch-icon.png",
+  },
+};
 
 export const viewport: Viewport = {
   colorScheme: "light dark",
