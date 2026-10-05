@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-import { BATCH_ROW_STATUSES, isPanelId } from "@/lib/panel-api-values";
+import { BATCH_ROW_STATUSES, isBatchId } from "@/lib/panel-api-values";
 
 // M5 batches, D-B1–D-B7 + the M5 additions C1–C2 (Pre-Contract). Unknown
 // states, statuses or ids fail the parse (INVALID_RESPONSE), never render.
 
-const batchIdSchema = z.string().refine(isPanelId);
+const batchIdSchema = z.string().refine(isBatchId);
 const count = z.number().int().nonnegative();
 const CNPJ_WIRE = /^[0-9A-Z]{12}[0-9]{2}$/; // A-X5
 

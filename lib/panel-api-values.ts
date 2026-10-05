@@ -7,6 +7,10 @@
 const PANEL_ID_PATTERN =
   /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{16,64})$/i;
 
+// Batch ids (Security C10, M4-12): ≥ 128 bits, so 22–64 URL-safe characters.
+// A UUID (36 characters of hex and hyphens) fits the same pattern.
+const BATCH_ID_PATTERN = /^[A-Za-z0-9_-]{22,64}$/;
+
 // An A-X6 cursor is opaque; only URL-safe characters (base64url, base64 padding
 // and . ~) up to 256 are put in a query. Anything else falls back to page one.
 const CURSOR_PATTERN = /^[A-Za-z0-9_.~=-]{1,256}$/;
@@ -14,6 +18,11 @@ const CURSOR_PATTERN = /^[A-Za-z0-9_.~=-]{1,256}$/;
 /** True for an id the panel may put in a URL or an API path (A-X3). Anything else is a 404 with no API call. */
 export function isPanelId(value: string): boolean {
   return PANEL_ID_PATTERN.test(value);
+}
+
+/** True for a batch id the panel may route or request (A-X3 + C10); anything else is a 404 with no API call. */
+export function isBatchId(value: string): boolean {
+  return BATCH_ID_PATTERN.test(value);
 }
 
 /** True for a cursor the panel may forward to the API (A-X6). */

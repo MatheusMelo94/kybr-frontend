@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  isBatchId,
   isBatchRowStatus,
   isPanelCursor,
   isPanelId,
@@ -66,7 +67,8 @@ function batchRowsQuery(filter: {
   return query.toString();
 }
 
-const batchPath = (id: string): string => `/v1/batches/${panelIdSegment(id)}`;
+const batchPath = (id: string): string =>
+  `/v1/batches/${segment("batch id", id, isBatchId)}`;
 
 export const apiPaths = {
   /** D1: link info. */
@@ -109,7 +111,7 @@ export const apiPaths = {
     /** D-A5 */
     passwordReset: (): string => "/v1/auth/password-reset",
     passwordResetConfirm: (): string => "/v1/auth/password-reset/confirm",
-    /** M5 batches (D-B1–D-B7); every id is checked against A-X3 first. */
+    /** M5 batches (D-B1–D-B7); every id is checked (A-X3 + C10) first. */
     batches: {
       /** D-B1 */
       start: (): string => "/v1/batches",

@@ -4,9 +4,9 @@
 // built from these, so they accept and reject the same rows.
 
 import {
+  isBatchId,
   isBatchRowStatus,
   isPanelCursor,
-  isPanelId,
 } from "@/lib/panel-api-values";
 
 /** D-B1: 1–5,000 rows per batch (spec J3, AC 15). */
@@ -51,8 +51,8 @@ export function isValidExtId(value: string): boolean {
   );
 }
 
-/** A `batchId` the panel may route or request (A-X3); anything else is a 404 with no API call. */
-export const isBatchId = isPanelId;
+/** A `batchId` the panel may route or request (A-X3 + Security C10: 22–64); anything else is a 404 with no API call. */
+export { isBatchId };
 
 /** `?cursor=` on the result table (A-X6, C2); a malformed one falls back to page one. */
 export const isBatchCursor = isPanelCursor;

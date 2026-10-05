@@ -14,7 +14,7 @@ import {
 } from "@/features/panel-lote/validation";
 import { BATCH_PROGRESS_INTERVAL_MS } from "@/features/panel-shell/polling";
 import { verifySchema } from "@/features/seller-link/schemas";
-import { isValidPanelId } from "@/lib/api/path";
+import { apiPaths } from "@/lib/api/path";
 
 describe("Lote limits (spec J3, contract C4, ADR-0012)", () => {
   it("caps rows, file size and the optional fields", () => {
@@ -68,10 +68,10 @@ describe("isValidExtId (≤ 64 printable)", () => {
   });
 });
 
-describe("isBatchId (A-X3)", () => {
+describe("isBatchId (A-X3 tightened by Security C10: ≥ 128 bits)", () => {
   it.each([
     "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
-    "lote_ABCDEFGHIJKLMNOP",
+    "lote_ABCDEFGHIJKLMNOPQR",
     "a".repeat(64),
   ])("accepts %j", (value) => {
     expect(isBatchId(value)).toBe(true);
@@ -80,17 +80,33 @@ describe("isBatchId (A-X3)", () => {
   it.each([
     "",
     "short",
+    // 16–21 characters pass A-X3's generic panel id, not C10's batch id.
+    "lote_ABCDEFGHIJKLMNOP",
+    "a".repeat(21),
     "a".repeat(65),
     "../x",
-    "a b c d e f g h i",
-    "lote%2Fx-0123456789",
+    "a b c d e f g h i j k l",
+    "lote%2Fx-0123456789abcdef",
   ])("refuses %j", (value) => {
     expect(isBatchId(value)).toBe(false);
   });
 
-  it("agrees with the API path's panel id check", () => {
-    for (const value of ["lote_ABCDEFGHIJKLMNOP", "short", "../x"])
-      expect(isBatchId(value)).toBe(isValidPanelId(value));
+  it("agrees with the batch API paths' check", () => {
+    for (const value of [
+      "lote_ABCDEFGHIJKLMNOPQR",
+      "lote_ABCDEFGHIJKLMNOP",
+      "../x",
+    ])
+      expect(isBatchId(value)).toBe(
+        (() => {
+          try {
+            apiPaths.panel.batches.get(value);
+            return true;
+          } catch {
+            return false;
+          }
+        })(),
+      );
   });
 });
 

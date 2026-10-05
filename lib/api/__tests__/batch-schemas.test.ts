@@ -64,6 +64,11 @@ describe("batchSchema (D-B2 + C1)", () => {
     expect(batchSchema.safeParse({ ...RUNNING, id: "../x" }).success).toBe(
       false,
     );
+    // C10: 16–21 characters isn't a batch id.
+    expect(
+      batchSchema.safeParse({ ...RUNNING, id: "lote_ABCDEFGHIJKLMNOP" })
+        .success,
+    ).toBe(false);
     expect(
       batchSchema.safeParse({
         ...RUNNING,

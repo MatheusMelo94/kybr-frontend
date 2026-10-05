@@ -169,16 +169,21 @@ describe("apiPaths.panel.batches (D-B1–D-B7)", () => {
     );
   });
 
-  it.each(["../x", "short", "a b c d e f g h i j", "%2e%2e%2fxxxxxxxxxxx", ""])(
-    "throws before a request for batch id %j",
-    (id) => {
-      const b = apiPaths.panel.batches;
-      expect(() => b.get(id)).toThrow(/Refused API path segment/);
-      expect(() => b.rows(id)).toThrow(/Refused API path segment/);
-      expect(() => b.csv(id, "result")).toThrow(/Refused API path segment/);
-      expect(() => b.toQueue(id)).toThrow(/Refused API path segment/);
-    },
-  );
+  it.each([
+    "../x",
+    "short",
+    // A-X3 allows 16–21 characters for other panel ids; batches need 22 (C10).
+    "lote_ABCDEFGHIJKLMNOP",
+    "a b c d e f g h i j",
+    "%2e%2e%2fxxxxxxxxxxx",
+    "",
+  ])("throws before a request for batch id %j", (id) => {
+    const b = apiPaths.panel.batches;
+    expect(() => b.get(id)).toThrow(/Refused API path segment/);
+    expect(() => b.rows(id)).toThrow(/Refused API path segment/);
+    expect(() => b.csv(id, "result")).toThrow(/Refused API path segment/);
+    expect(() => b.toQueue(id)).toThrow(/Refused API path segment/);
+  });
 
   it("throws for a status or cursor outside their patterns", () => {
     const b = apiPaths.panel.batches;
