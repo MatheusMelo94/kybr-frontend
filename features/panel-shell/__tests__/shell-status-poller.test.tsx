@@ -38,14 +38,13 @@ function Probe() {
 let visibility: DocumentVisibilityState = "visible";
 let online = true;
 
-function renderPoller(onSessionExpired = vi.fn()) {
+function renderPoller() {
   render(
     <ShellStatusProvider initial={{ contagens: COUNTS, plano: PLANO }}>
-      <ShellStatusPoller onSessionExpired={onSessionExpired} />
+      <ShellStatusPoller />
       <Probe />
     </ShellStatusProvider>,
   );
-  return onSessionExpired;
 }
 
 async function tick(ms = SHELL_STATUS_INTERVAL_MS): Promise<void> {
@@ -146,18 +145,5 @@ describe("ShellStatusPoller (ADR-0011 rule 3, AC 11)", () => {
     expect(screen.getByTestId("probe")).toHaveTextContent("lote=false");
     await tick();
     expect(screen.getByTestId("probe")).toHaveTextContent("lote=true");
-  });
-
-  it("SESSAO_EXPIRADA hands off to the session-expiry path and stops polling", async () => {
-    pollShellStatusAction.mockResolvedValue({
-      ok: false,
-      code: "SESSAO_EXPIRADA",
-    });
-    const onSessionExpired = renderPoller();
-    await tick();
-    await tick();
-
-    expect(onSessionExpired).toHaveBeenCalledTimes(1);
-    expect(pollShellStatusAction).toHaveBeenCalledTimes(1);
   });
 });

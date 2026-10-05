@@ -7,11 +7,20 @@ vi.mock("@/features/panel-auth/actions", () => ({ logoutAction: vi.fn() }));
 
 import { PanelNav } from "@/features/panel-shell/components/panel-nav";
 import { TopBar } from "@/features/panel-shell/components/top-bar";
+import { ShellStatusProvider } from "@/features/panel-shell/shell-status-context";
 
 const ITEMS = [
   { key: "fila", href: "/fila", label: "Fila de revisão" },
 ] as const;
 const scrollIntoView = vi.fn();
+
+function renderNav(variant: "sidebar" | "tabs" = "sidebar"): void {
+  render(
+    <ShellStatusProvider initial={{ contagens: undefined, plano: undefined }}>
+      <PanelNav items={ITEMS} variant={variant} />
+    </ShellStatusProvider>,
+  );
+}
 
 function reducedMotion(reduce: boolean): void {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -34,7 +43,7 @@ describe("PanelNav tabs (AC 10)", () => {
   // The row scrolling inside itself and the 44 px tabs: primitives.spec.
   it("scrolls the active tab into view on load", () => {
     reducedMotion(false);
-    render(<PanelNav items={ITEMS} contagens={undefined} variant="tabs" />);
+    renderNav("tabs");
 
     expect(scrollIntoView).toHaveBeenCalledWith({
       inline: "nearest",
@@ -45,7 +54,7 @@ describe("PanelNav tabs (AC 10)", () => {
 
   it("scrolls instantly under reduced motion", () => {
     reducedMotion(true);
-    render(<PanelNav items={ITEMS} contagens={undefined} variant="tabs" />);
+    renderNav("tabs");
 
     expect(scrollIntoView).toHaveBeenCalledWith({
       inline: "nearest",
@@ -56,7 +65,7 @@ describe("PanelNav tabs (AC 10)", () => {
 
   it("the sidebar variant scrolls nothing", () => {
     reducedMotion(false);
-    render(<PanelNav items={ITEMS} contagens={undefined} />);
+    renderNav();
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 });

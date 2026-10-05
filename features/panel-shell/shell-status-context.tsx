@@ -47,11 +47,6 @@ export function ShellStatusProvider({ initial, children }: Props): JSX.Element {
   );
 }
 
-/** The live status, or null outside the (app) shell (a leaf rendered on its own). */
-export function useOptionalShellStatus(): Value | null {
-  return useContext(ShellStatusContext);
-}
-
 export function useShellStatus(): Value {
   const value = useContext(ShellStatusContext);
   if (value === null)

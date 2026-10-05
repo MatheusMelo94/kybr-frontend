@@ -28,7 +28,10 @@ vi.mock("@/lib/api/panel/cookies", () => ({
 }));
 vi.mock("@/lib/monitoring", () => ({ reportMarker: vi.fn() }));
 
-import { pollShellStatusAction } from "@/features/panel-shell/actions";
+import {
+  pollShellStatusAction,
+  type ShellStatusResult,
+} from "@/features/panel-shell/actions";
 import { POLL_TIMEOUT_MS } from "@/features/panel-shell/polling";
 
 beforeEach(() => {
@@ -60,6 +63,13 @@ describe("pollShellStatusAction (ADR-0011 rule 3, AC 11)", () => {
     await expect(pollShellStatusAction()).rejects.toThrow(
       "NEXT_REDIRECT /entrar?motivo=sessao&volta=%2Ffila",
     );
+  });
+
+  it("no session is a thrown redirect, never a result: the union is ok | FAILED (ADR-0011 Addendum 1)", () => {
+    // @ts-expect-error SESSAO_EXPIRADA can't be returned since requireSession()
+    const expired: ShellStatusResult = { ok: false, code: "SESSAO_EXPIRADA" };
+    const failed: ShellStatusResult = { ok: false, code: "FAILED" };
+    expect([expired, failed]).toHaveLength(2);
   });
 
   it("no cookie: the same redirect, with no API call", async () => {

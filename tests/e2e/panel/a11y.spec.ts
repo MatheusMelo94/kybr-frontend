@@ -71,7 +71,7 @@ test.describe("M4 cross-cutting: AC 67, 69, 72, 74 @feature-ops-panel @panel-acc
   }, testInfo) => {
     await page.goto("/entrar");
     await crossCutting(page, "/entrar");
-    await page.getByLabel("E-mail").fill("ninguem@exemplo.test");
+    await page.getByLabel("E-mail").fill(uniqueEmail("ninguem", testInfo));
     await page.getByLabel("Senha").fill("errada-errada-1");
     await submitAction(page, "Entrar");
     await expect(page.getByRole("main").getByRole("alert")).toHaveText(

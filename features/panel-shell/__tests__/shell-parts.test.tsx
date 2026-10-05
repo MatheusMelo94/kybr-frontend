@@ -105,17 +105,6 @@ describe("WorkspaceBlock, the sidebar top (AC 9, brand v1)", () => {
 describe("PlanBlock (AC 12, S5)", () => {
   const trial = { tipo: "teste", usadas: 40, limite: 200 } as const;
 
-  it("a paid plan without nome is titled plan.unnamed, never Teste grátis (AC 12, P4-007)", () => {
-    render(
-      <PlanBlock
-        plano={{ tipo: "pago", usadas: 1240, limite: 5000 }}
-        contratarHref={undefined}
-      />,
-    );
-    expect(screen.getByText("Seu plano")).toBeVisible();
-    expect(screen.queryByText("Teste grátis")).not.toBeInTheDocument();
-  });
-
   it("trial: plan.trial.*, no Contratar while the commercial address is unset (P-U4)", () => {
     render(<PlanBlock plano={trial} contratarHref={undefined} />);
     expect(screen.getByText("Teste grátis")).toBeInTheDocument();
@@ -153,6 +142,20 @@ describe("PlanBlock (AC 12, S5)", () => {
       screen.getByText("1.240 de 5.000 verificações neste ciclo"),
     ).toBeInTheDocument();
     expect(screen.getByText("Ciclo até 04/11/2026")).toBeInTheDocument();
+  });
+
+  it("paid without nome (T65, spec v1.3): titled plan.unnamed over the cycle's usage, never Teste grátis", () => {
+    render(
+      <PlanBlock
+        plano={{ tipo: "pago", usadas: 10, limite: 5000 }}
+        contratarHref={undefined}
+      />,
+    );
+    expect(screen.getByText("Seu plano")).toBeInTheDocument();
+    expect(
+      screen.getByText("10 de 5.000 verificações neste ciclo"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Teste grátis")).not.toBeInTheDocument();
   });
 
   it("allowance used up: plan.exhausted in warning ink", () => {

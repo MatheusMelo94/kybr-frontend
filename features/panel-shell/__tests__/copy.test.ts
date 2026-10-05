@@ -20,7 +20,7 @@ const MODULES = {
   onboarding: onboardingCopy,
 };
 
-// Spec v1.2 § Content & Copy (Global, Auth, S4, S5, plus the Fila stub's
+// Spec v1.3 § Content & Copy (Global, Auth, S4, S5, plus the Fila stub's
 // fila.h1 / fila.lead), verbatim, grouped by the module that holds each key.
 // Plural rows are split into .one / .other. Extracted from the spec tables.
 const SPEC_DECK: Record<keyof typeof MODULES, Record<string, string>> = {

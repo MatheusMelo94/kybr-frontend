@@ -15,9 +15,8 @@ export function sessionExpiredHref(current: string, lost: boolean): string {
 }
 
 /**
- * For an action that answered SESSAO_EXPIRADA, and the shell's poller
- * (ADR-0009 rule 7): a full load of /entrar that brings Renata back to this
- * screen. Inside the shell it navigates only once, however many callers fire.
+ * For an action that answered SESSAO_EXPIRADA (ADR-0009 rule 7): a full
+ * load of /entrar that brings Renata back to this screen. Inside the shell it navigates only once, however many callers fire.
  */
 export function useSessionExpiry(): () => void {
   const context = useContext(SessionExpiryContext);

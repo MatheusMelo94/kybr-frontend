@@ -11,35 +11,24 @@ import {
   canPoll,
 } from "@/features/panel-shell/polling";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
-import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
-
-type Props = {
-  /** The session ended (default: useSessionExpiry(), once, AC 7). */
-  onSessionExpired?: () => void;
-};
 
 /**
  * Refreshes the shell's counts and plan every 60 s while the tab is visible
  * and online, and once on becoming visible or online (ADR-0011 rule 3).
  * Never router.refresh(): only the polled projection changes. A failure
- * hides the counts silently (AC 11); the next success restores them.
+ * hides the counts silently (AC 11); the next success restores them. A
+ * missing session is never a result: requireSession() redirects from the
+ * action and the client router leaves the shell (ADR-0011 Addendum 1).
  */
-export function ShellStatusPoller({
-  onSessionExpired,
-}: Props): JSX.Element | null {
+export function ShellStatusPoller(): JSX.Element | null {
   const { update } = useShellStatus();
-  const expire = useSessionExpiry();
-  const stopped = useRef(false);
   const inFlight = useRef(false);
-  const handlers = useRef({
-    update,
-    onSessionExpired: onSessionExpired ?? expire,
-  });
-  handlers.current = { update, onSessionExpired: onSessionExpired ?? expire };
+  const updateRef = useRef(update);
+  updateRef.current = update;
 
   useEffect(() => {
     async function poll(): Promise<void> {
-      if (stopped.current || inFlight.current || !canPoll()) return;
+      if (inFlight.current || !canPoll()) return;
       inFlight.current = true;
       let result: ShellStatusResult;
       try {
@@ -48,18 +37,11 @@ export function ShellStatusPoller({
         result = { ok: false, code: "FAILED" };
       }
       inFlight.current = false;
-      if (stopped.current) return;
-      if (result.ok) {
-        handlers.current.update({
-          contagens: result.contagens,
-          plano: result.plano,
-        });
-      } else if (result.code === "SESSAO_EXPIRADA") {
-        stopped.current = true;
-        handlers.current.onSessionExpired();
-      } else {
-        handlers.current.update({ contagens: undefined, plano: undefined });
-      }
+      updateRef.current(
+        result.ok
+          ? { contagens: result.contagens, plano: result.plano }
+          : { contagens: undefined, plano: undefined },
+      );
     }
 
     const timer = setInterval(() => void poll(), SHELL_STATUS_INTERVAL_MS);
