@@ -11,3 +11,10 @@ export function panelPath(externalPath: string): string {
     throw new Error("panelPath takes an absolute external path");
   return externalPath === "/" ? PANEL_PREFIX : `${PANEL_PREFIX}${externalPath}`;
 }
+
+/**
+ * The panel's home screen, where a login without a safe volta and a signed-in
+ * visit to /entrar or /cadastro land: the Fila until M8's Início (spec S9 MVP
+ * note). "/" redirects here too; going straight saves a hop (P4-009).
+ */
+export const PANEL_HOME = "/fila";

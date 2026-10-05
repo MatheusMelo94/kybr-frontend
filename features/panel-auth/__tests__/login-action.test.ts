@@ -34,6 +34,7 @@ vi.mock("@/lib/api/panel/cookies", () => cookies);
 vi.mock("@/lib/monitoring", () => ({ reportMarker: vi.fn() }));
 
 import { loginAction } from "@/features/panel-auth/actions";
+import { PANEL_HOME } from "@/lib/panel-paths";
 
 beforeEach(() => {
   state.headers = new Headers({
@@ -81,8 +82,15 @@ describe("loginAction (D-A4, ADR-0009)", () => {
       await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD, volta }),
     ).toEqual({
       ok: true,
-      next: "/",
+      next: PANEL_HOME,
     });
+  });
+
+  it("goes straight to the home screen, not to / and a second hop (P4-009)", async () => {
+    expect(PANEL_HOME).toBe("/fila");
+    expect(
+      await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD }),
+    ).toEqual({ ok: true, next: "/fila" });
   });
 
   it("drops a pending sign-up cookie on success only (M4-01)", async () => {

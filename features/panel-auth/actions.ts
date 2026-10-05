@@ -26,6 +26,7 @@ import { assertPanelHost } from "@/lib/api/panel/host";
 import { apiPaths } from "@/lib/api/path";
 import { isNewPassword } from "@/features/panel-auth/validation";
 import { env } from "@/lib/env";
+import { PANEL_HOME } from "@/lib/panel-paths";
 import { safeReturnPath } from "@/lib/safe-return-path";
 
 // The panel's auth actions (plan § 3.4; ADR-0009). Public POST endpoints:
@@ -96,7 +97,7 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
     // abandoned sign-up's PII leaves this browser (ADR-0009 rule 10, M4-01).
     await setSessionCookie(result.data.sessao);
     await deleteSignupCookie();
-    return { ok: true, next: safeReturnPath(volta) ?? "/" };
+    return { ok: true, next: safeReturnPath(volta) ?? PANEL_HOME };
   }
   const { error } = result;
   switch (error.code) {

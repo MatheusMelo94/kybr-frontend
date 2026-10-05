@@ -14,6 +14,7 @@ import {
   legalLinks,
   turnstileSiteKey,
 } from "@/lib/panel-config";
+import { PANEL_HOME } from "@/lib/panel-paths";
 
 export const metadata: Metadata = { title: signupCopy["signup.h1"] };
 
@@ -22,7 +23,7 @@ export const metadata: Metadata = { title: signupCopy["signup.h1"] };
 // A valid session goes home, like /entrar (QA plan Q10).
 export default async function CadastroPage(): Promise<JSX.Element> {
   await assertPanelHost();
-  if ((await getSession()) !== null) redirect("/");
+  if ((await getSession()) !== null) redirect(PANEL_HOME);
   const pending = await readSignupCookie();
   const { termsUrl, privacyUrl } = legalLinks();
   const nonce = (await headers()).get("x-nonce") ?? undefined;

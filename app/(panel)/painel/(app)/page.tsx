@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
-// MVP home = the Fila (spec S9 MVP note); Início replaces it in M8.
+import { PANEL_HOME } from "@/lib/panel-paths";
+
+// "/" has no screen of its own: the home is PANEL_HOME (spec S9 MVP note).
 export default function PanelHome(): never {
-  redirect("/fila");
+  redirect(PANEL_HOME);
 }

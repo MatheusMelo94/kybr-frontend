@@ -10,6 +10,7 @@ import { loginCopy } from "@/features/panel-auth/copy/login";
 import { entrarParams } from "@/features/panel-auth/route-params";
 import { getSession } from "@/lib/api/panel/session";
 import { turnstileSiteKey } from "@/lib/panel-config";
+import { PANEL_HOME } from "@/lib/panel-paths";
 
 export const metadata: Metadata = { title: loginCopy["login.h1"] };
 
@@ -23,7 +24,7 @@ export default async function EntrarPage({
   searchParams,
 }: Props): Promise<JSX.Element> {
   const { volta, banner } = entrarParams(await searchParams);
-  if ((await getSession()) !== null) redirect(volta ?? "/");
+  if ((await getSession()) !== null) redirect(volta ?? PANEL_HOME);
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
