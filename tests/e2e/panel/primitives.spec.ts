@@ -141,6 +141,8 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     // No shipped screen shows the warning or danger tone yet: render the
     // Notice's own classes under the panel's real stylesheet.
     await page.goto("/entrar");
+    // After hydration, so React never re-renders the probes away.
+    await page.waitForLoadState("networkidle");
     for (const tone of ["info", "warning", "danger"] as const) {
       const notice = page.locator(`#notice-${tone}`);
       await page.evaluate(
@@ -149,7 +151,7 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
           element.id = id;
           element.className = className;
           element.textContent = "Texto";
-          document.querySelector("main")?.append(element);
+          document.body.append(element);
         },
         [`notice-${tone}`, `${NOTICE_BASE} ${NOTICE_TONES[tone]}`] as const,
       );
