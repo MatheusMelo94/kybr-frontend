@@ -2,7 +2,11 @@ import "server-only";
 
 import type { z } from "zod";
 
-import { sendApiRequest, type ApiResult } from "@/lib/api/client";
+import {
+  sendApiRequest,
+  sendApiStreamRequest,
+  type ApiResult,
+} from "@/lib/api/client";
 import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { reportMarker } from "@/lib/monitoring";
@@ -92,6 +96,51 @@ export async function panelRequest<T>(
     result.error.status === 401 &&
     request.sessionToken !== undefined
   ) {
+    return {
+      ok: false,
+      error: new AppError({
+        code: "SESSAO_EXPIRADA",
+        status: 401,
+        requestId: result.error.requestId,
+      }),
+    };
+  }
+  return result;
+}
+
+/**
+ * A panel call whose body the caller reads itself (the CSV downloads, D-B4):
+ * the same /v1/ guard, bearer, no-store and 401 → SESSAO_EXPIRADA mapping as
+ * panelRequest, without a schema.
+ */
+export async function panelStreamRequest(
+  request: Omit<PanelRequest<unknown>, "schema" | "body" | "method"> & {
+    accept: string;
+  },
+): Promise<{ ok: true; response: Response } | { ok: false; error: AppError }> {
+  const url = panelApiUrl(request.path);
+  const headers = new Headers(request.headers);
+  if (request.sessionToken !== undefined)
+    headers.set("authorization", `Bearer ${request.sessionToken}`);
+  const result = await sendApiStreamRequest(
+    {
+      operation: request.operation,
+      url,
+      headers: Object.fromEntries(headers),
+      cache: "no-store",
+      ...(request.forwardClientIp !== undefined && {
+        forwardClientIp: request.forwardClientIp,
+      }),
+      ...(request.timeoutMs !== undefined && { timeoutMs: request.timeoutMs }),
+    },
+    request.accept,
+  );
+  if (
+    !result.ok &&
+    result.error.status === 401 &&
+    request.sessionToken !== undefined
+  ) {
+    reportMarker("SESSION_REJECTED", { operation: request.operation });
     return {
       ok: false,
       error: new AppError({

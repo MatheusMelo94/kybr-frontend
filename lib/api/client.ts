@@ -72,17 +72,19 @@ function transportError(error: unknown): AppError {
 /** One call on the shared transport: the URL is already checked by its surface. */
 export type TransportRequest<T> = Omit<ApiRequest<T>, "path"> & { url: URL };
 
+type FetchRequest = Omit<TransportRequest<unknown>, "schema">;
+
 /**
- * The one fetch path both surfaces share (the link's apiRequest, the panel's
- * panelRequest): BFF key, client IP, redirect refusal, timeout, error and
- * schema mapping. It never throws for an HTTP, network or schema failure.
- * The headers it sends are never logged.
+ * The fetch every API call makes: BFF key, client IP, redirect refusal,
+ * timeout, and a non-2xx mapped to an AppError. It never throws for an HTTP
+ * or network failure. The headers it sends are never logged.
  */
-export async function sendApiRequest<T>(
-  request: TransportRequest<T>,
-): Promise<ApiResult<T>> {
+async function fetchApi(
+  request: FetchRequest,
+  accept: string,
+): Promise<{ ok: true; response: Response } | { ok: false; error: AppError }> {
   const headers = new Headers(request.headers);
-  headers.set("accept", "application/json");
+  headers.set("accept", accept);
   if (env.API_BFF_KEY !== undefined)
     headers.set("x-kybr-bff-key", env.API_BFF_KEY);
   if (request.forwardClientIp) {
@@ -114,6 +116,31 @@ export async function sendApiRequest<T>(
   }
   if (!response.ok)
     return { ok: false, error: await appErrorFromResponse(response) };
+  return { ok: true, response };
+}
+
+/**
+ * A call whose 2xx body the caller reads itself (the panel's CSV downloads,
+ * D-B4): the same transport as sendApiRequest, without the JSON parse.
+ */
+export async function sendApiStreamRequest(
+  request: FetchRequest,
+  accept: string,
+): Promise<{ ok: true; response: Response } | { ok: false; error: AppError }> {
+  return fetchApi(request, accept);
+}
+
+/**
+ * The one fetch path both surfaces share (the link's apiRequest, the panel's
+ * panelRequest): fetchApi, then the schema mapping. It never throws for an
+ * HTTP, network or schema failure.
+ */
+export async function sendApiRequest<T>(
+  request: TransportRequest<T>,
+): Promise<ApiResult<T>> {
+  const fetched = await fetchApi(request, "application/json");
+  if (!fetched.ok) return fetched;
+  const { response } = fetched;
 
   let payload: unknown;
   try {
