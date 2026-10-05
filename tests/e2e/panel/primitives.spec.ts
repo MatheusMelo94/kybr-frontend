@@ -1,5 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import {
+  NOTICE_BASE,
+  NOTICE_TONES,
+} from "../../../components/panel/notice-styles.ts";
 import { createAccount, logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
 
 // Geometry and colour of the panel's primitives, in a real browser (review
@@ -43,7 +47,9 @@ async function style(
     | "flexDirection"
     | "whiteSpace"
     | "accentColor"
-    | "clipPath",
+    | "clipPath"
+    | "borderLeftColor"
+    | "borderLeftWidth",
 ): Promise<string> {
   return locator.evaluate(
     (element, prop) => getComputedStyle(element)[prop],
@@ -127,6 +133,40 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     expect(await style(alert, "color")).toBe(
       await tokenValue(page, "--color-danger-ink", "color"),
     );
+  });
+
+  test("Notice tones (DDR-0003): ink text in every tone; warning and danger add a 4 px bar in their signal colour", async ({
+    page,
+  }) => {
+    // No shipped screen shows the warning or danger tone yet: render the
+    // Notice's own classes under the panel's real stylesheet.
+    await page.goto("/entrar");
+    for (const tone of ["info", "warning", "danger"] as const) {
+      const notice = page.locator(`#notice-${tone}`);
+      await page.evaluate(
+        ([id, className]) => {
+          const element = document.createElement("div");
+          element.id = id;
+          element.className = className;
+          element.textContent = "Texto";
+          document.querySelector("main")?.append(element);
+        },
+        [`notice-${tone}`, `${NOTICE_BASE} ${NOTICE_TONES[tone]}`] as const,
+      );
+      expect(await style(notice, "color"), tone).toBe(
+        await tokenValue(page, "--color-ink", "color"),
+      );
+      if (tone === "info") {
+        expect(await style(notice, "borderLeftColor")).toBe(
+          await tokenValue(page, "--color-line", "borderColor"),
+        );
+      } else {
+        expect(await style(notice, "borderLeftColor"), tone).toBe(
+          await tokenValue(page, `--color-${tone}`, "borderColor"),
+        );
+        expect(await style(notice, "borderLeftWidth"), tone).toBe("4px");
+      }
+    }
   });
 
   test("the skip link is out of sight until focused, then shows the focus ring", async ({

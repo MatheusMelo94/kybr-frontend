@@ -33,21 +33,5 @@ describe("Notice", () => {
     expect(notice).toHaveFocus();
   });
 
-  // The colours: primitives.spec (Playwright).
-  it.each(["warning", "danger"] as const)(
-    "the %s tone is ink text with a coloured bar, never a signal text colour (DDR-0003)",
-    (tone) => {
-      render(<Notice tone={tone}>Texto</Notice>);
-      const notice = screen.getByRole("status");
-
-      expect(notice.className).toMatch(new RegExp(`border-l-${tone}\\b`));
-      expect(notice.className).not.toMatch(/text-(warning|danger)/);
-    },
-  );
-
-  it("the info tone has no bar", () => {
-    render(<Notice>Texto</Notice>);
-    expect(screen.getByRole("status").className).not.toMatch(/border-l-/);
-  });
-
+  // Each tone's computed colours and bar: primitives.spec (Playwright).
 });

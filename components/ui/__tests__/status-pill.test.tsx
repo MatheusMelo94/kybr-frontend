@@ -22,14 +22,5 @@ describe("StatusPill", () => {
     },
   );
 
-  it("never colours the text or fills the pill with a signal colour", () => {
-    const { container } = render(
-      <StatusPill tone="danger">Bloqueado</StatusPill>,
-    );
-    const pill = container.firstElementChild as HTMLElement;
-
-    expect(pill.className).not.toMatch(
-      /\b(text|bg)-(success|warning|danger|monitor)/,
-    );
-  });
+  // Ink words, signal dot: brand.spec (computed) and the source scan.
 });

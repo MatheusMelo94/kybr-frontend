@@ -53,8 +53,6 @@ describe("ApprovedView (tudo certo)", () => {
     expect(within(seal).getByRole("img", { name: "Kybr" })).toBeVisible();
     // Words separated by real spaces, so it reads "… verificado por Kybr".
     expect(seal.textContent).toBe("Vendedor verificado por ");
-    // DDR-0003: the green is the dot only; the words are ink.
-    expect(seal.innerHTML).not.toMatch(/text-success/);
     expect(
       screen.getByRole("heading", { level: 1, name: "Tudo certo, Maria." }),
     ).toBeInTheDocument();
@@ -116,8 +114,6 @@ describe("ApprovedView (tudo certo)", () => {
       const dot = row.querySelector('[aria-hidden="true"]');
       expect(dot).not.toBeNull();
       expect(dot?.parentElement?.textContent).toMatch(/ativa|confere/);
-      // DDR-0003: a neutral pill with ink text; the green is the dot only.
-      expect(row.innerHTML).not.toMatch(/text-success|bg-success\//);
     }
   });
 

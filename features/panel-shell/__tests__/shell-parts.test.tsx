@@ -45,11 +45,7 @@ describe("NavCount (AC 11, Q9)", () => {
       "aria-hidden",
       "true",
     );
-    // DDR-0003: no red fill or red text; the dot carries the signal.
-    expect(badge.className).not.toMatch(/bg-danger|text-danger/);
-    expect(screen.getByText("2 fora do prazo").className).not.toMatch(
-      /text-danger/,
-    );
+    // DDR-0003 colours: primitives.spec (Playwright) and the source scan.
   });
 
   it("is hidden at zero", () => {
@@ -171,7 +167,6 @@ describe("PlanBlock (AC 12, S5)", () => {
     // DDR-0003: ink text with a warning dot, never amber text.
     expect(text).toBeVisible();
     expect(text.querySelector("span[aria-hidden]")).not.toBeNull();
-    expect(text.className).not.toMatch(/text-warning/);
     expect(screen.getByRole("link", { name: "Contratar" })).toBeInTheDocument();
   });
 

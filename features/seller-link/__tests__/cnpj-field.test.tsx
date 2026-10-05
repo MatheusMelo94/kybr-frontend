@@ -71,11 +71,7 @@ describe("CnpjField", () => {
     );
   });
 
-  it("sets the CNPJ in tabular figures (brand v1, identity.md › Typography)", () => {
-    render(<Harness />);
-    // The class is the contract here: tabular-nums is font-variant-numeric.
-    expect(input()).toHaveClass("tabular-nums");
-  });
+  // Tabular figures on the CNPJ: brand.spec checks font-variant-numeric.
 
   it.each([
     ["12abc34501de35", "12.ABC.345/01DE-35"],

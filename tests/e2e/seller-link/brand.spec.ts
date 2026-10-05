@@ -59,3 +59,36 @@ test("AC 19: the seal reads 'Vendedor verificado por Kybr', its words in ink @fe
       .evaluate((element) => getComputedStyle(element).color),
   ).toBe(ink);
 });
+
+test("B5 / B6: the CNPJ input is 16 px text in tabular figures @feature-seller-link", async ({
+  page,
+}) => {
+  await page.goto(`/v/${SLUGS.ok}`);
+  const cnpj = page.getByRole("textbox", { name: "CNPJ da empresa" });
+  const [variant, size] = await cnpj.evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return [computed.fontVariantNumeric, computed.fontSize];
+  });
+  expect(variant).toContain("tabular-nums");
+  expect(size).toBe("16px");
+});
+
+test("DDR-0003: the confirmation pills' words are ink; the green is the dot only @feature-seller-link", async ({
+  page,
+}) => {
+  await page.goto(`/v/${SLUGS.ok}/c/${CASE_TOKENS.aprovado}`);
+  const ink = await page.evaluate(() => getComputedStyle(document.body).color);
+  const pills = page.getByRole("listitem").locator("span:has(> [aria-hidden])");
+  await expect(pills).toHaveCount(3);
+  for (const pill of await pills.all()) {
+    const [color, background] = await pill.evaluate((element) => [
+      getComputedStyle(element).color,
+      getComputedStyle(element).backgroundColor,
+    ]);
+    expect(color).toBe(ink);
+    const dot = await pill
+      .locator("[aria-hidden]")
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(dot).not.toBe(background);
+  }
+});

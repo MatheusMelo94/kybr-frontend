@@ -1,5 +1,6 @@
 import type { JSX, ReactNode, Ref } from "react";
 
+import { NOTICE_BASE, NOTICE_TONES } from "@/components/panel/notice-styles";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -14,12 +15,6 @@ type Props = {
   className?: string;
   ref?: Ref<HTMLDivElement>;
 };
-
-const TONES = {
-  info: "border-line text-ink",
-  warning: "border-line border-l-4 border-l-warning text-ink",
-  danger: "border-line border-l-4 border-l-danger text-ink",
-} as const;
 
 /** A banner: a status or alert message above a form or a screen. */
 export function Notice({
@@ -37,12 +32,7 @@ export function Notice({
       id={id}
       role={role}
       tabIndex={focusable ? -1 : undefined}
-      className={cn(
-        "rounded-lg border bg-surface-raised px-4 py-3 text-secondary",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
-        TONES[tone],
-        className,
-      )}
+      className={cn(NOTICE_BASE, NOTICE_TONES[tone], className)}
     >
       {children}
     </div>
