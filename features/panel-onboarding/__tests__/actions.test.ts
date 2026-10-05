@@ -50,7 +50,7 @@ describe("saveOnboardingAction (D-W3)", () => {
   it("saves with the session, completes onboarding, refreshes the panel layout and goes to ONBOARDING_NEXT", async () => {
     expect(await saveOnboardingAction(VALID)).toEqual({
       ok: true,
-      next: "/fila",
+      next: "/lote?inicio=1",
     });
     expect(
       panelStore().accounts.get(PANEL_EMAILS.nova)?.workspace

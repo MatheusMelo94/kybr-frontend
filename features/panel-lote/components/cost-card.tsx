@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
 import { loteCopy } from "@/features/panel-lote/copy";
+import { TEMPLATE_PATH } from "@/features/panel-lote/template";
 import { fill, formatNumber } from "@/features/panel-shell/format";
 import { plural } from "@/features/panel-shell/plural";
 import type { Plano } from "@/lib/api/schemas/panel/me";
@@ -10,7 +11,10 @@ type Props = {
   plano: Plano | undefined;
 };
 
-/** S7's side card: what a batch costs and what's left (AC 14). */
+const LINK =
+  "inline-flex min-h-10 items-center self-start text-body font-strong text-ink underline underline-offset-4 hover:decoration-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-11";
+
+/** S7's side card: what a batch costs, what's left, and the template (AC 14). */
 export function CostCard({ plano }: Props): JSX.Element {
   const left =
     plano === undefined ? undefined : Math.max(0, plano.limite - plano.usadas);
@@ -24,6 +28,13 @@ export function CostCard({ plano }: Props): JSX.Element {
           })}
         </p>
       )}
+      {/* A file download: a plain <a> with download, not a client navigation. */}
+      <a href={TEMPLATE_PATH} download className={LINK}>
+        {loteCopy["lote.template"]}
+      </a>
+      <p className="text-secondary text-ink-muted">
+        {loteCopy["lote.template.hint"]}
+      </p>
     </section>
   );
 }

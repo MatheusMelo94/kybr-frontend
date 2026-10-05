@@ -85,10 +85,11 @@ test.describe("M4 access journey, keyboard only @feature-ops-panel @panel-access
     );
     await pressOn(page, page.getByRole("button", { name: "Continuar" }));
 
-    // The Fila stub, inside the shell
-    await expect(page).toHaveURL(/\/fila$/);
+    // Step 2 (M5): Lote with the onboarding banner, inside the shell
+    await expect(page).toHaveURL(/\/lote\?inicio=1$/);
+    await expect(page.getByText("Passo 2 de 2")).toBeVisible();
     await expect(
-      page.getByRole("heading", { level: 1, name: "Fila de revisão" }),
+      page.getByRole("heading", { level: 1, name: "Verificar em lote" }),
     ).toBeVisible();
 
     // Sair through the "Conta" menu button

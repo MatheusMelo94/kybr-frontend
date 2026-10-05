@@ -3,6 +3,7 @@ import type { JSX } from "react";
 
 import { CostCard } from "@/features/panel-lote/components/cost-card";
 import { HistoryList } from "@/features/panel-lote/components/history-list";
+import { OnboardingStep2Banner } from "@/features/panel-lote/components/onboarding-step2-banner";
 import { WhyCard } from "@/features/panel-lote/components/why-card";
 import { loteCopy } from "@/features/panel-lote/copy";
 import { historyOrError } from "@/features/panel-lote/data";
@@ -12,8 +13,14 @@ export const metadata: Metadata = { title: loteCopy["lote.h1"] };
 
 // S7 Verificar em lote: the empty state, the cost and the history. Two
 // columns at lg (≈ 1.5 : 1), one below (main first, then the side cards).
-export default async function LotePage(): Promise<JSX.Element> {
+type Props = { searchParams: Promise<{ inicio?: string | string[] }> };
+
+export default async function LotePage({
+  searchParams,
+}: Props): Promise<JSX.Element> {
   const me = await requireSession();
+  // Onboarding step 2 (J1.5): only with ?inicio=1; no state behind it.
+  const onboarding = (await searchParams).inicio === "1";
   const history = await historyOrError();
 
   return (
@@ -28,6 +35,7 @@ export default async function LotePage(): Promise<JSX.Element> {
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
         <div className="flex min-w-0 flex-col gap-6">
+          {onboarding && <OnboardingStep2Banner />}
           <HistoryList history={history} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
