@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { LinkColumn } from "@/features/seller-link/components/link-column";
+import { LinkMain } from "@/features/seller-link/components/link-main";
 import { LoadError } from "@/features/seller-link/components/load-error";
 
 import "./(link)/link.css";
@@ -14,13 +14,14 @@ type Props = {
 
 // A failure in the root layout itself. It replaces the whole document, so it
 // renders its own <html>. Generic loaderror copy; the digest is never shown.
+// No Kybr footer: it stays minimal (brand v1 B9).
 export default function GlobalError({ reset }: Props): JSX.Element {
   return (
     <html lang="pt-BR">
       <body>
-        <LinkColumn>
+        <LinkMain>
           <LoadError onRetry={reset} />
-        </LinkColumn>
+        </LinkMain>
       </body>
     </html>
   );

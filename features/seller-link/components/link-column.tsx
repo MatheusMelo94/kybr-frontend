@@ -1,6 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { KybrFooter } from "@/features/seller-link/components/kybr-footer";
+import { LinkMain } from "@/features/seller-link/components/link-main";
 
 type Props = {
   children: ReactNode;
@@ -16,10 +17,9 @@ type Props = {
 export function LinkColumn({ children }: Props): JSX.Element {
   return (
     <>
-      <main className="mx-auto w-full max-w-link px-4 pt-8 pb-8 md:pt-16 lg:pt-24">
-        {children}
-      </main>
+      <LinkMain>{children}</LinkMain>
       <KybrFooter />
     </>
   );
 }
+
