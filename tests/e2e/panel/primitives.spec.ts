@@ -4,6 +4,7 @@ import {
   NOTICE_BASE,
   NOTICE_TONES,
 } from "../../../components/panel/notice-styles.ts";
+import { navCountClassName } from "../../../features/panel-shell/nav-count-styles.ts";
 import { createAccount, logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
 
 // Geometry and colour of the panel's primitives, in a real browser (review
@@ -135,6 +136,35 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     );
   });
 
+  test("the nav count: no pill on the active item, the field-coloured pill on an inactive one", async ({
+    page,
+  }) => {
+    // M4 has one nav item, so no shipped screen shows an inactive count:
+    // render NavCount's own classes under the panel's real stylesheet.
+    await page.goto("/entrar");
+    await page.waitForLoadState("networkidle");
+    for (const [id, className] of [
+      ["count-active", navCountClassName(true)],
+      ["count-inactive", navCountClassName(false)],
+    ] as const)
+      await page.evaluate(
+        ([elementId, classes]) => {
+          const element = document.createElement("span");
+          element.id = elementId;
+          element.className = classes;
+          element.textContent = "7";
+          document.body.append(element);
+        },
+        [id, className] as const,
+      );
+    expect(await style(page.locator("#count-active"), "backgroundColor")).toBe(
+      "rgba(0, 0, 0, 0)",
+    );
+    expect(
+      await style(page.locator("#count-inactive"), "backgroundColor"),
+    ).toBe(await tokenValue(page, "--color-field", "backgroundColor"));
+  });
+
   test("Notice tones (DDR-0003): ink text in every tone; warning and danger add a 4 px bar in their signal colour", async ({
     page,
   }) => {
@@ -200,9 +230,12 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     await createAccount(request, email, "renata");
     await logIn(page, email);
     const badge = page.locator("aside").getByTestId("nav-count");
-    expect(await style(badge, "backgroundColor")).toBe(
-      await tokenValue(page, "--color-field", "backgroundColor"),
-    );
+    // The Fila is the active item here: its count has no pill (the
+    // Aplicações board); the dot and the glyph still mark the late state.
+    await expect(
+      page.locator("aside").getByRole("link", { name: /^Fila de revisão/ }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(await style(badge, "backgroundColor")).toBe("rgba(0, 0, 0, 0)");
     expect(await style(badge, "color")).toBe(
       await tokenValue(page, "--color-ink", "color"),
     );

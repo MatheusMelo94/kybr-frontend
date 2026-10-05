@@ -78,6 +78,7 @@ export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
                   <NavCount
                     abertos={counts.fila_abertos}
                     vencidos={counts.fila_vencidos}
+                    active={active}
                   />
                 )}
               </Link>
