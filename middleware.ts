@@ -32,16 +32,21 @@ const hosts = hostConfigFromEnv(env);
  */
 const LINK_NOT_FOUND_PATH = "/_kybr/nao-encontrado";
 
+/** The vendored dependencies' notices (Apache-2.0 SheetJS: its banner is minified away). */
+const THIRD_PARTY_NOTICES_PATH = "/third-party-notices.txt";
+
 /**
  * Paths both hosts serve as they are (ADR-0008 rule 5). /favicon.ico and
  * BRAND_FILES are the static Kybr icons in public/ (P4-001, brand v1); only
- * those exact paths, never the whole /brand/ prefix (Security 0001).
+ * those exact paths, never the whole /brand/ prefix (Security 0001). The
+ * third-party notice is public/third-party-notices.txt (ADR-0012, C12).
  */
 function isShared(pathname: string): boolean {
   return (
     pathname.startsWith("/_next/") ||
     pathname === CSP_REPORT_PATH ||
     pathname === "/favicon.ico" ||
+    pathname === THIRD_PARTY_NOTICES_PATH ||
     (BRAND_FILES as readonly string[]).includes(pathname)
   );
 }
@@ -153,7 +158,7 @@ export function middleware(request: NextRequest): NextResponse {
   const policy = buildContentSecurityPolicy({
     nonce,
     ...(panel
-      ? { turnstile: usesTurnstile(pathname) }
+      ? { turnstile: usesTurnstile(pathname), worker: true }
       : { apiOrigin: new URL(env.API_PUBLIC_BASE_URL).origin }),
     isDev: env.NODE_ENV === "development",
     upgradeInsecureRequests: !isLoopbackHostname(request.nextUrl.hostname),

@@ -207,3 +207,33 @@ describe("middleware: Next's action forwarding never chains (HIGH, branch-introd
     );
   });
 });
+
+describe("middleware: Lote's worker in the CSP (ADR-0012 item 7, Security C5)", () => {
+  it.each(["/fila", "/lote", "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", "/entrar", "/comecar"])(
+    "every panel-host page allows same-origin workers: %s",
+    (path) => {
+      const response = middleware(
+        request(path, { headers: { cookie: "__Host-kybr_session=v" } }),
+      );
+      expect(response.headers.get("content-security-policy")).toContain(
+        "worker-src 'self';",
+      );
+    },
+  );
+
+  it("the link host never does", () => {
+    const response = middleware(request("/v/loja-exemplo", { host: "kybr.test" }));
+    expect(response.headers.get("content-security-policy")).not.toContain(
+      "worker-src",
+    );
+  });
+});
+
+describe("middleware: the third-party notice (Security C12)", () => {
+  for (const host of ["app.kybr.test", "kybr.test"])
+    it(`passes /third-party-notices.txt through untouched on ${host}`, () => {
+      const response = middleware(request("/third-party-notices.txt", { host }));
+      expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    });
+});

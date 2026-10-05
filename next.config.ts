@@ -40,6 +40,19 @@ const nextConfig: NextConfig = {
         source: "/v/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
+      // ADR-0012 / Security C3: a worker takes its CSP from its own response,
+      // and middleware skips /_next/static. No egress from Lote's parser
+      // worker: nothing but same-origin scripts. Inert on classic <script>
+      // loads (a script's response CSP doesn't apply to it).
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'none'; script-src 'self'",
+          },
+        ],
+      },
       // Static SVG art: it renders nothing active even when opened directly
       // (Security 0002). The page CSP comes from middleware, which these
       // shared files skip.
