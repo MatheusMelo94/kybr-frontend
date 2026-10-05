@@ -25,17 +25,17 @@ describe("NavCount (AC 11, Q9)", () => {
     expect(screen.getByText("1 caso para decidir")).toBeInTheDocument();
   });
 
-  it("with an overdue case: the danger badge with the glyph, the late line, and count_sr_late", () => {
-    // The badge's and the late line's colours: primitives.spec (Playwright).
+  it("with an overdue case: a neutral pill with the danger dot and the glyph, the late line, count_sr_late (AC 11, DDR-0003)", () => {
+    // The colours: primitives.spec (Playwright).
     render(
       <a href="/fila">
         <NavCount abertos={7} vencidos={2} />
       </a>,
     );
 
-    expect(
-      screen.getByTestId("nav-count").querySelector("svg"),
-    ).toHaveAttribute("aria-hidden", "true");
+    const badge = screen.getByTestId("nav-count");
+    expect(badge.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(badge.querySelector("span[aria-hidden]:empty")).not.toBeNull();
     expect(
       screen.getByRole("link", {
         name: "7 casos para decidir, 2 fora do prazo",
@@ -44,6 +44,11 @@ describe("NavCount (AC 11, Q9)", () => {
     expect(screen.getByText("2 fora do prazo")).toHaveAttribute(
       "aria-hidden",
       "true",
+    );
+    // DDR-0003: no red fill or red text; the dot carries the signal.
+    expect(badge.className).not.toMatch(/bg-danger|text-danger/);
+    expect(screen.getByText("2 fora do prazo").className).not.toMatch(
+      /text-danger/,
     );
   });
 
@@ -149,8 +154,10 @@ describe("PlanBlock (AC 12, S5)", () => {
     const text = screen.getByText(
       "As verificações do plano acabaram. Contrate para continuar verificando.",
     );
-    // Its warning ink: primitives.spec (Playwright).
+    // DDR-0003: ink text with a warning dot, never amber text.
     expect(text).toBeVisible();
+    expect(text.querySelector("span[aria-hidden]")).not.toBeNull();
+    expect(text.className).not.toMatch(/text-warning/);
     expect(screen.getByRole("link", { name: "Contratar" })).toBeInTheDocument();
   });
 

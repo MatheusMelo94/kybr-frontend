@@ -6,7 +6,7 @@ type Props = {
   children: ReactNode;
   /** "status" is polite; "alert" interrupts (only for what needs action now). */
   role?: "status" | "alert";
-  /** The text carries the meaning; the tone only adds the matching ink. */
+  /** The text carries the meaning, in ink; warning and danger add a coloured left bar (DDR-0003). */
   tone?: "info" | "warning" | "danger";
   /** Lets a client leaf move focus here (tabIndex -1), e.g. a banner read on load. */
   focusable?: boolean;
@@ -17,8 +17,8 @@ type Props = {
 
 const TONES = {
   info: "border-line text-ink",
-  warning: "border-line text-warning-ink",
-  danger: "border-line text-danger-ink",
+  warning: "border-line border-l-4 border-l-warning text-ink",
+  danger: "border-line border-l-4 border-l-danger text-ink",
 } as const;
 
 /** A banner: a status or alert message above a form or a screen. */

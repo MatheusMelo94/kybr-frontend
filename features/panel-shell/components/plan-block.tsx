@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { StatusDot } from "@/components/ui/status-dot";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
 import { fill, formatDate, formatNumber } from "@/features/panel-shell/format";
 import type { Plano } from "@/lib/api/schemas/panel/me";
@@ -62,7 +63,9 @@ export function PlanBlock({ plano, contratarHref }: Props): JSX.Element | null {
             </p>
           )}
           {exhausted && (
-            <p className="text-secondary text-warning-ink">
+            // DDR-0003: ink text with a warning dot, never amber text.
+            <p className="flex items-baseline gap-2 text-secondary text-ink">
+              <StatusDot tone="warning" />
               {shellCopy["plan.exhausted"]}
             </p>
           )}

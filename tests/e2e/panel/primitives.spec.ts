@@ -150,7 +150,7 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     );
   });
 
-  test("the late Fila count is a danger badge with badge ink and a danger-ink late line; an exhausted plan is warning ink", async ({
+  test("DDR-0003: the late Fila count is a neutral pill with a danger dot and an ink-muted late line; an exhausted plan is ink with a warning dot; in grayscale the late state still shows (AC 11, 69, 71)", async ({
     page,
     request,
   }, testInfo) => {
@@ -159,32 +159,43 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     await logIn(page, email);
     const badge = page.locator("aside").getByTestId("nav-count");
     expect(await style(badge, "backgroundColor")).toBe(
-      await tokenValue(page, "--color-danger", "backgroundColor"),
+      await tokenValue(page, "--color-field", "backgroundColor"),
     );
     expect(await style(badge, "color")).toBe(
-      await tokenValue(page, "--color-danger-badge-ink", "color"),
+      await tokenValue(page, "--color-ink", "color"),
+    );
+    const dot = badge.locator("span[aria-hidden]").first();
+    expect(await style(dot, "backgroundColor")).toBe(
+      await tokenValue(page, "--color-danger", "backgroundColor"),
     );
     expect(
       await style(
         page.locator("aside").getByText("2 fora do prazo", { exact: true }),
         "color",
       ),
-    ).toBe(await tokenValue(page, "--color-danger-ink", "color"));
+    ).toBe(await tokenValue(page, "--color-ink-muted", "color"));
+    // AC 71: without colour, the glyph and the late line still say it.
+    await page.addStyleTag({ content: "html { filter: grayscale(1) }" });
+    await expect(badge.locator("svg")).toBeVisible();
+    await expect(
+      page.locator("aside").getByText("2 fora do prazo", { exact: true }),
+    ).toBeVisible();
 
     const exhausted = uniqueEmail("cores-esgotado", testInfo);
     await createAccount(request, exhausted, "esgotado");
     await page.context().clearCookies();
     await logIn(page, exhausted);
+    const line = page
+      .locator("aside")
+      .getByText(
+        "As verificações do plano acabaram. Contrate para continuar verificando.",
+      );
+    expect(await style(line, "color")).toBe(
+      await tokenValue(page, "--color-ink", "color"),
+    );
     expect(
-      await style(
-        page
-          .locator("aside")
-          .getByText(
-            "As verificações do plano acabaram. Contrate para continuar verificando.",
-          ),
-        "color",
-      ),
-    ).toBe(await tokenValue(page, "--color-warning-ink", "color"));
+      await style(line.locator("span[aria-hidden]"), "backgroundColor"),
+    ).toBe(await tokenValue(page, "--color-warning", "backgroundColor"));
   });
 
   test("a RadioGroup's error is danger ink, and its radios are 24 px", async ({
