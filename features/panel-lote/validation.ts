@@ -8,6 +8,7 @@ import {
   isBatchRowStatus,
   isPanelCursor,
 } from "@/lib/panel-api-values";
+import { validateCnpj } from "@/lib/cnpj";
 
 /** D-B1: 1–5,000 rows per batch (spec J3, AC 15). */
 export const MAX_ROWS = 5000;
@@ -48,6 +49,35 @@ export function isValidResponsavel(value: string): boolean {
 export function isValidExtId(value: string): boolean {
   return (
     value.length > 0 && value.length <= EXT_ID_MAX && EXT_ID_PATTERN.test(value)
+  );
+}
+
+/** A-X5: the CNPJ on the wire, 14 uppercase alphanumerics, the last two digits. */
+const CNPJ_WIRE = /^[0-9A-Z]{12}[0-9]{2}$/;
+const LINHA_KEYS = new Set(["cnpj", "responsavel", "ext_id"]);
+
+/** A wire-format CNPJ with valid check digits. */
+export function isWireCnpj(value: string): boolean {
+  return CNPJ_WIRE.test(value) && validateCnpj(value) === "ok";
+}
+
+/**
+ * One D-B1 row as the API takes it (contract C4): a wire CNPJ, and only
+ * valid optional fields, nothing else. The worker builds rows that pass it;
+ * startBatchAction's zod (schemas.ts) agrees with it (ADR-0010 rule 8).
+ */
+export function isValidLinha(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const linha = value as Record<string, unknown>;
+  if (Object.keys(linha).some((key) => !LINHA_KEYS.has(key))) return false;
+  const { cnpj, responsavel, ext_id } = linha;
+  return (
+    typeof cnpj === "string" &&
+    isWireCnpj(cnpj) &&
+    (responsavel === undefined ||
+      (typeof responsavel === "string" && isValidResponsavel(responsavel))) &&
+    (ext_id === undefined ||
+      (typeof ext_id === "string" && isValidExtId(ext_id)))
   );
 }
 

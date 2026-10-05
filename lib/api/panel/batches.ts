@@ -18,7 +18,7 @@ import {
   type BatchHistory,
   type BatchRowsPage,
 } from "@/lib/api/schemas/panel/batches";
-import type { BatchRowStatus } from "@/lib/panel-api-values";
+import type { BatchLinha, BatchRowStatus } from "@/lib/panel-api-values";
 
 // Lote's data functions (D-B1–D-B7, Pre-Contract). Every call goes through the
 // panel client (no-store forced, P06; the bearer from the DAL; the BFF key)
@@ -28,8 +28,6 @@ import type { BatchRowStatus } from "@/lib/panel-api-values";
 
 /** D-B4: the downloads' size cap (the handlers answer 502 past it, T86). */
 export const CSV_MAX_BYTES = 5 * 1024 * 1024;
-
-export type BatchLinha = { cnpj: string; responsavel?: string; ext_id?: string };
 
 const noBody = z.unknown().transform(() => undefined);
 

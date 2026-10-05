@@ -37,3 +37,10 @@ export type BatchRowStatus = (typeof BATCH_ROW_STATUSES)[number];
 export function isBatchRowStatus(value: string): value is BatchRowStatus {
   return (BATCH_ROW_STATUSES as readonly string[]).includes(value);
 }
+
+/** One D-B1 row on the wire (contract C4): the worker builds it, the action checks it. */
+export type BatchLinha = {
+  cnpj: string;
+  responsavel?: string;
+  ext_id?: string;
+};

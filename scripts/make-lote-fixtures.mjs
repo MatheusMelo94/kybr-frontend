@@ -61,11 +61,12 @@ const files = {
   "ac16-windows-1252.csv": windows1252(csv(ac16)),
   // No header row: the first row is data (T74's header rule).
   "sem-cabecalho.csv": BOM + csv(ac16.slice(0, 20), { header: null }),
-  // No column says "CNPJ" and none is ≥ 80 % CNPJ-shaped (AC 17).
+  // No column says "CNPJ" and none is ≥ 80 % CNPJ-shaped (AC 17): the
+  // "Documento" holds only the 8-character root.
   "sem-coluna-cnpj.csv":
     BOM +
     csv(
-      ac16.slice(0, 20).map(([cnpj, nome, id]) => [nome, id, `x${cnpj}`]),
+      ac16.slice(0, 20).map(([cnpj, nome, id]) => [nome, id, cnpj.slice(0, 8)]),
       { header: ["Nome", "Código", "Documento"] },
     ),
   // The row cap: exactly 5,000 data rows, then one more (AC 15).
