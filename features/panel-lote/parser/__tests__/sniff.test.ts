@@ -92,4 +92,18 @@ describe("sniffFile (ADR-0012 item 2, AC 15 type)", () => {
       format: "csv",
     });
   });
+
+  it.each([
+    ["a password-protected XLSX (CFB bytes)", "lista.xlsx", CFB],
+    ["a UTF-16LE CSV", "lista.csv", [0xff, 0xfe, 0x43, 0x00, 0x4e, 0x00]],
+    ["a UTF-16BE CSV", "lista.csv", [0xfe, 0xff, 0x00, 0x43, 0x00, 0x4e]],
+  ])(
+    "Q5: %s → unreadable (it is Excel / CSV, just not readable)",
+    (_, name, head) => {
+      expect(sniffFile(file(name as string, head as number[]))).toEqual({
+        ok: false,
+        error: "unreadable",
+      });
+    },
+  );
 });

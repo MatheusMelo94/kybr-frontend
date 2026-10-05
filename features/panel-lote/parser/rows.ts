@@ -16,8 +16,21 @@ function isBlank(cells: readonly string[]): boolean {
   return cells.every((cell) => cell.trim() === "");
 }
 
+/**
+ * A cell read as a CNPJ (QA Q2): one leading ' (Excel's text-forcing
+ * prefix) is dropped, and an all-digit value of 12–13 digits is left-padded
+ * to 14 (Excel drops leading zeros, in CSV too); then normalizeCnpj. The
+ * check digits decide the rest.
+ */
+export function cnpjFromCell(raw: string): string {
+  let text = raw.trim();
+  if (text.startsWith("'")) text = text.slice(1);
+  if (/^\d{12,13}$/.test(text)) text = text.padStart(14, "0");
+  return normalizeCnpj(text);
+}
+
 function hasValidCnpj(cells: readonly string[]): boolean {
-  return cells.some((cell) => validateCnpj(normalizeCnpj(cell)) === "ok");
+  return cells.some((cell) => validateCnpj(cnpjFromCell(cell)) === "ok");
 }
 
 /**

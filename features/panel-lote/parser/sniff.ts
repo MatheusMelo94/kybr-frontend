@@ -10,7 +10,7 @@ export const SNIFF_BYTES = 8 * 1024;
 export type SheetFormat = "csv" | "xlsx" | "xls";
 export type SniffResult =
   | { ok: true; format: SheetFormat }
-  | { ok: false; error: "type" | "too_large" };
+  | { ok: false; error: "type" | "too_large" | "unreadable" };
 
 const ZIP = [0x50, 0x4b, 0x03, 0x04];
 const CFB = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
@@ -28,6 +28,12 @@ function startsWith(head: Uint8Array, magic: readonly number[]): boolean {
   return magic.every((byte, index) => head[index] === byte);
 }
 
+// UTF-16 byte-order marks (QA Q5: a CSV, just not one we read).
+const UTF16 = [
+  [0xff, 0xfe],
+  [0xfe, 0xff],
+];
+
 function looksLikeText(head: Uint8Array): boolean {
   return (
     !BINARY.some((magic) => startsWith(head, magic)) &&
@@ -39,6 +45,8 @@ function looksLikeText(head: Uint8Array): boolean {
  * `type` for anything but .csv / .xlsx / .xls whose bytes agree with the name
  * (.xlsm, .xlsb, .ods, a PDF, an image, a zip called .csv…); `too_large` over
  * 10 MB (shown as lote.error.unreadable: the spec has no size copy).
+ * QA Q5: a password-protected XLSX (OOXML encryption wraps it in a CFB) and
+ * a UTF-16 CSV are what they claim to be, just unreadable: `unreadable`.
  */
 export function sniffFile(file: {
   name: string;
@@ -47,6 +55,11 @@ export function sniffFile(file: {
 }): SniffResult {
   if (file.size > MAX_FILE_BYTES) return { ok: false, error: "too_large" };
   const extension = /\.([A-Za-z0-9]+)$/.exec(file.name)?.[1]?.toLowerCase();
+  if (
+    (extension === "xlsx" && startsWith(file.head, CFB)) ||
+    (extension === "csv" && UTF16.some((bom) => startsWith(file.head, bom)))
+  )
+    return { ok: false, error: "unreadable" };
   const agrees =
     (extension === "xlsx" && startsWith(file.head, ZIP)) ||
     (extension === "xls" && startsWith(file.head, CFB)) ||

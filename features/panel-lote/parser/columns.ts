@@ -8,7 +8,8 @@ import {
   isValidExtId,
   isValidResponsavel,
 } from "@/features/panel-lote/validation";
-import { normalizeCnpj, validateCnpj } from "@/lib/cnpj";
+import { cnpjFromCell } from "@/features/panel-lote/parser/rows";
+import { validateCnpj } from "@/lib/cnpj";
 import type { BatchLinha } from "@/lib/panel-api-values";
 
 /** Per column: valid (distinct), repeats after the first, and invalid cells. */
@@ -24,6 +25,8 @@ export type Analysis = {
   /** The header row's text, or "A", "B", … when the sheet has none. */
   headers: string[];
   hasHeader: boolean;
+  /** Where the data rows start (rows above a found header are ignored, Q1). */
+  dataStart: number;
   dataRows: number;
   /** The first 5 data rows (the worker cuts each cell for the page, T75). */
   preview: string[][];
@@ -35,6 +38,8 @@ export type AnalyzeResult =
   { ok: true; analysis: Analysis } | { ok: false; error: "empty" | "too_many" };
 
 const PREVIEW_ROWS = 5;
+/** QA Q1: the header is searched for among the first 10 non-blank rows. */
+const HEADER_SEARCH_ROWS = 10;
 const SHAPED_SHARE = 0.8;
 const CNPJ_SHAPE = /^[0-9A-Z]{12}[0-9]{2}$/;
 const RESPONSAVEL_HEADERS = ["responsavel", "nome do responsavel"];
@@ -50,6 +55,13 @@ function headerKey(text: string): string {
     .replace(/\s+/g, " ");
 }
 
+/** QA Q1b: punctuation and spaces stripped too, so "C.N.P.J." and "CNPJ/CPF" match. */
+function mentionsCnpj(text: string): boolean {
+  return headerKey(text)
+    .replace(/[^a-z0-9]/g, "")
+    .includes("cnpj");
+}
+
 /** "A", "B", … "Z", "AA", "AB", … */
 function columnLetter(index: number): string {
   let name = "";
@@ -59,13 +71,13 @@ function columnLetter(index: number): string {
 }
 
 const isValid = (cell: string): boolean =>
-  validateCnpj(normalizeCnpj(cell)) === "ok";
+  validateCnpj(cnpjFromCell(cell)) === "ok";
 
 function statsFor(rows: readonly string[][], column: number): ColumnStats {
   const seen = new Set<string>();
   const stats = { valid: 0, duplicates: 0, invalid: 0 };
   for (const row of rows) {
-    const cnpj = normalizeCnpj(row[column] ?? "");
+    const cnpj = cnpjFromCell(row[column] ?? "");
     if (validateCnpj(cnpj) !== "ok") stats.invalid++;
     else if (seen.has(cnpj)) stats.duplicates++;
     else {
@@ -82,9 +94,7 @@ function cnpjColumn(
   rows: readonly string[][],
   columns: number,
 ): number | undefined {
-  const byName = headers?.findIndex((text) =>
-    headerKey(text).replace(/ /g, "").includes("cnpj"),
-  );
+  const byName = headers?.findIndex(mentionsCnpj);
   if (byName !== undefined && byName >= 0) return byName;
   for (let column = 0; column < columns; column++) {
     let filled = 0;
@@ -93,7 +103,7 @@ function cnpjColumn(
       const cell = (row[column] ?? "").trim();
       if (cell === "") continue;
       filled++;
-      if (CNPJ_SHAPE.test(normalizeCnpj(cell))) shaped++;
+      if (CNPJ_SHAPE.test(cnpjFromCell(cell))) shaped++;
     }
     if (filled > 0 && shaped / filled >= SHAPED_SHARE) return column;
   }
@@ -109,21 +119,32 @@ function optionalColumn(
 }
 
 /**
- * The first non-blank row is the header unless its candidate CNPJ cell
- * validates as a CNPJ: then the sheet has no header and columns are named by
- * letter. Without a header there are no optional columns.
+ * The header (QA Q1): the first row, among the first 10, with a cell that
+ * mentions "cnpj"; rows above it (an ERP's title) are ignored. Otherwise the
+ * first row is the header unless its candidate CNPJ cell validates as a CNPJ:
+ * then the sheet has no header and columns are named by letter. Without a
+ * header there are no optional columns.
  */
 export function analyzeRows(rows: readonly string[][]): AnalyzeResult {
-  const [first, ...rest] = rows;
-  if (first === undefined) return { ok: false, error: "empty" };
+  if (rows.length === 0) return { ok: false, error: "empty" };
   const columns = Math.max(...rows.map((row) => row.length));
 
-  const candidate = cnpjColumn(first, rest, columns);
-  const hasHeader = !(
-    first.some(isValid) &&
-    (candidate === undefined || isValid(first[candidate] ?? ""))
-  );
-  const data = hasHeader ? rest : rows;
+  const named = rows
+    .slice(0, HEADER_SEARCH_ROWS)
+    .findIndex((row) => row.some(mentionsCnpj));
+  let dataStart: number;
+  if (named >= 0) dataStart = named + 1;
+  else {
+    const first = rows[0] ?? [];
+    const candidate = cnpjColumn(first, rows.slice(1), columns);
+    const headerless =
+      first.some(isValid) &&
+      (candidate === undefined || isValid(first[candidate] ?? ""));
+    dataStart = headerless ? 0 : 1;
+  }
+  const hasHeader = dataStart > 0;
+  const first = rows[dataStart - 1] ?? [];
+  const data = rows.slice(dataStart);
   if (data.length === 0) return { ok: false, error: "empty" };
   if (data.length > MAX_ROWS) return { ok: false, error: "too_many" };
 
@@ -132,7 +153,7 @@ export function analyzeRows(rows: readonly string[][]): AnalyzeResult {
       ? (first[column] ?? "")
       : columnLetter(column),
   );
-  const cnpj = hasHeader ? candidate : cnpjColumn(undefined, data, columns);
+  const cnpj = cnpjColumn(hasHeader ? first : undefined, data, columns);
   const responsavel = hasHeader
     ? optionalColumn(first, RESPONSAVEL_HEADERS)
     : undefined;
@@ -143,6 +164,7 @@ export function analyzeRows(rows: readonly string[][]): AnalyzeResult {
     analysis: {
       headers,
       hasHeader,
+      dataStart,
       dataRows: data.length,
       preview: data.slice(0, PREVIEW_ROWS),
       stats: Array.from({ length: columns }, (_, column) =>
@@ -165,15 +187,15 @@ export function analyzeRows(rows: readonly string[][]): AnalyzeResult {
  */
 export function buildPayload(
   rows: readonly string[][],
-  analysis: Pick<Analysis, "hasHeader" | "detected">,
+  analysis: Pick<Analysis, "dataStart" | "detected">,
   column: number,
 ): BatchLinha[] {
-  const data = analysis.hasHeader ? rows.slice(1) : rows;
+  const data = rows.slice(analysis.dataStart);
   const { responsavel, extId } = analysis.detected;
   const seen = new Set<string>();
   const linhas: BatchLinha[] = [];
   for (const row of data) {
-    const cnpj = normalizeCnpj(row[column] ?? "");
+    const cnpj = cnpjFromCell(row[column] ?? "");
     if (validateCnpj(cnpj) !== "ok" || seen.has(cnpj)) continue;
     seen.add(cnpj);
     const linha: BatchLinha = { cnpj };

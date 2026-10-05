@@ -249,3 +249,86 @@ describe("buildPayload (ADR-0012 items 2 and 8)", () => {
     ]);
   });
 });
+
+describe("QA decisions Q1, Q2, Q16 (accepted 2026-10-05)", () => {
+  it("Q1: an ERP title row (and a blank row) above the header is ignored, not counted", () => {
+    const rows = [
+      ["Relatório de vendedores"],
+      ["Gerado em 05/10/2026"],
+      ["CNPJ", "Responsável"],
+      [A, "Maria Exemplo"],
+      [B, "João Exemplo"],
+    ];
+    const analysis = analyzed(rows);
+    expect(analysis.hasHeader).toBe(true);
+    expect(analysis.headers).toEqual(["CNPJ", "Responsável"]);
+    expect(analysis.dataRows).toBe(2);
+    expect(analysis.stats[0]).toEqual({ valid: 2, duplicates: 0, invalid: 0 });
+    expect(buildPayload(rows, analysis, 0)).toEqual([
+      { cnpj: A, responsavel: "Maria Exemplo" },
+      { cnpj: B, responsavel: "João Exemplo" },
+    ]);
+  });
+
+  it("Q1: only the first 10 rows are searched for the header", () => {
+    const rows = [
+      ...Array.from({ length: 10 }, (_, i) => [`título ${i}`]),
+      ["CNPJ"],
+      [A],
+    ];
+    expect(analyzed(rows).headers[0]).toBe("título 0");
+  });
+
+  it.each([["C.N.P.J."], ["CNPJ/CPF"], ["c n p j"]])(
+    "Q1b: %j matches with punctuation stripped",
+    (header) => {
+      const analysis = analyzed([
+        ["Nome", header],
+        ["Maria", A],
+      ]);
+      expect(analysis.detected.cnpj).toBe(1);
+    },
+  );
+
+  it("Q10: the leftmost cnpj column wins", () => {
+    const analysis = analyzed([
+      ["CNPJ Matriz", "CNPJ Filial"],
+      [A, B],
+    ]);
+    expect(analysis.detected.cnpj).toBe(0);
+  });
+
+  it("Q2: all-digit 12–13-digit values are padded to 14; one leading ' is stripped", () => {
+    // 11222333000181 lost its leading zero? Use a CNPJ that starts with 0.
+    const zero = AC16.linhas[0]?.cnpj ?? "";
+    expect(zero).toMatch(/^0\d{13}$/);
+    const rows = [
+      ["CNPJ"],
+      [zero.slice(1)], // 13 digits (Excel dropped the 0)
+      [`'${B}`], // a text-forcing prefix
+      [`'${zero}`],
+    ];
+    const analysis = analyzed(rows);
+    expect(analysis.stats[0]).toEqual({ valid: 2, duplicates: 1, invalid: 0 });
+    expect(buildPayload(rows, analysis, 0)).toEqual([
+      { cnpj: zero },
+      { cnpj: B },
+    ]);
+  });
+
+  it("Q2: 11 digits stay invalid (only 12–13 are padded)", () => {
+    expect(analyzed([["CNPJ"], [A.slice(3)]]).stats[0]).toEqual({
+      valid: 0,
+      duplicates: 0,
+      invalid: 1,
+    });
+  });
+
+  it("Q16b: a repeated invalid value counts as invalid each time", () => {
+    expect(analyzed([["CNPJ"], ["x"], ["x"], [A], [A]]).stats[0]).toEqual({
+      valid: 1,
+      duplicates: 1,
+      invalid: 2,
+    });
+  });
+});
