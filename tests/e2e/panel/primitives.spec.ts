@@ -4,6 +4,10 @@ import {
   NOTICE_BASE,
   NOTICE_TONES,
 } from "../../../components/panel/notice-styles.ts";
+import {
+  TOAST_ITEM,
+  TOAST_REGION,
+} from "../../../components/panel/toast-styles.ts";
 import { navCountClassName } from "../../../features/panel-shell/nav-count-styles.ts";
 import { createAccount, logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
 
@@ -381,5 +385,74 @@ test.describe("panel primitives on a coarse pointer @feature-ops-panel @panel-ac
     // "Reenviar em {segundos} s" while the countdown runs.
     const resend = page.getByRole("button", { name: /^Reenviar/ });
     expect(await height(resend)).toBeGreaterThanOrEqual(44);
+  });
+});
+
+// T76: the toast primitive. No shipped screen shows a toast until T84, so the
+// motion is read from its classes under the panel's real stylesheet.
+test.describe("panel toasts @feature-ops-panel @panel-lote", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("the shell's polite toast region is in the server HTML (present at first paint), empty", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("toasts", testInfo);
+    await createAccount(request, email);
+    await logIn(page, email);
+
+    const html = await (await page.request.get("/fila")).text();
+    expect(html).toMatch(
+      /<div role="status" aria-live="polite" aria-atomic="false" class="[^"]*fixed[^"]*"><\/div>/,
+    );
+  });
+
+  test("a toast rises 8 px and fades in at --duration-base, leaves at --duration-fast; reduced motion fades only; line border, no shadow", async ({
+    page,
+  }) => {
+    await page.goto("/entrar");
+    await page.waitForLoadState("networkidle");
+
+    const probe = async (leaving: boolean) =>
+      page.evaluate(
+        ([region, item, out]) => {
+          const box = document.createElement("div");
+          box.className = region;
+          const toast = document.createElement("div");
+          toast.className = item;
+          if (out) toast.setAttribute("data-leaving", "");
+          toast.textContent = "1 caso na fila";
+          box.append(toast);
+          document.body.append(box);
+          const s = getComputedStyle(toast);
+          const result = {
+            property: s.transitionProperty,
+            duration: s.transitionDuration,
+            translate: s.translate,
+            boxShadow: s.boxShadow,
+            borderStyle: s.borderTopStyle,
+          };
+          box.remove();
+          return result;
+        },
+        [TOAST_REGION, TOAST_ITEM, leaving] as const,
+      );
+
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    const entering = await probe(false);
+    expect(entering.property).toBe("opacity, translate");
+    // One value per property, or one for all: both mean 250 ms each.
+    expect(entering.duration).toMatch(/^0\.25s(, 0\.25s)?$/);
+    expect(entering.boxShadow).toBe("none");
+    expect(entering.borderStyle).toBe("solid");
+    const leaving = await probe(true);
+    expect(leaving.duration).toMatch(/^0\.15s(, 0\.15s)?$/);
+    expect(leaving.translate).toBe("0px 8px");
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const reduced = await probe(false);
+    expect(reduced.property).toBe("opacity");
+    const reducedOut = await probe(true);
+    expect(reducedOut.translate).toBe("0px");
   });
 });
