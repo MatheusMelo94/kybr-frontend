@@ -11,9 +11,9 @@ const PANEL_ID_PATTERN =
 // A UUID (36 characters of hex and hyphens) fits the same pattern.
 const BATCH_ID_PATTERN = /^[A-Za-z0-9_-]{22,64}$/;
 
-// An A-X6 cursor is opaque; only URL-safe characters (base64url, base64 padding
-// and . ~) up to 256 are put in a query. Anything else falls back to page one.
-const CURSOR_PATTERN = /^[A-Za-z0-9_.~=-]{1,256}$/;
+// An A-X6 cursor is opaque base64url, at most 512 characters (Security C11);
+// anything else falls back to page one with no API call.
+const CURSOR_PATTERN = /^[A-Za-z0-9_-]{1,512}$/;
 
 /** True for an id the panel may put in a URL or an API path (A-X3). Anything else is a 404 with no API call. */
 export function isPanelId(value: string): boolean {

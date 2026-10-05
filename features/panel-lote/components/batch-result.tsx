@@ -30,7 +30,7 @@ export function BatchResult({ batch }: { batch: Batch }): JSX.Element {
   const { erro } = batch.contagens;
 
   return (
-    <section aria-labelledby="lote-result-h" className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <ResultHeading summary={summary} />
       <p className="text-body text-ink tabular-nums">{summary}</p>
       <div className="flex flex-wrap items-center gap-6">
@@ -46,6 +46,6 @@ export function BatchResult({ batch }: { batch: Batch }): JSX.Element {
           })}
         </p>
       )}
-    </section>
+    </div>
   );
 }

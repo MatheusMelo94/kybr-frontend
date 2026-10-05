@@ -29,7 +29,7 @@ export function HistoryList({ history }: Props): JSX.Element | null {
         <ul className="flex flex-col">
           {history.map((batch) => (
             <li key={batch.id}>
-              <Link href={`/lote/${batch.id}`} className={LINK}>
+              <Link href={`/lote/${batch.id}`} prefetch={false} className={LINK}>
                 <span className="tabular-nums">
                   {fill(loteCopy["lote.history.row"], {
                     data: formatDate(batch.iniciado_em),

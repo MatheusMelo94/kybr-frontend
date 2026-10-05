@@ -1,19 +1,17 @@
 import type { JSX } from "react";
 
-import { StatusDot, type StatusTone } from "@/components/ui/status-dot";
-import { loteCopy } from "@/features/panel-lote/copy";
+import { StatusDot } from "@/components/ui/status-dot";
+import { STATUS_WORDS } from "@/features/panel-lote/components/status-word";
 import { formatNumber } from "@/features/panel-shell/format";
 import type { Batch } from "@/lib/api/schemas/panel/batches";
 
 type Contagens = Batch["contagens"];
 
-const ITEMS: { key: keyof Contagens; word: string; tone: StatusTone }[] = [
-  { key: "ok", word: loteCopy["lote.legend.ok"], tone: "success" },
-  { key: "warn", word: loteCopy["lote.legend.warn"], tone: "warning" },
-  { key: "bad", word: loteCopy["lote.legend.bad"], tone: "danger" },
-  // Not a verdict: a neutral dot (plan M5 styling).
-  { key: "erro", word: loteCopy["lote.legend.err"], tone: "neutral" },
-];
+// "Não consultados" isn't a verdict: a neutral dot (plan M5 styling).
+const ITEMS = (["ok", "warn", "bad", "erro"] as const).map((key) => ({
+  key,
+  ...STATUS_WORDS[key],
+}));
 
 /**
  * The result's legend (AC 20, 69, 71): every status as a dot (decorative), its

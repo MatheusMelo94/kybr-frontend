@@ -116,7 +116,9 @@ test.describe("Lote: routes and history @feature-ops-panel @panel-lote", () => {
     await expect(
       page.getByRole("heading", { name: "Verificando 184 CNPJs" }),
     ).toBeVisible();
-    await expect(page.getByText("0 de 184")).toBeVisible();
+    await expect(
+      page.locator("main p").getByText("0 de 184", { exact: true }),
+    ).toBeVisible();
   });
 
   test("a D-B6 failure shows lote.history.error inline; the rest of /lote works", async ({

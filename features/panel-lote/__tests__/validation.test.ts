@@ -118,10 +118,20 @@ describe("rows query values (D-B3, C2)", () => {
       expect(isBatchRowStatus(status)).toBe(false);
   });
 
-  it("a cursor is an opaque URL-safe token of at most 256 characters", () => {
-    expect(isBatchCursor("eyJvZmZzZXQiOjI1fQ==")).toBe(true);
-    expect(isBatchCursor("c_25.x~y-z")).toBe(true);
-    for (const cursor of ["", "a b", "x/y", "x&status=ok", "c".repeat(257)])
+  it("a cursor is base64url of at most 512 characters (Security C11)", () => {
+    expect(isBatchCursor("eyJvZmZzZXQiOjI1fQ")).toBe(true);
+    expect(isBatchCursor("c_25-x")).toBe(true);
+    expect(isBatchCursor("c".repeat(512))).toBe(true);
+    for (const cursor of [
+      "",
+      "a b",
+      "x/y",
+      "x&status=ok",
+      "eyJvIjoyNX0=",
+      "c.x",
+      "c~x",
+      "c".repeat(513),
+    ])
       expect(isBatchCursor(cursor)).toBe(false);
   });
 });

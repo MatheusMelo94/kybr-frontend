@@ -164,8 +164,8 @@ describe("apiPaths.panel.batches (D-B1–D-B7)", () => {
   it("rows: limit 25, then status and cursor when given", () => {
     const b = apiPaths.panel.batches;
     expect(b.rows(ID)).toBe(`/v1/batches/${ID}/rows?limit=25`);
-    expect(b.rows(ID, { status: "warn", cursor: "eyJvIjoyNX0=" })).toBe(
-      `/v1/batches/${ID}/rows?limit=25&status=warn&cursor=eyJvIjoyNX0%3D`,
+    expect(b.rows(ID, { status: "warn", cursor: "eyJvIjoyNX0" })).toBe(
+      `/v1/batches/${ID}/rows?limit=25&status=warn&cursor=eyJvIjoyNX0`,
     );
   });
 

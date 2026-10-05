@@ -36,7 +36,13 @@ test.describe("Lote: the result @feature-ops-panel @panel-lote", () => {
     await logIn(page, email);
     await page.goto(`/lote/${id}`);
 
-    const result = page.getByRole("region", { name: "Resultado" });
+    // The result's block: from its heading to the errors line.
+    const result = page
+      .locator("main div", {
+        has: page.getByRole("heading", { name: "Resultado" }),
+      })
+      .filter({ has: page.getByRole("list") })
+      .last();
     await expect(
       result.getByText("181 CNPJs consultados em 41 s.", { exact: true }),
     ).toBeVisible();

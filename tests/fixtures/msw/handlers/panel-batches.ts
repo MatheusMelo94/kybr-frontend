@@ -189,13 +189,22 @@ function remember(
 
 // C2: an opaque cursor (base64url of the offset).
 function encodeCursor(offset: number): string {
-  return btoa(`o:${offset}`).replace(/\+/g, "-").replace(/\//g, "_");
+  // base64url without padding (Security C11's pattern).
+  return btoa(`o:${offset}`)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function decodeCursor(cursor: string): number | undefined {
   try {
     const match = /^o:(\d+)$/.exec(
-      atob(cursor.replace(/-/g, "+").replace(/_/g, "/")),
+      atob(
+        cursor
+          .replace(/-/g, "+")
+          .replace(/_/g, "/")
+          .padEnd(Math.ceil(cursor.length / 4) * 4, "="),
+      ),
     );
     return match ? Number(match[1]) : undefined;
   } catch {
