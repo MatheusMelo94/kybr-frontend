@@ -6,6 +6,7 @@ import {
   buildContentSecurityPolicy,
   generateNonce,
 } from "@/lib/csp";
+import { BRAND_FILES } from "@/lib/brand-assets";
 import { env } from "@/lib/env";
 import { panelCookieNames } from "@/lib/panel-cookie-names";
 import {
@@ -33,14 +34,15 @@ const LINK_NOT_FOUND_PATH = "/_kybr/nao-encontrado";
 
 /**
  * Paths both hosts serve as they are (ADR-0008 rule 5). /favicon.ico and
- * /brand/* are the static Kybr icons in public/ (P4-001, brand v1).
+ * BRAND_FILES are the static Kybr icons in public/ (P4-001, brand v1); only
+ * those exact paths, never the whole /brand/ prefix (Security 0001).
  */
 function isShared(pathname: string): boolean {
   return (
     pathname.startsWith("/_next/") ||
     pathname === CSP_REPORT_PATH ||
     pathname === "/favicon.ico" ||
-    pathname.startsWith("/brand/")
+    (BRAND_FILES as readonly string[]).includes(pathname)
   );
 }
 

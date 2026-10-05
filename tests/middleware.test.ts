@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { BRAND_FILES } from "@/lib/brand-assets";
 import { middleware } from "@/middleware";
 
 // The vitest env: PANEL_HOST app.kybr.test, LINK_HOST kybr.test.
@@ -79,6 +80,36 @@ describe("middleware: panel concerns (T47)", () => {
 
 describe("middleware: shared paths (P4-001)", () => {
   for (const host of ["app.kybr.test", "kybr.test"]) {
+    it(`any other /brand/ path gets the normal routing and its CSP on ${host} (Security 0001)`, () => {
+      for (const path of [
+        "/brand/nope",
+        "/brand/kybr-icon.svg.bak",
+        "/brand/",
+      ]) {
+        const response = middleware(request(path, { host }));
+
+        expect(
+          response.headers.get("x-middleware-rewrite"),
+          path,
+        ).not.toBeNull();
+        expect(response.headers.get("content-security-policy"), path).toContain(
+          "default-src",
+        );
+      }
+    });
+
+    it(`passes exactly the three brand files through on ${host}`, () => {
+      expect(BRAND_FILES).toEqual([
+        "/brand/kybr-icon.svg",
+        "/brand/apple-touch-icon.png",
+        "/brand/kybr-og-1200x630.png",
+      ]);
+      for (const path of BRAND_FILES) {
+        const response = middleware(request(path, { host }));
+        expect(response.headers.get("x-middleware-rewrite"), path).toBeNull();
+      }
+    });
+
     it(`passes /brand/kybr-icon.svg through untouched on ${host} (brand B1)`, () => {
       const response = middleware(request("/brand/kybr-icon.svg", { host }));
 

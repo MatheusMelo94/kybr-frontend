@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+import { BRAND_FILES } from "./lib/brand-assets";
 import { parseServerEnv } from "./lib/env-schema";
 
 // Fail `next build` / `next start` on a missing or invalid variable, so a bad
@@ -41,7 +42,7 @@ const nextConfig: NextConfig = {
       },
       // The brand icons (public/): a day in the browser and on the CDN, as
       // the old 204 route was (review 0023).
-      ...["/favicon.ico", "/brand/:path*"].map((source) => ({
+      ...["/favicon.ico", ...BRAND_FILES].map((source) => ({
         source,
         headers: [
           {

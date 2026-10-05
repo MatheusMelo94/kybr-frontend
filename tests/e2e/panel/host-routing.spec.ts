@@ -73,11 +73,7 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
     ).toBeVisible();
   });
 
-  for (const path of [
-    "/painel/x",
-    "/painel",
-    "/v/loja-exemplo",
-  ]) {
+  for (const path of ["/painel/x", "/painel", "/v/loja-exemplo"]) {
     test(`the panel host answers ${path} with the panel's not-found`, async ({
       page,
     }) => {
@@ -103,6 +99,14 @@ test.describe("host routing @feature-ops-panel @panel-access", () => {
         expect(response.status).toBe(200);
         expect(response.headers["cache-control"]).toContain("max-age=86400");
       }
+
+    // Only those exact files pass through (Security 0001): any other /brand/
+    // path is the host's normal 404, with its CSP.
+    for (const host of ["127.0.0.1:3000", "localhost:3000"]) {
+      const nope = await rawGet("/brand/nope", host);
+      expect(nope.status).toBe(404);
+      expect(nope.headers["content-security-policy"]).toContain("default-src");
+    }
 
     const errors: string[] = [];
     page.on("console", (message) => {
