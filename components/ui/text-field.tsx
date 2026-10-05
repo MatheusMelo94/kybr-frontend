@@ -70,7 +70,7 @@ export function TextField({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <label htmlFor={id} className="text-xs font-strong text-ink">
+      <label htmlFor={id} className="text-label font-strong text-ink">
         {label}
       </label>
       <input
@@ -94,7 +94,7 @@ export function TextField({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         className={cn(
-          "h-12 w-full rounded-lg border border-field-line bg-field px-4 text-base text-ink",
+          "h-12 w-full rounded-lg border border-field-line bg-field px-4 text-input text-ink",
           // hover: applies to fine pointers only (Tailwind 4: @media (hover: hover)).
           "hover:border-ink-muted",
           "placeholder:text-ink-muted",

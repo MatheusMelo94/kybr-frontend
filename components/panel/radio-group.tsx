@@ -59,7 +59,7 @@ export function RadioGroup({
       className={cn("flex flex-col gap-2", className)}
       disabled={disabled}
     >
-      <legend className="mb-2 text-xs font-strong text-ink">{legend}</legend>
+      <legend className="mb-2 text-label font-strong text-ink">{legend}</legend>
       {hint && (
         <p id={hintId} className="text-secondary text-ink-muted">
           {hint}

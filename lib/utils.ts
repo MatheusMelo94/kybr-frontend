@@ -7,7 +7,16 @@ import { extendTailwindMerge } from "tailwind-merge";
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ["body", "secondary", "title"],
+      text: [
+        "body",
+        "secondary",
+        "title",
+        "lead",
+        "h2",
+        "verdict",
+        "label",
+        "input",
+      ],
       "font-weight": ["title", "body", "strong", "lead"],
       container: ["link", "auth"],
       ease: ["out-quart", "in-out-quart"],

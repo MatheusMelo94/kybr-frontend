@@ -81,7 +81,7 @@ describe("TextField", () => {
   it("uses 16 px input text, so iOS doesn't zoom on focus", () => {
     render(<TextField label="CNPJ da empresa" name="cnpj" />);
 
-    expect(screen.getByRole("textbox")).toHaveClass("text-base");
+    expect(screen.getByRole("textbox")).toHaveClass("text-input");
   });
 
   it("forwards its ref to the input, so a form can focus the first invalid field", () => {

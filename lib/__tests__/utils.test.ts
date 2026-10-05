@@ -27,6 +27,11 @@ describe("cn", () => {
       );
     });
 
+    it("treats the brand v1 sizes (lead, h2, verdict, label, input) as font sizes too", () => {
+      for (const size of ["lead", "h2", "verdict", "label", "input"])
+        expect(cn(`text-${size}`, "text-ink")).toBe(`text-${size} text-ink`);
+    });
+
     it("treats font-title/-body/-strong/-lead as font weights, not families", () => {
       expect(cn("font-sans", "font-title")).toBe("font-sans font-title");
       expect(cn("font-body", "font-strong")).toBe("font-strong");

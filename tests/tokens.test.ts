@@ -68,6 +68,13 @@ const OTHER_TOKENS = {
   "--text-secondary": "0.8125rem",
   "--text-title": "2rem",
   "--text-title--line-height": "1.15",
+  // Brand v1 (identity.md › Typography)
+  "--text-lead": "1.25rem",
+  "--text-lead--line-height": "1.4",
+  "--text-h2": "1.25rem",
+  "--text-verdict": "1.625rem",
+  "--text-label": "0.75rem",
+  "--text-input": "1rem",
   "--font-weight-title": "652",
   "--font-weight-body": "456",
   "--font-weight-strong": "600",
