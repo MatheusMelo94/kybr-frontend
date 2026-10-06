@@ -36,8 +36,11 @@ import type {
 /** F12: the cursor chain's hard cap, if the backend caps `limit` (C-M6-2). */
 export const CASE_CHAIN_MAX_CALLS = 8;
 
-/** D-C5: the proof's size cap (C-M6-9). */
-export const CERTIFICATE_MAX_BYTES = 5 * 1024 * 1024;
+/**
+ * D-C5: the proof's size cap. 4 MiB, the documents' cap, under Vercel's
+ * 4.5 MB response limit (M6C-03); C-M6-9's 5 MB is asked down to it.
+ */
+export const CERTIFICATE_MAX_BYTES = 4 * 1024 * 1024;
 
 /** The body comes back raw: it's parsed here, so a failure logs shape only (F11). */
 const raw = z.unknown();

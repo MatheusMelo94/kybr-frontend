@@ -2,6 +2,7 @@
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DOCUMENT_MAX_BYTES } from "@/features/panel-fila/document-route";
 import { CERTIFICATE_MAX_BYTES } from "@/lib/api/panel/cases";
 import { FOREIGN_CASE_ID, PDF_BYTES } from "@/tests/fixtures/factories/panel";
 import {
@@ -160,8 +161,26 @@ describe("proofResponse (D-C5, AC 42, F12)", () => {
     expect((await proofResponse(caseOf("link").id)).status).toBe(502);
   });
 
-  it("the 5 MB cap is the certificate's", () => {
-    expect(CERTIFICATE_MAX_BYTES).toBe(5 * 1024 * 1024);
+  it("M6C-03: the cap is 4 MiB, the documents' (under Vercel's 4.5 MB response limit)", () => {
+    expect(CERTIFICATE_MAX_BYTES).toBe(4 * 1024 * 1024);
+    expect(CERTIFICATE_MAX_BYTES).toBe(DOCUMENT_MAX_BYTES);
+  });
+
+  it.each([
+    [4 * 1024 * 1024, 200],
+    [4 * 1024 * 1024 + 1, 502],
+  ])("a %d-byte certificate → %d", async (bytes, status) => {
+    const pdf = new Uint8Array(bytes);
+    pdf.set(PDF_BYTES);
+    pdf.set(PDF_BYTES.subarray(PDF_BYTES.length - 6), bytes - 6);
+    server.use(
+      http.get("*/v1/verifications/:id/certificate", () =>
+        HttpResponse.arrayBuffer(pdf.buffer, {
+          headers: { "Content-Type": "application/pdf" },
+        }),
+      ),
+    );
+    expect((await proofResponse(caseOf("link").id)).status).toBe(status);
   });
 });
 
