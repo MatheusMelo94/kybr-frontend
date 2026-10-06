@@ -39,6 +39,9 @@ const VERCEL_CLIENT_IP_HEADER = "x-vercel-forwarded-for";
 /** host[:port], lowercased (ADR-0008 rule 1): what a request's Host header holds. */
 export const HOST_PATTERN = /^[a-z0-9.-]+(:\d+)?$/;
 
+/** DOCUMENTS_DOMAIN_CHECKED_AT's format, the same as scripts/check-deploy-env.mjs. */
+const CHECKED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
 const host = z
   .string()
   .transform((value) => value.toLowerCase())
@@ -125,6 +128,15 @@ const serverEnvSchema = z
     // them as attachments (F4). Unset: attachment in production, until the
     // F3 check passes (T116).
     PANEL_DOCUMENTS_MODE: z.enum(["redirect", "attachment"]).optional(),
+    // When the F3 check passed, as scripts/check-documents-domain.sh prints it.
+    // Deployed production needs it before PANEL_DOCUMENTS_MODE=redirect.
+    DOCUMENTS_DOMAIN_CHECKED_AT: z
+      .string()
+      .regex(CHECKED_AT, "Must be the UTC timestamp the F3 check prints")
+      .refine((value) => !Number.isNaN(Date.parse(value)), {
+        message: "Must be the UTC timestamp the F3 check prints",
+      })
+      .optional(),
     // Set to "1" by Vercel itself at build and run time.
     VERCEL: z.string().optional(),
     // Set by Vercel: the environment, and this deployment's own URLs (no scheme).
@@ -222,6 +234,32 @@ const serverEnvSchema = z
           code: "custom",
           path: [name],
           message: "Must be an https: URL in production",
+        });
+    }
+    // The F3 gate, mirroring scripts/check-deploy-env.mjs (M6C-07) for a
+    // deployed production server: a local production build runs with
+    // API_ALLOW_LOOPBACK_HTTP, and a Vercel Preview is staging.
+    const deployedProduction =
+      env.API_ALLOW_LOOPBACK_HTTP !== "true" && env.VERCEL_ENV !== "preview";
+    if (deployedProduction) {
+      if (
+        env.PANEL_HOST !== undefined &&
+        env.PANEL_DOCUMENTS_ORIGIN === undefined
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["PANEL_DOCUMENTS_ORIGIN"],
+          message: "Required when PANEL_HOST is set in production",
+        });
+      if (
+        env.PANEL_DOCUMENTS_MODE === "redirect" &&
+        env.DOCUMENTS_DOMAIN_CHECKED_AT === undefined
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["DOCUMENTS_DOMAIN_CHECKED_AT"],
+          message:
+            "Required for PANEL_DOCUMENTS_MODE=redirect in production (the F3 check: scripts/check-documents-domain.sh)",
         });
     }
     if (env.API_BFF_KEY === undefined) {

@@ -250,6 +250,8 @@ describe("parseServerEnv", () => {
       LEGAL_PRIVACY_URL: "https://kybr.com.br/privacidade",
       LEGAL_TERMS_VERSION: "2026-10-04",
       TURNSTILE_SITE_KEY: "0x4AAAAAAAexampleKey",
+      // Required with PANEL_HOST in production (M6C-07).
+      PANEL_DOCUMENTS_ORIGIN: "https://docs.exemplo-arquivos.test",
     };
 
     it("requires LINK_HOST in production: the link 404s without it", () => {
@@ -501,12 +503,130 @@ describe("parseServerEnv", () => {
 
     it("takes redirect or attachment as the mode, nothing else", () => {
       expect(
-        parseServerEnv({ ...panel, PANEL_DOCUMENTS_MODE: "redirect" })
-          .PANEL_DOCUMENTS_MODE,
+        parseServerEnv({
+          ...panel,
+          PANEL_DOCUMENTS_ORIGIN: "https://docs.exemplo-arquivos.test",
+          PANEL_DOCUMENTS_MODE: "redirect",
+          DOCUMENTS_DOMAIN_CHECKED_AT: "2026-10-20T14:03:11Z",
+        }).PANEL_DOCUMENTS_MODE,
       ).toBe("redirect");
       expect(
         parseError({ ...panel, PANEL_DOCUMENTS_MODE: "inline" }),
       ).toContain("PANEL_DOCUMENTS_MODE");
+    });
+  });
+
+  describe("the F3 documents gate at runtime (M6C-07, mirrors check-deploy-env.mjs)", () => {
+    const panel = {
+      ...production,
+      PANEL_HOST: "app.kybr.com.br",
+      LEGAL_TERMS_URL: "https://kybr.com.br/termos",
+      LEGAL_PRIVACY_URL: "https://kybr.com.br/privacidade",
+      LEGAL_TERMS_VERSION: "2026-10-04",
+      TURNSTILE_SITE_KEY: "0x4AAAAAAAexampleKey",
+      PANEL_DOCUMENTS_ORIGIN: "https://docs.exemplo-arquivos.test",
+    };
+    const local = {
+      ...panel,
+      PANEL_HOST: "localhost:3000",
+      LINK_HOST: "localhost:3001",
+      API_BASE_URL: "http://localhost:4010",
+      API_PUBLIC_BASE_URL: "http://localhost:4010",
+      API_ALLOW_LOOPBACK_HTTP: "true",
+    };
+
+    it("requires PANEL_DOCUMENTS_ORIGIN with PANEL_HOST in production", () => {
+      expect(
+        parseError({ ...panel, PANEL_DOCUMENTS_ORIGIN: undefined }),
+      ).toContain(
+        "PANEL_DOCUMENTS_ORIGIN: Required when PANEL_HOST is set in production",
+      );
+    });
+
+    it("doesn't require PANEL_DOCUMENTS_ORIGIN with the panel off", () => {
+      expect(parseServerEnv(production).PANEL_DOCUMENTS_ORIGIN).toBeUndefined();
+    });
+
+    it("refuses PANEL_DOCUMENTS_MODE=redirect in production without DOCUMENTS_DOMAIN_CHECKED_AT", () => {
+      expect(
+        parseError({ ...panel, PANEL_DOCUMENTS_MODE: "redirect" }),
+      ).toContain(
+        "DOCUMENTS_DOMAIN_CHECKED_AT: Required for PANEL_DOCUMENTS_MODE=redirect in production",
+      );
+    });
+
+    it("takes redirect in production once the F3 check is recorded", () => {
+      expect(
+        parseServerEnv({
+          ...panel,
+          PANEL_DOCUMENTS_MODE: "redirect",
+          DOCUMENTS_DOMAIN_CHECKED_AT: "2026-10-20T14:03:11Z",
+        }),
+      ).toMatchObject({
+        PANEL_DOCUMENTS_MODE: "redirect",
+        DOCUMENTS_DOMAIN_CHECKED_AT: "2026-10-20T14:03:11Z",
+      });
+    });
+
+    it.each([
+      "yesterday",
+      "2026-10-20 14:03:11",
+      "2026-10-20T14:03:11+00:00",
+      "2026-13-45T99:99:99Z",
+    ])(
+      "refuses DOCUMENTS_DOMAIN_CHECKED_AT=%s: only the script's UTC stamp",
+      (value) => {
+        expect(
+          parseError({
+            ...panel,
+            PANEL_DOCUMENTS_MODE: "redirect",
+            DOCUMENTS_DOMAIN_CHECKED_AT: value,
+          }),
+        ).toContain("DOCUMENTS_DOMAIN_CHECKED_AT");
+      },
+    );
+
+    it("takes attachment in production without the F3 check", () => {
+      expect(
+        parseServerEnv({ ...panel, PANEL_DOCUMENTS_MODE: "attachment" })
+          .PANEL_DOCUMENTS_MODE,
+      ).toBe("attachment");
+    });
+
+    it("keeps the local production build booting: loopback with API_ALLOW_LOOPBACK_HTTP isn't Production", () => {
+      expect(
+        parseServerEnv({
+          ...local,
+          PANEL_DOCUMENTS_ORIGIN: "http://localhost:4010",
+          PANEL_DOCUMENTS_MODE: "redirect",
+        }).PANEL_DOCUMENTS_MODE,
+      ).toBe("redirect");
+      expect(
+        parseServerEnv({ ...local, PANEL_DOCUMENTS_ORIGIN: undefined })
+          .PANEL_DOCUMENTS_ORIGIN,
+      ).toBeUndefined();
+    });
+
+    it("leaves a Vercel Preview to the deploy check's staging rules", () => {
+      expect(
+        parseServerEnv({
+          ...panel,
+          VERCEL_ENV: "preview",
+          PANEL_DOCUMENTS_MODE: "redirect",
+        }).PANEL_DOCUMENTS_MODE,
+      ).toBe("redirect");
+    });
+
+    it("applies neither rule outside production", () => {
+      expect(
+        parseServerEnv({
+          ...panel,
+          ...development,
+          PANEL_HOST: "localhost:3000",
+          PANEL_DOCUMENTS_ORIGIN: undefined,
+          PANEL_DOCUMENTS_MODE: "redirect",
+        }).PANEL_DOCUMENTS_MODE,
+      ).toBe("redirect");
     });
   });
 
