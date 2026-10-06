@@ -270,6 +270,38 @@ describe("CaseDetail II: sections, partial, decided", () => {
     expect(screen.queryByRole("link", { name: /^Abrir/ })).toBeNull();
   });
 
+  it("Baixar comprovante shows on an open and a decided case (AC 42)", () => {
+    const { unmount } = render(<CaseDetail view={view()} now={NOW} />);
+    expect(
+      screen.getByRole("button", { name: "Baixar comprovante" }),
+    ).toBeVisible();
+    unmount();
+    render(
+      <CaseDetail
+        view={view({
+          estado: "decidido",
+          decisao: { tipo: "aprovar", em: "2026-10-05T13:37:00Z" },
+        })}
+        now={NOW}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Baixar comprovante" }),
+    ).toBeVisible();
+  });
+
+  it("DADOS_NAO_ENCONTRADOS has no proof, so no button (D7)", () => {
+    render(
+      <CaseDetail
+        view={view({ variante: "DADOS_NAO_ENCONTRADOS" })}
+        now={NOW}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Baixar comprovante" }),
+    ).toBeNull();
+  });
+
   it("a decided case shows the banner", () => {
     render(
       <CaseDetail

@@ -6,6 +6,7 @@ import { Consulted } from "@/features/panel-fila/components/consulted";
 import { DecidedBanner } from "@/features/panel-fila/components/decided-banner";
 import { DocumentList } from "@/features/panel-fila/components/document-list";
 import { NoDataBlock } from "@/features/panel-fila/components/no-data-block";
+import { ProofDownload } from "@/features/panel-fila/components/proof-download";
 import { PartialNotice } from "@/features/panel-fila/components/partial-notice";
 import { SellerBlock } from "@/features/panel-fila/components/seller-block";
 import { Timeline } from "@/features/panel-fila/components/timeline";
@@ -53,6 +54,10 @@ export function CaseDetail({ view, now, documentsMode }: Props): JSX.Element {
         />
       )}
       {view.eventos && <Timeline eventos={view.eventos} now={now} />}
+      {/* D7: no data means no proof. T110's action bar may move it at lg. */}
+      {view.variante !== "DADOS_NAO_ENCONTRADOS" && (
+        <ProofDownload caseId={view.id} />
+      )}
     </article>
   );
 }

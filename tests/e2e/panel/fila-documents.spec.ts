@@ -151,7 +151,7 @@ test.describe("Fila documents, attachment mode (T102, F4) @feature-ops-panel @pa
     await expect(detail.getByRole("link", { name: /^Abrir/ })).toHaveCount(0);
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      detail.getByRole("button", { name: "Baixar" }).click(),
+      detail.getByRole("button", { name: "Baixar", exact: true }).click(),
     ]);
     expect(download.suggestedFilename()).toBe("documento-cartao-cnpj.pdf");
     expect(
@@ -187,7 +187,7 @@ test.describe("Fila documents, attachment mode (T102, F4) @feature-ops-panel @pa
       downloaded = true;
     });
     const detail = page.locator("[data-pane='detail']");
-    await detail.getByRole("button", { name: "Baixar" }).click();
+    await detail.getByRole("button", { name: "Baixar", exact: true }).click();
     await expect(detail.getByRole("alert")).toHaveText(
       "Não conseguimos gerar o arquivo. Tente de novo.",
     );

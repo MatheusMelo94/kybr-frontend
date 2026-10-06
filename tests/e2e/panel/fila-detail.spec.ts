@@ -295,7 +295,8 @@ test.describe("Fila case detail II (T101) @feature-ops-panel @panel-fila", () =>
     await expect(
       detail.getByRole("link", { name: "Voltar para a fila" }),
     ).toBeVisible();
-    await expect(detail.getByRole("button")).toHaveCount(0);
+    // Spec § states: no action on a decided case but the proof (T103).
+    await expect(detail.getByRole("button")).toHaveText(["Baixar comprovante"]);
   });
 
   test("F11: an extra vendedor_email on the wire never reaches the page", async ({

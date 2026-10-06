@@ -402,7 +402,7 @@ export async function requestDocuments(
  */
 export async function streamCertificate(
   verificationId: string,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const operation = "case-certificate";
   const path = apiPaths.panel.cases.certificate(verificationId);
   const token = await sessionToken();

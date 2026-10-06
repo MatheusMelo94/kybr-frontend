@@ -63,3 +63,14 @@ export function formatDuration(ms: number): string {
   const days = Math.floor(hours / 24);
   return days === 1 ? "1 dia" : `${days} dias`;
 }
+
+/** yyyy-mm-dd in São Paulo, for file names; an invalid date is today (P5-003). */
+export function fileDay(date: Date): string {
+  const when = Number.isNaN(date.getTime()) ? new Date() : date;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(when);
+}
