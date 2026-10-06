@@ -67,7 +67,7 @@ function contatoFrom(value: unknown): ContatoVendedor | undefined {
 
 export const panelWorkspaceHandlers: RequestHandler[] = [
   http.get("*/v1/me", async ({ request }) => {
-    const { token, refused } = await incoming(request);
+    const { token, refused, call } = await incoming(request);
     if (refused) return refused;
     // A poll (X-Kybr-Poll: 1) doesn't keep the session alive (Q decision).
     const account = sessionAccount(
@@ -75,6 +75,8 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
       request.headers.get("x-kybr-poll") !== "1",
     );
     if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    // QA A40-09 / SV-05: the call log names the session's account.
+    call.email = account.email;
     // QA G4: a slow or failing /me for one account.
     const fault = takeFault(account.email, "me");
     if (fault?.kind === "delay") await delay(fault.ms ?? 1_000);
@@ -90,10 +92,11 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
     });
   }),
   http.get("*/v1/categories", async ({ request }) => {
-    const { token, refused } = await incoming(request);
+    const { token, refused, call } = await incoming(request);
     if (refused) return refused;
     const account = sessionAccount(token);
     if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    call.email = account.email;
     if (scenarioApplies("categorias-falham", account.email))
       return apiError(500, "ERRO_INTERNO");
     // QA G3: slow enough for the route's skeleton to show.
@@ -101,10 +104,11 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
     return ok([...CATEGORIES]);
   }),
   http.put("*/v1/workspace", async ({ request }) => {
-    const { body, token, refused } = await incoming(request);
+    const { body, token, refused, call } = await incoming(request);
     if (refused) return refused;
     const account = sessionAccount(token);
     if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    call.email = account.email;
     // QA G3: the save fails (500), drops, or is refused with a field.
     if (scenarioApplies("workspace-falha", account.email))
       return apiError(500, "ERRO_INTERNO");

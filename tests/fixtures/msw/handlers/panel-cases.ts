@@ -34,6 +34,7 @@ import {
   seedCases,
   sessionAccount,
   setCaseClock,
+  CASE_FAULT_KINDS,
   setCaseFault,
   takeCaseFault,
   type Account,
@@ -779,12 +780,17 @@ export const panelCaseControlHandlers: RequestHandler[] = [
     ).toLowerCase();
     return HttpResponse.json(idsView(casesOf(email).sort(bySla)));
   }),
-  // PC16 / AC 40: { email, kind?, count? } creates cases now.
+  // PC16 / AC 40: { email, kind?, count?, slaInMs? | sla_ate? } creates
+  // cases now (QA A40-02: an SLA relative to the account's clock, or an ISO).
   http.post("*/__mock/panel/cases", async ({ request }) => {
-    const { email, kind, count } = await controlBody(request);
+    const { email, kind, count, slaInMs, sla_ate } = await controlBody(request);
+    const slaAt = typeof sla_ate === "string" ? Date.parse(sla_ate) : undefined;
     if (
       typeof email !== "string" ||
-      (kind !== undefined && !(CASE_KINDS as readonly unknown[]).includes(kind))
+      (kind !== undefined &&
+        !(CASE_KINDS as readonly unknown[]).includes(kind)) ||
+      (slaInMs !== undefined && typeof slaInMs !== "number") ||
+      (sla_ate !== undefined && (slaAt === undefined || Number.isNaN(slaAt)))
     )
       return new HttpResponse(null, { status: 400 });
     const owner = email.toLowerCase();
@@ -797,7 +803,12 @@ export const panelCaseControlHandlers: RequestHandler[] = [
         email: owner,
         n: 500 + casesOf(owner).length,
         now,
-        slaInMs: REOPENED_SLA_MS,
+        slaInMs:
+          slaAt !== undefined
+            ? slaAt - now
+            : typeof slaInMs === "number"
+              ? slaInMs
+              : REOPENED_SLA_MS,
       });
       record.criado_em = now;
       record.abertoEm = now;
@@ -855,7 +866,8 @@ export const panelCaseControlHandlers: RequestHandler[] = [
     if (
       typeof email !== "string" ||
       !(CASE_ENDPOINTS as readonly unknown[]).includes(endpoint) ||
-      typeof fault !== "string"
+      (fault !== "none" &&
+        !(CASE_FAULT_KINDS as readonly unknown[]).includes(fault))
     )
       return new HttpResponse(null, { status: 400 });
     setCaseFault(

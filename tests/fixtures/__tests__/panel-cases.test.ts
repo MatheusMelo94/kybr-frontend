@@ -982,3 +982,83 @@ describe("G1, G3, G4, G5, G6: presets, derived counts, clock, call log, hostile 
     expect(parsed.ext_id).toBe("<script>");
   });
 });
+
+describe("QA's T92 review asks: SLA on new cases, /me's e-mail, long hostile strings, unknown faults", () => {
+  it("A40-02: POST /cases takes slaInMs, or an ISO sla_ate, for the new case", async () => {
+    const { email, token } = await seeded("vazia", "sla");
+    const at = "2026-10-06T15:00:00.000Z";
+    await control("POST", "/case-clock", { email, now: at });
+    const byMs = await json<Listed[]>(
+      await control("POST", "/cases", { email, slaInMs: 60_000 }),
+    );
+    const byIso = await json<Listed[]>(
+      await control("POST", "/cases", {
+        email,
+        sla_ate: "2026-10-06T14:00:00.000Z",
+      }),
+    );
+    expect((await read(token, byMs[0]?.id ?? "")).sla_ate).toBe(
+      "2026-10-06T15:01:00.000Z",
+    );
+    const late = await read(token, byIso[0]?.id ?? "");
+    expect(late.sla_ate).toBe("2026-10-06T14:00:00.000Z");
+    expect(late.vencido).toBe(true);
+    expect(
+      (await control("POST", "/cases", { email, sla_ate: "ontem" })).status,
+    ).toBe(400);
+  });
+
+  it("A40-09 / SV-05: /me, /categories and PUT /workspace log the session's e-mail", async () => {
+    const { email, token } = await seeded("vazia", "me-log");
+    await call("GET", "/v1/me", token);
+    await call("GET", "/v1/categories", token);
+    await call("PUT", "/v1/workspace", token, {});
+    const calls = await json<Record<string, unknown>[]>(
+      await control("GET", `/calls?email=${encodeURIComponent(email)}`),
+    );
+    expect(calls.map((c) => c.path)).toEqual(
+      expect.arrayContaining(["/v1/me", "/v1/categories", "/v1/workspace"]),
+    );
+  });
+
+  it("RF-01 / SV-09: hostil-longo (200 unbroken chars, 64-char ext_id) and hostil-formula (=1+1)", async () => {
+    const { email, token } = await seeded("vazia", "hostil-longo");
+    const longo = await json<Listed[]>(
+      await control("POST", "/cases", { email, kind: "hostil-longo" }),
+    );
+    const formula = await json<Listed[]>(
+      await control("POST", "/cases", { email, kind: "hostil-formula" }),
+    );
+    const a = await read(token, longo[0]?.id ?? "");
+    expect(a.razao_social).toBe("A".repeat(200));
+    expect(a.ext_id).toBe("x".repeat(64));
+    expect((await read(token, formula[0]?.id ?? "")).ext_id).toBe("=1+1");
+  });
+
+  it("cada-tipo still leaves every hostile kind out", async () => {
+    const { cases } = await seeded("cada-tipo");
+    expect(cases.some((c) => c.kind.startsWith("hostil"))).toBe(false);
+  });
+
+  it("case-fault answers 400 to an unknown fault name", async () => {
+    const email = `fault-${crypto.randomUUID().slice(0, 8)}@exemplo.test`;
+    const bad = await control("POST", "/case-fault", {
+      email,
+      endpoint: "list",
+      fault: "explode",
+    });
+    expect(bad.status).toBe(400);
+    const good = await control("POST", "/case-fault", {
+      email,
+      endpoint: "list",
+      fault: "500",
+    });
+    expect(good.status).toBe(204);
+    const none = await control("POST", "/case-fault", {
+      email,
+      endpoint: "list",
+      fault: "none",
+    });
+    expect(none.status).toBe(204);
+  });
+});

@@ -84,31 +84,34 @@ export type CaseEndpoint =
   | "doc-url"
   /** G11 lista-atrasada: armed for the next decision. */
   | "lag";
+/** Every fault kind the case-fault control accepts (anything else → 400). */
+export const CASE_FAULT_KINDS = [
+  "delay",
+  "500",
+  "503",
+  "drop",
+  /** F5: applied, then the socket is destroyed (the outcome is unknown). */
+  "drop-after",
+  /** eventos / documentos left out of the case (partial). */
+  "omit",
+  /** G11: a case that breaks the schema. */
+  "invalido",
+  "link-estranho",
+  "link-invalido",
+  "lista-atrasada",
+  /** The certificate / a document: HTML, over 5 MB, or cut short. */
+  "html",
+  "grande",
+  "truncado",
+  /** G9 / PC20: a signed URL the documents allowlist must refuse. */
+  "host-estranho",
+  "userinfo",
+  "host-parecido",
+  "porta",
+  "http-externo",
+] as const;
 export type CaseFault = {
-  kind:
-    | "delay"
-    | "500"
-    | "503"
-    | "drop"
-    /** F5: applied, then the socket is destroyed (the outcome is unknown). */
-    | "drop-after"
-    /** eventos / documentos left out of the case (partial). */
-    | "omit"
-    /** G11: a case that breaks the schema. */
-    | "invalido"
-    | "link-estranho"
-    | "link-invalido"
-    | "lista-atrasada"
-    /** The certificate / a document: HTML, over 5 MB, or cut short. */
-    | "html"
-    | "grande"
-    | "truncado"
-    /** G9 / PC20: a signed URL the documents allowlist must refuse. */
-    | "host-estranho"
-    | "userinfo"
-    | "host-parecido"
-    | "porta"
-    | "http-externo";
+  kind: (typeof CASE_FAULT_KINDS)[number];
   ms?: number;
   /** How many requests it applies to (unlimited when missing). */
   times?: number;

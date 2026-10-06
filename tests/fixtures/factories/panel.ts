@@ -661,7 +661,11 @@ export type CaseKind =
   | "aguardando"
   | "aguardando-sem-email"
   | "aguardando-alerta"
-  | "hostil";
+  | "hostil"
+  /** QA RF-01 / SV-09: a 200-char unbroken name and a 64-char ext_id. */
+  | "hostil-longo"
+  /** QA SV-09: an ext_id a spreadsheet would read as a formula. */
+  | "hostil-formula";
 
 export const CASE_KINDS: readonly CaseKind[] = [
   "link",
@@ -679,6 +683,8 @@ export const CASE_KINDS: readonly CaseKind[] = [
   "aguardando-sem-email",
   "aguardando-alerta",
   "hostil",
+  "hostil-longo",
+  "hostil-formula",
 ];
 
 export type CaseCheck = {
@@ -1044,6 +1050,17 @@ export function caseFor(
           ],
           extra: { vendedor_email: "vendedor@exemplo.test" },
         };
+      case "hostil-longo":
+        return {
+          razao_social: HOSTILE_CASE_STRINGS.longName,
+          seller: {
+            ...base.seller,
+            razao_social: HOSTILE_CASE_STRINGS.longName,
+          },
+          ext_id: HOSTILE_CASE_STRINGS.extIds[2],
+        };
+      case "hostil-formula":
+        return { ext_id: HOSTILE_CASE_STRINGS.extIds[1] };
     }
   })();
   const record = { ...base, ...patch };
@@ -1134,8 +1151,9 @@ export function casesForPreset(
     case "tres-tardios-de-trinta":
       return openCases(email, now, 30, 3);
     case "cada-tipo":
-      return CASE_KINDS.filter((kind) => kind !== "hostil").map((kind, i) =>
-        caseFor(kind, { email, n: i + 1, now, slaInMs: (i + 1) * HOUR }),
+      return CASE_KINDS.filter((kind) => !kind.startsWith("hostil")).map(
+        (kind, i) =>
+          caseFor(kind, { email, n: i + 1, now, slaInMs: (i + 1) * HOUR }),
       );
     case "limites": {
       // QA G4: SLA boundaries ("41 s", "3 min", "6 h", late "2 dias") and
