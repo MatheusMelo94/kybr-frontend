@@ -1,7 +1,15 @@
 // @vitest-environment node
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, type Server } from "node:http";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -50,9 +58,11 @@ function serve(
   });
 }
 
+/** Runs the script with the URLs on stdin, one per line (M6C-09), never argv. */
 function run(
-  args: string[],
+  urls: string[],
   env: Record<string, string> = { API_ALLOW_LOOPBACK_HTTP: "true" },
+  args: string[] = [],
 ): Promise<{ status: number | null; output: string }> {
   return new Promise((done) => {
     const child = spawn("sh", [SCRIPT, ...args], {
@@ -62,6 +72,7 @@ function run(
     child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
     child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
     child.on("close", (status) => done({ status, output }));
+    child.stdin.end(urls.map((url) => `${url}\n`).join(""));
   });
 }
 
@@ -221,9 +232,57 @@ describe("check-documents-domain.sh (T116, Security F3)", () => {
     expect(off.status).toBe(1);
   });
 
-  it("prints its usage without two URLs", async () => {
-    const { status, output } = await run([]);
+  it("prints its usage without two URLs on stdin", async () => {
+    const none = await run([]);
+    expect(none.output).toMatch(/Usage/);
+    expect(none.status).toBe(2);
+
+    const one = await run([`https://docs.exemplo.test/pdf?${SIG}`]);
+    expect(one.output).toMatch(/Usage/);
+    expect(one.status).toBe(2);
+  });
+
+  it("M6C-09: refuses URLs as arguments (shell history, ps) without echoing them", async () => {
+    const url = `https://docs.exemplo.test/pdf?${SIG}`;
+    const { status, output } = await run([], undefined, [url, url]);
     expect(output).toMatch(/Usage/);
+    expect(output).toMatch(/stdin/);
+    expect(output).not.toContain("s3cr3t");
     expect(status).toBe(2);
+  });
+
+  it("M6C-09: reads CRLF lines and passes the URLs to node and curl off their argv", async () => {
+    const base = await serve({
+      "/__docs/pdf": { headers: PDF },
+      "/__docs/png": { headers: PNG },
+    });
+    // Shims record every argv node and curl get, then run the real binary.
+    const bin = mkdtempSync(join(tmpdir(), "f3-argv-"));
+    const log = join(bin, "argv.log");
+    for (const [name, real] of [
+      ["node", process.execPath],
+      ["curl", execFileSync("sh", ["-c", "command -v curl"]).toString().trim()],
+    ] as const) {
+      writeFileSync(
+        join(bin, name),
+        `#!/bin/sh\nprintf '%s\\n' "${name} $*" >> "${log}"\nexec "${real}" "$@"\n`,
+      );
+      chmodSync(join(bin, name), 0o755);
+    }
+    try {
+      const { status, output } = await run(
+        [`${base}/__docs/pdf?${SIG}\r`, `${base}/__docs/png?${SIG}\r`],
+        { API_ALLOW_LOOPBACK_HTTP: "true", PATH: `${bin}:${process.env.PATH}` },
+      );
+      expect(output).toContain("PASSED");
+      expect(status).toBe(0);
+      const argv = readFileSync(log, "utf8");
+      expect(argv).toMatch(/^curl /m);
+      expect(argv).toMatch(/^node /m);
+      expect(argv).not.toContain("s3cr3t");
+      expect(argv).not.toContain("/__docs/");
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
   });
 });
