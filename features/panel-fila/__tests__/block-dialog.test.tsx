@@ -20,6 +20,7 @@ import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { FilaProvider } from "@/features/panel-fila/components/fila-provider";
 import { FILA_TAB_ACTIVE_ID } from "@/features/panel-fila/components/fila-tabs";
 import { DECIDE_TIMEOUT_MS } from "@/features/panel-fila/limits";
+import { SessionExpiryProvider } from "@/features/panel-shell/components/session-expiry-provider";
 import {
   ShellStatusProvider,
   useShellStatus,
@@ -351,6 +352,38 @@ describe("Bloquear dialog (T107; AC 38; D10; F5, F6, F7)", () => {
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(router.push).not.toHaveBeenCalled();
     expect(toastText()).toBe("");
+  });
+
+  it("AC 7 (P6-010): a reason only is a dirty draft: SESSAO_EXPIRADA brings perdido=1", async () => {
+    const assign = vi.fn();
+    const location = vi.spyOn(window, "location", "get").mockReturnValue({
+      ...window.location,
+      pathname: "/fila/caso-a",
+      search: "",
+      assign,
+    });
+    try {
+      decideAction.mockResolvedValueOnce({
+        ok: false,
+        code: "SESSAO_EXPIRADA",
+      });
+      // The shell's draft registry (useDialogDraft) says what was lost.
+      render(
+        <SessionExpiryProvider>
+          <Screen caseId="caso-a" />
+        </SessionExpiryProvider>,
+      );
+      await openWith("MEI acima do limite");
+      await act(async () => fireEvent.click(submit()));
+      await flush();
+      expect(assign).toHaveBeenCalledTimes(1);
+      const url = new URL(String(assign.mock.calls[0]?.[0]), "https://x");
+      expect(url.pathname).toBe("/entrar");
+      expect(url.searchParams.get("motivo")).toBe("sessao");
+      expect(url.searchParams.get("perdido")).toBe("1");
+    } finally {
+      location.mockRestore();
+    }
   });
 
   it("Q9: Esc or Cancelar when idle closes, focus returns to Bloquear, and the draft is gone on reopen", async () => {
