@@ -99,6 +99,9 @@ export function initMonitoring(dsn: string | undefined): void {
  *   PANEL_HOST_MISMATCH (a panel route or action off the panel host),
  *   SESSION_REJECTED (a sent session got a 401), TURNSTILE_FAILED (the API
  *   refused the token).
+ * - The Fila's (M6, F8, F11): CASE_SCHEMA_INVALID (a case response failed
+ *   its schema; paths only), LINK_VENDEDOR_INVALID (a seller link failed
+ *   parseLinkVendedor and was dropped).
  */
 export const MARKERS = [
   "REDIRECT_REFUSED",
@@ -106,6 +109,8 @@ export const MARKERS = [
   "PANEL_HOST_MISMATCH",
   "SESSION_REJECTED",
   "TURNSTILE_FAILED",
+  "CASE_SCHEMA_INVALID",
+  "LINK_VENDEDOR_INVALID",
 ] as const;
 
 export type Marker = (typeof MARKERS)[number];
