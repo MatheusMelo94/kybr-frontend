@@ -7,6 +7,7 @@ import { FormAlert } from "@/components/panel/form-alert";
 import { RadioGroup } from "@/components/panel/radio-group";
 import { TextArea } from "@/components/panel/text-area";
 import { Button } from "@/components/ui/button";
+import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { NOTA_VENDEDOR_MAX } from "@/features/panel-fila/limits";
 import { useDecisionFlow } from "@/features/panel-fila/use-decision-flow";
@@ -46,6 +47,7 @@ export function BlockDialog({
   offline,
 }: Props): JSX.Element {
   const { target, call, advance, conflict, unknown } = useDecisionFlow();
+  const { focusCase } = useFila();
   const arm = useNavigationGuard();
   const expire = useSessionExpiry();
   const [open, setOpen] = useState(false);
@@ -101,6 +103,9 @@ export function BlockDialog({
       case "CASO_JA_DECIDIDO":
         close();
         conflict(caseId, result.decididoEm, here);
+        // The trigger the dialog returns focus to unmounts with the
+        // decided state: the case's heading takes it (P6-003, as useDecide).
+        if (here) focusCase(caseId);
         return;
       case "MOTIVO_OBRIGATORIO":
         setReasonError(true);

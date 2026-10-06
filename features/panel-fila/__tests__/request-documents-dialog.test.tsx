@@ -409,7 +409,14 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     requestDocumentsAction.mockReset();
   });
 
-  it("409: the dialog closes and T106's conflict state shows; no toast, no navigation", async () => {
+  it("the conflict notice's polite region is mounted, empty, before any conflict (P6-003)", () => {
+    const { container } = render(<Screen caseId="caso-a" />);
+    const region = container.querySelector("[data-fila-conflict]");
+    expect(region).not.toBeNull();
+    expect(region).toHaveTextContent("");
+  });
+
+  it("409: the dialog closes and T106's conflict state shows, announced in the detail's polite region, with focus on the case's heading (P6-003); no toast, no navigation", async () => {
     requestDocumentsAction.mockResolvedValueOnce({
       ok: false,
       code: "CASO_JA_DECIDIDO",
@@ -420,9 +427,15 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     await act(async () => fireEvent.click(submit()));
     await flush();
     expect(dialog()).toBeNull();
-    expect(
-      screen.getByText("Este caso já tinha sido decidido em 06/10, 10:05."),
-    ).toBeInTheDocument();
+    const notice = screen.getByText(
+      "Este caso já tinha sido decidido em 06/10, 10:05.",
+    );
+    expect(notice.closest("[data-fila-conflict]")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
+    // The trigger unmounts once the re-read shows the decided state.
+    expect(screen.getByText("Caso caso-a")).toHaveFocus();
     expect(router.push).not.toHaveBeenCalled();
     expect(toastText()).toBe("");
   });

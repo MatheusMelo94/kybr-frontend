@@ -355,6 +355,9 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     await expect(
       page.getByText(/^Este caso já tinha sido decidido em /),
     ).toBeVisible();
+    await expect(page.getByText(/^Decidido: /)).toBeVisible();
+    // P6-003: focus on the case's heading, not <body>.
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
     await expect(
       page.getByRole("status").filter({ hasText: "Documento pedido:" }),

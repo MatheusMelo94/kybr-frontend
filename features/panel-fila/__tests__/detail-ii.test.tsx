@@ -320,12 +320,12 @@ describe("CaseDetail II: sections, partial, decided", () => {
     ).toBeVisible();
   });
 
-  it("the decided notice slot (T106's ConflictNotice) sits under the decided banner, only on a decided case", () => {
+  it("the decided notice slot (T106's ConflictNotice, a live region) is mounted on every case (P6-003), under the decided banner once decided", () => {
     const notice = <p>conflito</p>;
     const { unmount } = render(
       <CaseDetail view={view()} now={NOW} decidedNotice={notice} />,
     );
-    expect(screen.queryByText("conflito")).toBeNull();
+    expect(screen.getByText("conflito")).toBeInTheDocument();
     unmount();
     render(
       <CaseDetail

@@ -15,22 +15,26 @@ type Props = {
 
 /**
  * The conflict flash (AC 35): this case had been decided elsewhere when
- * Renata decided it. Next to DecidedBanner, which shows the decision.
+ * Renata decided it. Next to DecidedBanner, which shows the decision. The
+ * polite region mounts with the detail and only its text changes, so the
+ * conflict is announced (P6-003; plan § 8).
  */
-export function ConflictNotice({
-  caseId,
-  decididoEm,
-}: Props): JSX.Element | null {
+export function ConflictNotice({ caseId, decididoEm }: Props): JSX.Element {
   const { flash } = useFila();
   const conflict = flash[caseId];
-  if (conflict?.kind !== "conflict") return null;
-  const em = conflict.decididoEm ?? decididoEm;
-  if (em === undefined) return null;
+  const em =
+    conflict?.kind === "conflict"
+      ? (conflict.decididoEm ?? decididoEm)
+      : undefined;
   return (
-    <p className="text-body text-ink tabular-nums">
-      {fill(filaCopy["fila.decide.conflict"], {
-        data_hora: formatDataHora(em),
-      })}
-    </p>
+    <div data-fila-conflict aria-live="polite">
+      {em !== undefined && (
+        <p className="text-body text-ink tabular-nums">
+          {fill(filaCopy["fila.decide.conflict"], {
+            data_hora: formatDataHora(em),
+          })}
+        </p>
+      )}
+    </div>
   );
 }

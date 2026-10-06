@@ -47,11 +47,10 @@ export function CaseDetail({
     <article className="@container/detail flex flex-col gap-6">
       <VerdictHeader view={view} />
       {view.estado === "decidido" && view.decisao && (
-        <>
-          <DecidedBanner decisao={view.decisao} />
-          {decidedNotice}
-        </>
+        <DecidedBanner decisao={view.decisao} />
       )}
+      {/* A live region: mounted with the detail, decided or not (P6-003). */}
+      {decidedNotice}
       {view.origem === "monitoramento" && view.mudanca && (
         <ChangeBlock mudanca={view.mudanca} />
       )}

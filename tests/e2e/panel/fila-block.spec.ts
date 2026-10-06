@@ -186,6 +186,8 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
       page.getByText(/^Este caso já tinha sido decidido em /),
     ).toBeVisible();
     await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible();
+    // P6-003: focus on the case's heading, not <body>.
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
     await expect(
       page.getByRole("status").filter({ hasText: "Bloqueado:" }),

@@ -47,7 +47,7 @@ export function RequestDocumentsDialog({
   offline,
 }: Props): JSX.Element {
   const { target, request, advance, conflict, unknown } = useDecisionFlow();
-  const { setFlash } = useFila();
+  const { setFlash, focusCase } = useFila();
   const arm = useNavigationGuard();
   const expire = useSessionExpiry();
   const [open, setOpen] = useState(false);
@@ -106,6 +106,9 @@ export function RequestDocumentsDialog({
       case "CASO_JA_DECIDIDO":
         close();
         conflict(caseId, result.decididoEm, here);
+        // The trigger the dialog returns focus to unmounts with the
+        // decided state: the case's heading takes it (P6-003, as useDecide).
+        if (here) focusCase(caseId);
         return;
       case "NETWORK":
       case "UNAVAILABLE":

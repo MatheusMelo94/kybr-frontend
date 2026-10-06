@@ -381,6 +381,8 @@ test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @fea
     ).toBeVisible();
     await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible();
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+    // P6-003: focus on the case's heading, not <body>.
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
     await expect(
       page.getByRole("status").filter({ hasText: "Aprovado:" }),
