@@ -634,6 +634,22 @@ export const panelDocumentHandlers: RequestHandler[] = [
         },
       });
     }
+    if (fault?.kind === "tamanho" && fault.bytes !== undefined) {
+      // A real PDF head and tail, padded in the middle to the exact size.
+      const sized = new Uint8Array(fault.bytes).fill(0x20);
+      sized.set(PDF_BYTES.slice(0, Math.min(PDF_BYTES.length, fault.bytes)));
+      const tail = new TextEncoder().encode("\n%%EOF\n");
+      if (fault.bytes >= PDF_BYTES.length + tail.length)
+        sized.set(tail, fault.bytes - tail.length);
+      return new HttpResponse(sized, {
+        status: 200,
+        headers: {
+          ...headers,
+          "Content-Type": "application/pdf",
+          "Content-Disposition": 'inline; filename="documento.pdf"',
+        },
+      });
+    }
     if (fault?.kind === "truncado")
       return new HttpResponse(PDF_BYTES.slice(0, 24), {
         status: 200,
@@ -686,7 +702,11 @@ const CASE_ENDPOINTS: readonly CaseEndpoint[] = [
 /** T92's named seeds (PC12, PC18–PC22) and QA's G9 / G11, as per-account faults. */
 const NAMED_SEEDS: Record<
   string,
-  (n: number | undefined, ms: number | undefined) => [CaseEndpoint, CaseFault][]
+  (
+    n: number | undefined,
+    ms: number | undefined,
+    bytes: number | undefined,
+  ) => [CaseEndpoint, CaseFault][]
 > = {
   "decide-falha": (n) => [["decide", { kind: "503", times: n ?? 1 }]],
   "decide-lento": (n, ms) => [
@@ -734,6 +754,9 @@ const NAMED_SEEDS: Record<
   "doc-html": () => [["documento", { kind: "html" }]],
   "doc-grande": () => [["documento", { kind: "grande" }]],
   "doc-truncado": () => [["documento", { kind: "truncado" }]],
+  // DR-15: { bytes } is required (a positive integer); see the case-seed control.
+  "doc-tamanho": (_n, _ms, bytes) =>
+    bytes === undefined ? [] : [["documento", { kind: "tamanho", bytes }]],
   "doc-falha": (n) => [
     ["documento", { kind: "500", ...(n !== undefined && { times: n }) }],
   ],
@@ -885,13 +908,22 @@ export const panelCaseControlHandlers: RequestHandler[] = [
   }),
   // T92's named seeds: { email, seed, n?, ms? } (always per account).
   http.post("*/__mock/panel/case-seed", async ({ request }) => {
-    const { email, seed, n, ms } = await controlBody(request);
+    const { email, seed, n, ms, bytes } = await controlBody(request);
     const make = typeof seed === "string" ? NAMED_SEEDS[seed] : undefined;
-    if (typeof email !== "string" || !make)
+    const size =
+      typeof bytes === "number" && Number.isSafeInteger(bytes) && bytes > 0
+        ? bytes
+        : undefined;
+    if (
+      typeof email !== "string" ||
+      !make ||
+      (seed === "doc-tamanho" && size === undefined)
+    )
       return new HttpResponse(null, { status: 400 });
     for (const [endpoint, fault] of make(
       typeof n === "number" ? n : undefined,
       typeof ms === "number" ? ms : undefined,
+      size,
     ))
       setCaseFault(email, endpoint, fault);
     return new HttpResponse(null, { status: 204 });

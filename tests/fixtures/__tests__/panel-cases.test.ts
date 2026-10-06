@@ -829,6 +829,32 @@ describe("PC20, G9: signed document URLs and the documents origin", () => {
     await check(await fetch(url));
   });
 
+  it.each([4_194_304, 4_194_305, 10 * 1024 * 1024])(
+    "DR-15: doc-tamanho { bytes: %d } serves a PDF of exactly that size",
+    async (bytes) => {
+      const { email, token, cases } = await seeded("hostil");
+      await control("POST", "/case-seed", {
+        email,
+        seed: "doc-tamanho",
+        bytes,
+      });
+      const url =
+        (await read(token, cases[0]?.id ?? "")).documentos?.[0]?.url ?? "";
+      const body = new Uint8Array(await (await fetch(url)).arrayBuffer());
+      expect(body.byteLength).toBe(bytes);
+      expect(new TextDecoder().decode(body.slice(0, 5))).toBe("%PDF-");
+      expect(new TextDecoder().decode(body.slice(-6))).toContain("%%EOF");
+    },
+  );
+
+  it("DR-15: doc-tamanho without a positive integer bytes is a 400", async () => {
+    const { email } = await seeded("hostil");
+    expect(
+      (await control("POST", "/case-seed", { email, seed: "doc-tamanho" }))
+        .status,
+    ).toBe(400);
+  });
+
   it("F1: the docs origin is readable by the E2E", async () => {
     expect(await json(await control("GET", "/docs-origin"))).toEqual({
       origin: "https://documentos.exemplo.test",

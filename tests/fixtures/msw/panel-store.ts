@@ -103,6 +103,8 @@ export const CASE_FAULT_KINDS = [
   "html",
   "grande",
   "truncado",
+  /** DR-15: a valid PDF of exactly `bytes` bytes (the 4 MiB attachment boundary). */
+  "tamanho",
   /** G9 / PC20: a signed URL the documents allowlist must refuse. */
   "host-estranho",
   "userinfo",
@@ -117,6 +119,8 @@ export type CaseFault = {
   times?: number;
   /** lista-atrasada: how many list reads still show the decided case. */
   reads?: number;
+  /** tamanho: the document's exact size. */
+  bytes?: number;
 };
 
 /** QA G4: a per-account fault on one batch endpoint. */
