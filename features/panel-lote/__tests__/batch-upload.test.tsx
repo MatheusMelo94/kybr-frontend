@@ -218,6 +218,31 @@ describe("BatchUpload: starting a batch (T80, AC 16, 18, 19)", () => {
     expect(hook.build).toHaveBeenCalledTimes(1);
   });
 
+  it("P5-001: a rejected action (offline, 411/413 from middleware) → error.network as an alert, the preview kept; the retry reuses the key and the rows", async () => {
+    start.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    start.mockResolvedValueOnce({
+      ok: true,
+      id: "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+    });
+    startPreview();
+    await act(async () => fireEvent.click(cta()));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Não conseguimos falar com o servidor. Confira sua conexão e tente de novo.",
+    );
+    expect(cta()).not.toHaveAttribute("aria-busy");
+    expect(
+      screen.getByRole("heading", { name: "Confira antes de verificar" }),
+    ).toBeVisible();
+    await act(async () => fireEvent.click(cta()));
+    const [first, second] = start.mock.calls.map(([input]) => input);
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
+    expect(second.linhas).toBe(first.linhas);
+    expect(hook.build).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith(
+      "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+    );
+  });
+
   it("402 → the over-allowance state with the server's disponiveis", async () => {
     start.mockResolvedValue({ ok: false, code: "SEM_SALDO", disponiveis: 50 });
     startPreview();

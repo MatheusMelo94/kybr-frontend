@@ -136,6 +136,11 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
       if (result.code === "SESSAO_EXPIRADA") expire();
       else if (result.code === "SEM_SALDO") setServerLeft(result.disponiveis);
       else setStartError(true);
+    } catch {
+      // P5-001: the action itself rejected (offline, a dropped connection, a
+      // new deploy's action id, middleware's 411/413): the same error.network,
+      // and the key and rows stay for the retry (A-X7).
+      setStartError(true);
     } finally {
       setBusy(false);
     }
