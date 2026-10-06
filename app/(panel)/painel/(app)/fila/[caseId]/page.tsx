@@ -12,6 +12,7 @@ import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
 import { FilaTabs } from "@/features/panel-fila/components/fila-tabs";
 import { ListSkeleton } from "@/features/panel-fila/components/list-skeleton";
+import { RequestLinkPanel } from "@/features/panel-fila/components/request-link-panel";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { documentsSettings } from "@/features/panel-fila/document-route";
 import { parseFilaSearch } from "@/features/panel-fila/search-params";
@@ -79,6 +80,11 @@ export default async function CasePage({
                       decididoEm={result.case.decisao?.em}
                     />
                   }
+                />
+                {/* D11: whenever the case has link_vendedor (no seller e-mail). */}
+                <RequestLinkPanel
+                  caseId={result.case.id}
+                  link={result.case.link_vendedor}
                 />
                 {/* The only owner of decideAction and requestDocumentsAction (ADR-0008 Addendum 2, F7). */}
                 {result.case.estado !== "decidido" && (

@@ -151,6 +151,114 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     expect(await requestPosts(request, email)).toHaveLength(1);
   });
 
+  test("T109 (AC 37 after, F9): the link panel with focus on doc.link.h; Copiar link fills the clipboard and toasts; it shows again on a later visit; the link never reaches the title, the URL, a toast or the console", async ({
+    page,
+    request,
+    context,
+    browserName,
+  }, testInfo) => {
+    test.skip(browserName !== "chromium", "clipboard permissions: chromium");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const email = uniqueEmail("fila-pedir-link", testInfo);
+    await createAccount(request, email);
+    await seedCases(request, email, "cada-tipo");
+    const target = (await openCases(request, email)).find(
+      (c) => c.kind === "link-sem-email",
+    );
+    const consoleText: string[] = [];
+    page.on("console", (message) => consoleText.push(message.text()));
+    await logIn(page, email);
+    const response = await page.goto(`/fila/${target?.id}`);
+    // F9: clipboard-write is left unrestricted (or self only).
+    const policy = response?.headers()["permissions-policy"] ?? "";
+    expect(
+      !policy.includes("clipboard-write") ||
+        policy.includes("clipboard-write=(self)"),
+    ).toBe(true);
+
+    await openRequest(page);
+    await requestDialog(page)
+      .getByRole("checkbox", { name: "Cartão CNPJ atualizado" })
+      .check();
+    await submitButton(page).click();
+    await expect(requestDialog(page)).toBeHidden();
+    const heading = page.getByRole("heading", {
+      name: "Pedido criado. Envie este link ao vendedor:",
+    });
+    await expect(heading).toBeFocused();
+    const field = page.getByRole("textbox", { name: /^Pedido criado/ });
+    await expect(field).toHaveValue(/^https?:\/\/[^/]+\/v\/[^/]+\/c\//);
+    const link = await field.inputValue();
+    await expect(field).toHaveAttribute("readonly", "");
+
+    await page.getByRole("button", { name: "Copiar link" }).click();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Link copiado" }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      link,
+    );
+
+    const leaks = async () => [
+      await page.title(),
+      page.url(),
+      ...(await page.getByRole("status").allTextContents()),
+      ...consoleText,
+    ];
+    for (const text of await leaks()) expect(text).not.toContain(link);
+
+    // A later visit (the case is now in Aguardando vendedor): the panel again.
+    await page.goto("/fila?aba=aguardando");
+    await page.goto(`/fila/${target?.id}?aba=aguardando`);
+    await expect(field).toHaveValue(link);
+    await expect(heading).not.toBeFocused();
+    for (const text of await leaks()) expect(text).not.toContain(link);
+  });
+
+  test("T109: a clipboard rejection → copy.error with the whole link selected", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("fila-pedir-copia", testInfo);
+    await createAccount(request, email);
+    await seedCases(request, email, "cada-tipo");
+    const target = (await openCases(request, email)).find(
+      (c) => c.kind === "link-sem-email",
+    );
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: () =>
+            Promise.reject(new DOMException("no", "NotAllowedError")),
+        },
+      });
+    });
+    await logIn(page, email);
+    await page.goto(`/fila/${target?.id}`);
+    await openRequest(page);
+    await requestDialog(page)
+      .getByRole("checkbox", { name: "Cartão CNPJ atualizado" })
+      .check();
+    await submitButton(page).click();
+    const field = page.getByRole("textbox", { name: /^Pedido criado/ });
+    await expect(field).toBeVisible();
+    await page.getByRole("button", { name: "Copiar link" }).click();
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Não conseguimos copiar" }),
+    ).toHaveText(
+      "Não conseguimos copiar. Selecione o link e copie manualmente.",
+    );
+    await expect(field).toBeFocused();
+    const value = await field.inputValue();
+    expect(
+      await field.evaluate((input: HTMLInputElement) => [
+        input.selectionStart,
+        input.selectionEnd,
+      ]),
+    ).toEqual([0, value.length]);
+  });
+
   test("a failure (503): error.network in the dialog, the values kept, the case in place; the retry succeeds", async ({
     page,
     request,

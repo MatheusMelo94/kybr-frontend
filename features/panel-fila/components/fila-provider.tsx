@@ -32,11 +32,14 @@ type Removal = { id: string; next: string | null } | null;
 
 /**
  * A decision's outcome shown on its case (plan-m6 § 3.3): decide-error
- * (a failure or an unknown outcome) or conflict (a 409, decided elsewhere).
+ * (a failure or an unknown outcome), conflict (a 409, decided elsewhere) or
+ * requested (Pedir documento with no seller e-mail, D11: the action's link
+ * until the case re-renders with its own).
  */
 export type Flash =
   | { kind: "decide-error" }
-  | { kind: "conflict"; decididoEm: string | undefined };
+  | { kind: "conflict"; decididoEm: string | undefined }
+  | { kind: "requested"; link: string | undefined };
 
 /** The list as rendered: its ids in order and its ?aba=&ate= (the next case, D5). */
 type ListSnapshot = { ids: readonly string[]; query: string };

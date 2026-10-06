@@ -19,6 +19,7 @@ import { ConflictNotice } from "@/features/panel-fila/components/conflict-notice
 import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { FilaProvider } from "@/features/panel-fila/components/fila-provider";
 import { FILA_TAB_ACTIVE_ID } from "@/features/panel-fila/components/fila-tabs";
+import { RequestLinkPanel } from "@/features/panel-fila/components/request-link-panel";
 import { DECIDE_TIMEOUT_MS } from "@/features/panel-fila/limits";
 import {
   ShellStatusProvider,
@@ -119,6 +120,7 @@ function Screen({
                 Caso {caseId}
               </h2>
               <ConflictNotice caseId={caseId} decididoEm={undefined} />
+              <RequestLinkPanel caseId={caseId} link={undefined} />
               <CaseActions
                 caseId={caseId}
                 origem="link"
@@ -325,6 +327,19 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     expect(toastText()).toContain("Documento pedido: Empresa caso-a");
     expect(router.push).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
+    // T109: the action's link at once, with focus on doc.link.h.
+    await act(
+      async () =>
+        new Promise<void>((done) => requestAnimationFrame(() => done())),
+    );
+    expect(
+      screen.getByRole("heading", {
+        name: "Pedido criado. Envie este link ao vendedor:",
+      }),
+    ).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: /^Pedido criado/ })).toHaveValue(
+      "https://kybr.test/v/abc/c/AAAAAAAAAAAAAAAAAAAAAA",
+    );
   });
 
   it.each(["UNAVAILABLE", "DOCUMENTO_NAO_HABILITADO", "VALOR_INVALIDO"])(

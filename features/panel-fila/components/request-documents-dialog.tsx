@@ -7,6 +7,7 @@ import { Dialog } from "@/components/panel/dialog";
 import { FormAlert } from "@/components/panel/form-alert";
 import { TextArea } from "@/components/panel/text-area";
 import { Button } from "@/components/ui/button";
+import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { NOTA_VENDEDOR_MAX } from "@/features/panel-fila/limits";
 import { useDecisionFlow } from "@/features/panel-fila/use-decision-flow";
@@ -31,9 +32,10 @@ type Props = {
  * enabled types, the optional note and the plural submit. Non-optimistic by
  * rule (F6), like Bloquear: nothing leaves the list until ok. Then, with a
  * seller e-mail, toast.requested and the next case (D5); without one, the
- * screen stays on the case for T109's link panel (D11). Failures stay in the
- * dialog with error.network and the values (D10, DOCUMENTO_NAO_HABILITADO
- * included); a 409 closes it on T106's conflict state.
+ * screen stays on the case and RequestLinkPanel shows the link (D11).
+ * Failures stay in the dialog with error.network and the values (D10,
+ * DOCUMENTO_NAO_HABILITADO included); a 409 closes it on T106's conflict
+ * state.
  */
 export function RequestDocumentsDialog({
   caseId,
@@ -42,6 +44,7 @@ export function RequestDocumentsDialog({
   vendedorTemEmail,
 }: Props): JSX.Element {
   const { target, request, advance, conflict, unknown } = useDecisionFlow();
+  const { setFlash } = useFila();
   const arm = useNavigationGuard();
   const expire = useSessionExpiry();
   const [open, setOpen] = useState(false);
@@ -88,6 +91,9 @@ export function RequestDocumentsDialog({
         here && vendedorTemEmail,
         fill(filaCopy["toast.requested"], { razao_social: razao }),
       );
+      // T109's panel shows the result's link at once, focused.
+      if (here && !vendedorTemEmail)
+        setFlash(caseId, { kind: "requested", link: result.linkVendedor });
       return;
     }
     switch (result.code) {
