@@ -1,0 +1,60 @@
+import type { JSX } from "react";
+
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
+import { filaCopy } from "@/features/panel-fila/copy";
+import { formatDataHora } from "@/features/panel-fila/format";
+import { globalCopy } from "@/features/panel-shell/copy/global";
+import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
+import { fill } from "@/features/panel-shell/format";
+import type { CaseDocumentView } from "@/lib/api/panel/cases";
+
+type Props = {
+  caseId: string;
+  documentos: readonly CaseDocumentView[];
+};
+
+/**
+ * The seller's documents (spec AC 29). "Abrir" goes to the panel's own
+ * route, which redirects to a fresh signed URL (D6, T102): the page never
+ * holds a document URL (F1).
+ */
+export function DocumentList({ caseId, documentos }: Props): JSX.Element {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-body font-strong text-ink">
+        {filaCopy["fila.docs.h"]}
+      </h3>
+      {documentos.length === 0 ? (
+        <p className="text-body text-ink-muted">
+          {filaCopy["fila.docs.empty"]}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {documentos.map((doc) => (
+            <li
+              key={doc.id}
+              className="flex flex-wrap items-center justify-between gap-x-4"
+            >
+              <span className="text-body text-ink tabular-nums">
+                {fill(filaCopy["fila.docs.item"], {
+                  documento: filaCopy[`documento.${doc.tipo}`],
+                  data_hora: formatDataHora(doc.enviadoEm),
+                })}
+              </span>
+              {/* A route handler, not a page: a plain link (FA § Routing). */}
+              <a
+                href={`/fila/${encodeURIComponent(caseId)}/documentos/${encodeURIComponent(doc.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={PANEL_LINK}
+              >
+                {filaCopy["fila.docs.open"]}{" "}
+                <VisuallyHidden>{globalCopy["common.new_tab"]}</VisuallyHidden>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

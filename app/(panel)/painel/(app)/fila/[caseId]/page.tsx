@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense, type JSX } from "react";
 
+import { BackLink } from "@/features/panel-fila/components/back-link";
 import { CaseDetail } from "@/features/panel-fila/components/case-detail";
+import { CaseDetailError } from "@/features/panel-fila/components/case-detail-error";
 import { CaseList } from "@/features/panel-fila/components/case-list";
 import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
@@ -57,13 +59,17 @@ export default async function CasePage({
       }
       detail={
         <DetailPane caseId={caseId}>
-          {result.ok ? (
-            <CaseDetail view={result.case} />
-          ) : (
-            <p className="text-body text-ink">
-              {filaCopy["fila.detail.error"]}
-            </p>
-          )}
+          <div className="flex flex-col gap-4">
+            <BackLink
+              search={search}
+              always={result.ok && result.case.estado === "decidido"}
+            />
+            {result.ok ? (
+              <CaseDetail view={result.case} now={new Date()} />
+            ) : (
+              <CaseDetailError />
+            )}
+          </div>
         </DetailPane>
       }
     />

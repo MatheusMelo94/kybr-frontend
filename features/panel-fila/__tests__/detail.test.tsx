@@ -199,7 +199,9 @@ describe("CheckList (AC 30, C-M6-6)", () => {
 
 describe("CaseDetail (AC 31, 32)", () => {
   it("is the @container/detail; consulted with {data_hora}", () => {
-    const { container } = render(<CaseDetail view={view()} />);
+    const { container } = render(
+      <CaseDetail view={view()} now={new Date("2026-10-06T15:00:00Z")} />,
+    );
     expect(container.firstElementChild).toHaveClass("@container/detail");
     expect(screen.getByText("Consultado em 05/10, 10:37")).toBeInTheDocument();
   });
@@ -207,6 +209,7 @@ describe("CaseDetail (AC 31, 32)", () => {
   it("modo cache → fila.consulted.cache", () => {
     render(
       <CaseDetail
+        now={new Date("2026-10-06T15:00:00Z")}
         view={view({
           verification: { ...view().verification, modo: "cache" },
         })}
@@ -220,6 +223,7 @@ describe("CaseDetail (AC 31, 32)", () => {
   it("origem monitoramento: O que mudou above the checks", () => {
     render(
       <CaseDetail
+        now={new Date("2026-10-06T15:00:00Z")}
         view={view({
           origem: "monitoramento",
           mudanca: {
@@ -247,13 +251,14 @@ describe("CaseDetail (AC 31, 32)", () => {
   });
 
   it("no O que mudou outside monitoramento", () => {
-    render(<CaseDetail view={view()} />);
+    render(<CaseDetail view={view()} now={new Date("2026-10-06T15:00:00Z")} />);
     expect(screen.queryByRole("heading", { name: "O que mudou" })).toBeNull();
   });
 
   it("DADOS_NAO_ENCONTRADOS: fila.nodata.body in place of the checks", () => {
     render(
       <CaseDetail
+        now={new Date("2026-10-06T15:00:00Z")}
         view={view({
           variante: "DADOS_NAO_ENCONTRADOS",
           verification: { ...view().verification, checagens: [] },
