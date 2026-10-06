@@ -5,7 +5,8 @@ import { createAccount, logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
 
 // T99: selection — the listbox opens cases, /fila auto-selects the oldest at
 // lg (D4), the case-switch skeleton, focus and scroll (AC 27 selection
-// half, AC 41 deep-link half, AC 45 list half).
+// half, AC 41 deep-link half, AC 45 list half). The case heading is
+// [data-detail-heading]:visible (D9: an h1 below lg, an h2 at lg, T100).
 
 async function openIds(
   request: Parameters<typeof casesFor>[0],
@@ -36,8 +37,10 @@ test.describe("Fila selection (T99) @feature-ops-panel @panel-fila", () => {
       "true",
     );
     // A deep link (auto-select included) moves no focus.
-    await expect(page.locator("[data-detail-heading]")).toBeVisible();
-    await expect(page.locator("[data-detail-heading]")).not.toBeFocused();
+    await expect(page.locator("[data-detail-heading]:visible")).toBeVisible();
+    await expect(
+      page.locator("[data-detail-heading]:visible"),
+    ).not.toBeFocused();
   });
 
   test("keyboard: Tab into the list, Down ×2, Enter → the third case, its heading focused", async ({
@@ -60,7 +63,7 @@ test.describe("Fila selection (T99) @feature-ops-panel @panel-fila", () => {
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(new RegExp(`/fila/${ids[2]}$`));
-    await expect(page.locator("[data-detail-heading]")).toBeFocused();
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
     await expect(page.getByRole("option").nth(2)).toHaveAttribute(
       "aria-selected",
       "true",
@@ -77,7 +80,7 @@ test.describe("Fila selection (T99) @feature-ops-panel @panel-fila", () => {
     const ids = await openIds(request, email);
     await logIn(page, email);
     await page.goto(`/fila/${ids[0]}`);
-    await expect(page.locator("[data-detail-heading]")).toBeVisible();
+    await expect(page.locator("[data-detail-heading]:visible")).toBeVisible();
     await caseFault(request, email, "case", "delay", { ms: 2_500, times: 1 });
     await page.getByRole("option").nth(1).click();
     await expect(page.getByTestId("fila-detail-skeleton")).toBeVisible();
@@ -87,7 +90,7 @@ test.describe("Fila selection (T99) @feature-ops-panel @panel-fila", () => {
       timeout: 10_000,
     });
     await expect(page.getByTestId("fila-detail-skeleton")).toHaveCount(0);
-    await expect(page.locator("[data-detail-heading]")).toBeFocused();
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
   });
 
   test("the list's scroll comes back after the page remounts: item 20 stays in view", async ({
@@ -104,7 +107,7 @@ test.describe("Fila selection (T99) @feature-ops-panel @panel-fila", () => {
     await item.scrollIntoViewIfNeeded();
     await item.click();
     await expect(page).toHaveURL(new RegExp(`/fila/${ids[20]}$`));
-    await expect(page.locator("[data-detail-heading]")).toBeFocused();
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
     await expect(page.getByRole("option").nth(20)).toHaveAttribute(
       "aria-selected",
       "true",
@@ -124,8 +127,10 @@ test.describe("Fila selection on phones (T99) @feature-ops-panel @panel-fila @pa
     const ids = await openIds(request, email);
     await logIn(page, email);
     await page.goto(`/fila/${ids[1]}`);
-    await expect(page.locator("[data-detail-heading]")).toBeVisible();
-    await expect(page.locator("[data-detail-heading]")).not.toBeFocused();
+    await expect(page.locator("[data-detail-heading]:visible")).toBeVisible();
+    await expect(
+      page.locator("[data-detail-heading]:visible"),
+    ).not.toBeFocused();
 
     const wide = (page.viewportSize()?.width ?? 0) >= 1024;
     await page.goto("/fila");
@@ -137,7 +142,7 @@ test.describe("Fila selection on phones (T99) @feature-ops-panel @panel-fila @pa
       await expect(page).toHaveURL(/\/fila$/);
       await page.getByRole("option").nth(1).click();
       await expect(page).toHaveURL(new RegExp(`/fila/${ids[1]}$`));
-      await expect(page.locator("[data-detail-heading]")).toBeFocused();
+      await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
     }
   });
 });

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense, type JSX } from "react";
 
+import { CaseDetail } from "@/features/panel-fila/components/case-detail";
 import { CaseList } from "@/features/panel-fila/components/case-list";
 import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
@@ -55,17 +56,9 @@ export default async function CasePage({
         </>
       }
       detail={
-        // T100/T101 build the detail; T97 names the case. The heading that
-        // takes focus after an open carries data-detail-heading (T99).
         <DetailPane caseId={caseId}>
           {result.ok ? (
-            <h2
-              data-detail-heading
-              tabIndex={-1}
-              className="text-h2 font-title text-ink"
-            >
-              {result.case.razao_social ?? result.case.cnpj}
-            </h2>
+            <CaseDetail view={result.case} />
           ) : (
             <p className="text-body text-ink">
               {filaCopy["fila.detail.error"]}

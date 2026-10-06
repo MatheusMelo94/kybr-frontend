@@ -27,7 +27,16 @@ export function DetailPane({ caseId, children }: Props): JSX.Element {
 
   useEffect(() => {
     if (focusIntent === null || focusIntent !== caseId) return;
-    pane.current?.querySelector<HTMLElement>("[data-detail-heading]")?.focus();
+    // D9: an h1 below lg and an h2 at lg; focus the one displayed.
+    const headings = [
+      ...(pane.current?.querySelectorAll<HTMLElement>(
+        "[data-detail-heading]",
+      ) ?? []),
+    ];
+    (
+      headings.find((heading) => heading.getClientRects().length > 0) ??
+      headings[0]
+    )?.focus();
     settle("focus");
   }, [focusIntent, caseId, settle]);
 
