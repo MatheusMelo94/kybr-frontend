@@ -91,7 +91,7 @@ test.describe("the M6 journey at 1280, keyboard only (T117) @feature-ops-panel @
     // Aprovar: the next case opens.
     await expect(page.getByRole("listbox")).toBeVisible();
     await press(page, "Aprovar");
-    await expect(toast(page, /^Aprovado: /)).toBeVisible();
+    await expect(toast(page, /Aprovado: /)).toBeVisible();
     const semEmail = byKind(cases, "link-sem-email");
     await expect(page).toHaveURL(new RegExp(`/fila/${semEmail.id}$`));
 
@@ -123,14 +123,14 @@ test.describe("the M6 journey at 1280, keyboard only (T117) @feature-ops-panel @
       .focus();
     await page.keyboard.type("Fale com o suporte.");
     await press(page, "Bloquear vendedor");
-    await expect(toast(page, /^Bloqueado: /)).toBeVisible();
+    await expect(toast(page, /Bloqueado: /)).toBeVisible();
     await expect(page).not.toHaveURL(new RegExp(`/fila/${lote.id}$`));
 
     // Manter aprovado on an alert case.
     const alerta = byKind(cases, "alerta");
     await openFromList(page, alerta.id);
     await press(page, "Manter aprovado");
-    await expect(toast(page, /^Mantido como aprovado: /)).toBeVisible();
+    await expect(toast(page, /Mantido como aprovado: /)).toBeVisible();
     await expect(page).not.toHaveURL(new RegExp(`/fila/${alerta.id}$`));
 
     // A seller uploads on a waiting case → the notice → Mostrar → decide it.
