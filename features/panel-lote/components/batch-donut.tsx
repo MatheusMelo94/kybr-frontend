@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 
 import type { Batch } from "@/lib/api/schemas/panel/batches";
+import { cn } from "@/lib/utils";
 
 type Contagens = Batch["contagens"];
 
@@ -59,7 +60,10 @@ export function BatchDonut({
               strokeWidth="6"
               strokeDasharray={`${share} ${100 - share}`}
               strokeDashoffset={offset}
-              className={`${arc.stroke} transition-[stroke-dasharray] duration-(--duration-slow) ease-out-quart motion-reduce:transition-none starting:[stroke-dasharray:0_100]`}
+              className={cn(
+                arc.stroke,
+                "transition-[stroke-dasharray] duration-(--duration-slow) ease-out-quart motion-reduce:transition-none starting:[stroke-dasharray:0_100]",
+              )}
             />
           );
         })}

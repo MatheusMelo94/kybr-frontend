@@ -49,10 +49,13 @@ async function BatchBody({
 }: Props): Promise<JSX.Element> {
   const { batchId } = await params;
   await requireSession();
-  const batch = await batchOrExit(batchId);
+  // P5-011: the batch (cached from the layout) and the history in parallel.
+  const [batch, history, query] = await Promise.all([
+    batchOrExit(batchId),
+    historyOrError(),
+    searchParams,
+  ]);
   const finished = batch.estado.startsWith("concluido");
-  const history = await historyOrError();
-  const query = await searchParams;
 
   return (
     <div className="flex flex-col gap-6">

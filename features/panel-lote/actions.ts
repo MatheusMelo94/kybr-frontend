@@ -8,6 +8,7 @@ import {
   startBatchSchema,
 } from "@/features/panel-lote/schemas";
 import { POLL_TIMEOUT_MS } from "@/features/panel-shell/polling";
+import type { ApiResult } from "@/lib/api/client";
 import {
   getBatch,
   monitorBatch,
@@ -105,14 +106,11 @@ export type BatchWriteResult =
   | { ok: true; count: number }
   | { ok: false; code: "SESSAO_EXPIRADA" | "FAILED" };
 
-type Write = (
-  id: string,
-  key: string,
-) => ReturnType<typeof sendToQueue> | ReturnType<typeof monitorBatch>;
-
-async function batchWrite(
+/** P5-010: each write brings the count from its own schema's type. */
+async function batchWrite<T>(
   input: unknown,
-  write: Write,
+  write: (id: string, key: string) => Promise<ApiResult<T>>,
+  count: (data: T) => number,
   layout: boolean,
 ): Promise<BatchWriteResult> {
   await assertPanelHost();
@@ -125,8 +123,7 @@ async function batchWrite(
   if (result.ok) {
     revalidatePath(panelPath(`/lote/${batchId}`));
     if (layout) revalidatePath(panelPath("/"), "layout");
-    const data = result.data as { criados?: number; monitorados?: number };
-    return { ok: true, count: data.criados ?? data.monitorados ?? 0 };
+    return { ok: true, count: count(result.data) };
   }
   if (result.error.code === "SESSAO_EXPIRADA")
     return { ok: false, code: "SESSAO_EXPIRADA" };
@@ -142,14 +139,14 @@ async function batchWrite(
 export async function sendToQueueAction(
   input: unknown,
 ): Promise<BatchWriteResult> {
-  return batchWrite(input, sendToQueue, true);
+  return batchWrite(input, sendToQueue, (data) => data.criados, true);
 }
 
 /** D-B5 monitor, from /lote/[batchId]: weekly monitoring for the successful rows, once. */
 export async function monitorBatchAction(
   input: unknown,
 ): Promise<BatchWriteResult> {
-  return batchWrite(input, monitorBatch, false);
+  return batchWrite(input, monitorBatch, (data) => data.monitorados, false);
 }
 
 export type ResumeResult =

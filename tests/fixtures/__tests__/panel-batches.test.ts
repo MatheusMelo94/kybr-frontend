@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   AC16,
@@ -931,10 +931,15 @@ describe("QA fixture gaps (M5 test plan G1–G11)", () => {
     const before = await json<{ lastActivity: number }>(
       await control("GET", `/session?id=${token}`),
     );
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    await call("GET", `/v1/batches/${id}`, token, undefined, {
-      "x-kybr-poll": "1",
-    });
+    // The clock moves on (P5-012: no real sleep); a poll must not slide idle.
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 1_000 });
+    try {
+      await call("GET", `/v1/batches/${id}`, token, undefined, {
+        "x-kybr-poll": "1",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
     const after = await json<{ lastActivity: number }>(
       await control("GET", `/session?id=${token}`),
     );
