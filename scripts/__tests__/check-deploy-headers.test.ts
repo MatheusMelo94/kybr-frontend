@@ -30,7 +30,7 @@ const PANEL_PAGE = {
   "x-robots-tag": "noindex, nofollow",
   "cache-control": "private, no-store",
   "content-security-policy":
-    "default-src 'self'; script-src 'self' 'nonce-abc' 'strict-dynamic' https://challenges.cloudflare.com; connect-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests",
+    "default-src 'self'; script-src 'self' 'nonce-abc' 'strict-dynamic' https://challenges.cloudflare.com; connect-src 'self'; worker-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests",
 };
 
 let server: Server | undefined;
@@ -123,6 +123,45 @@ describe("check-deploy-headers.sh: hosts (T62)", () => {
     expect(output).toMatch(/private, no-store/);
     expect(output).toMatch(/noindex/);
     expect(output).toMatch(/connect-src/);
+    expect(status).toBe(1);
+  });
+
+  it("ADR-0012 / C5: fails when the panel's CSP has no worker-src 'self' or lets blob: workers in", async () => {
+    for (const csp of [
+      PANEL_PAGE["content-security-policy"].replace("worker-src 'self'; ", ""),
+      PANEL_PAGE["content-security-policy"].replace(
+        "worker-src 'self'",
+        "worker-src 'self' blob:",
+      ),
+    ]) {
+      const base = await serve({
+        "/api/health": { status: 200 },
+        "/v/loja-exemplo": { status: 200, headers: LINK_PAGE },
+        "/entrar": {
+          status: 200,
+          headers: { ...PANEL_PAGE, "content-security-policy": csp },
+        },
+      });
+      const { status, output } = await run(base, { PANEL_URL: base });
+      expect(output).toMatch(/worker-src/);
+      expect(status).toBe(1);
+      server?.close();
+    }
+  });
+
+  it("ADR-0012: fails when the link host's CSP has a worker-src", async () => {
+    const base = await serve({
+      "/api/health": { status: 200 },
+      "/v/loja-exemplo": {
+        status: 200,
+        headers: {
+          ...LINK_PAGE,
+          "content-security-policy": `${LINK_PAGE["content-security-policy"]}; worker-src 'self'`,
+        },
+      },
+    });
+    const { status, output } = await run(base, {});
+    expect(output).toMatch(/link host has a worker-src/);
     expect(status).toBe(1);
   });
 });

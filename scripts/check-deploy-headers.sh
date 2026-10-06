@@ -27,7 +27,9 @@
 #
 # PANEL_URL=https://app.kybr.com.br: also check the panel host's headers on
 # /entrar (ADR-0008 rule 9: private, no-store; noindex; a CSP whose
-# connect-src is 'self' only). Unset while the panel is dark.
+# connect-src is 'self' only, and worker-src 'self' for Lote: ADR-0012).
+# Unset while the panel is dark. The link page's CSP must have no
+# worker-src either way.
 set -eu
 
 base="${1:?Usage: check-deploy-headers.sh <base-url>}"
@@ -130,6 +132,9 @@ for directive in "frame-ancestors 'none'" "'nonce-" "'strict-dynamic'" "object-s
   printf '%s' "$csp" | grep -qF -- "$directive" || fail "CSP lacks ${directive}"
 done
 printf '%s' "$csp" | grep -qF -- "'unsafe-eval'" && fail "CSP allows 'unsafe-eval'"
+# ADR-0012 item 7 / Security C5: the parser worker's worker-src is the
+# panel host's alone; the link never runs a worker.
+printf '%s' "$csp" | grep -qF -- "worker-src" && fail "CSP on the link host has a worker-src"
 
 printf '%s\n' "$headers" | grep -q '^x-powered-by:' && fail "x-powered-by is present"
 printf '%s\n' "$headers" | grep '^cache-control:' | grep -qF "no-store" ||
@@ -151,6 +156,13 @@ if [ -n "${PANEL_URL:-}" ]; then
   for directive in "frame-ancestors 'none'" "'nonce-" "'strict-dynamic'" "connect-src 'self';"; do
     printf '%s' "$panel_csp" | grep -qF -- "$directive" || fail "panel: CSP lacks ${directive} (the panel browser never calls the API)"
   done
+  # Lote's parser worker (ADR-0012 item 7, Security C5): with
+  # 'strict-dynamic', a same-origin worker needs worker-src 'self', and it
+  # is on every panel document (a soft navigation to /lote keeps the first
+  # document's policy). Never blob:. /lote itself needs a session (a 307
+  # with no policy), so /entrar stands for it.
+  printf '%s' "$panel_csp" | grep -qF -- "worker-src 'self'" || fail "panel: CSP lacks worker-src 'self' (Lote's parser worker)"
+  printf '%s' "$panel_csp" | grep -qE -- "worker-src[^;]*blob:" && fail "panel: worker-src allows blob:"
 fi
 
 finish
