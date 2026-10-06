@@ -3,15 +3,16 @@
 // visible sheet, cached values only. It gives the same row model as readCsv.
 // Header text is never an object key (C6): rows are arrays by column.
 
-import { CFB, read, utils, type CellObject, type WorkBook } from "xlsx";
+import { CFB, read, type CellObject, type WorkBook } from "xlsx";
 
 import { rowSink, type ReadResult } from "@/features/panel-lote/parser/rows";
 import { zipGuard } from "@/features/panel-lote/parser/zip-guard";
 
-/** SheetJS reads at most this many physical rows (`sheetRows`). */
+/**
+ * SheetJS reads at most this many physical rows (`sheetRows`): the memory
+ * and CPU bound. Rows past it are not read (Amendment 3).
+ */
 const SHEET_ROWS = 10_001;
-/** More physical rows than this is too many (ADR-0012 item 2). */
-const MAX_PHYSICAL_ROWS = 10_000;
 
 const OPTIONS = {
   type: "array",
@@ -82,13 +83,11 @@ export async function readWorkbook(
   const name = firstVisible(workbook);
   const sheet = name === undefined ? undefined : workbook.Sheets[name];
   if (sheet === undefined) return unreadable;
-  const range = sheet["!fullref"] ?? sheet["!ref"];
-  if (range !== undefined) {
-    const { s, e } = utils.decode_range(range);
-    if (e.r - s.r + 1 > MAX_PHYSICAL_ROWS)
-      return { ok: false, error: "too_many" };
-  }
-
+  // ADR-0012 Amendment 3 (QA-M5-001): the sheet's declared range (!ref,
+  // !fullref) is never a refusal: Excel files often declare far more rows
+  // than they hold (formatting below the data, a stale dimension). SheetJS
+  // reads at most 10,001 physical rows; too_many comes only from more than
+  // 5,000 non-blank data rows among them (rowSink).
   const sink = rowSink();
   const data = (sheet["!data"] ?? []) as (CellObject | undefined)[][];
   for (const row of data) {

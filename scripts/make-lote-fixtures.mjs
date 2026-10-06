@@ -239,7 +239,22 @@ formulas["!ref"] = "A1:B3";
 const scientific = XLSX.utils.aoa_to_sheet([["CNPJ"], [Number(ac16[1][0])]]);
 scientific.A2.z = "0.00E+00";
 
+// QA-M5-001 / ADR-0012 Amendment 3: 190 rows in a sheet that declares far
+// more. Formatted empty cells down to row 12,000 (as Excel leaves them),
+// and a stale dimension A1:C20000. Both must preview 190.
+function declaresMore(ref, formatted = []) {
+  const sheet = XLSX.utils.aoa_to_sheet([["CNPJ", "Responsável", "ID na plataforma"], ...many(190)]);
+  for (const cell of formatted) sheet[cell] = { t: "s", v: "" };
+  sheet["!ref"] = ref;
+  return sheet;
+}
+
 const xlsxFiles = {
+  "formatado-ate-12000.xlsx": write(
+    book(["Vendedores", declaresMore("A1:C12000", ["A5000", "B9000", "A12000"])]),
+    "xlsx",
+  ),
+  "dimensao-antiga.xlsx": write(book(["Vendedores", declaresMore("A1:C20000")]), "xlsx"),
   "ac16.xlsx": ac16Xlsx,
   "ac16.xls": write(book(["Vendedores", ac16Sheet()]), "biff8"),
   // BIFF5 needs codepage tables the worker doesn't load (ADR-0012 item 4).

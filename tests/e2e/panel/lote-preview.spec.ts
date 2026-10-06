@@ -136,6 +136,27 @@ test.describe("Lote: drop zone and preview @feature-ops-panel @panel-lote", () =
     await expectNoBatchCall(request, email);
   });
 
+  for (const name of ["formatado-ate-12000.xlsx", "dimensao-antiga.xlsx"])
+    test(`QA-M5-001: ${name} (a sheet that declares far more rows than it holds) previews its 190 rows`, async ({
+      page,
+      request,
+    }, testInfo) => {
+      const email = uniqueEmail("lote-faixa", testInfo);
+      await createAccount(request, email, "pago");
+      await logIn(page, email);
+      await page.goto("/lote");
+      await page.waitForLoadState("networkidle");
+      await pick(page, name);
+      await expect(
+        page
+          .getByRole("region", { name: "Confira antes de verificar" })
+          .getByText('Encontramos 190 CNPJs na coluna "CNPJ".'),
+      ).toBeVisible();
+      await expect(
+        page.getByText("A lista tem mais de 5.000 linhas. Divida em arquivos menores."),
+      ).toHaveCount(0);
+    });
+
   test("AC 17: no CNPJ column → nocolumn, the select focused, the CTA unavailable until a column is picked; a column with no valid CNPJ → novalid", async ({
     page,
     request,

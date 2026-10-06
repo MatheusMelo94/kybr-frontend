@@ -134,12 +134,12 @@ describe("readWorkbook: refusals", () => {
     });
   });
 
-  it("more than 10,000 physical rows → too_many", async () => {
+  it("Amendment 3: data past the 10,001-row read window is not read (never a range refusal)", async () => {
     const aoa = [["CNPJ"], ...Array.from({ length: 10_001 }, () => [""])];
     aoa.push([cnpjWithRoot("123456780001")]);
     expect(await readWorkbook(workbook(aoa), "xlsx")).toEqual({
       ok: false,
-      error: "too_many",
+      error: "empty",
     });
   });
 
@@ -206,3 +206,73 @@ describe("C7 v1.1 regressions: legitimate big sheets parse (Amendment 2)", () =>
     });
   }, 60_000);
 });
+
+/** n data rows under a CNPJ header, with distinct valid CNPJs. */
+function dataRows(n: number): string[][] {
+  return Array.from({ length: n }, (_, r) => [
+    cnpjWithRoot(`7${String(r).padStart(7, "0")}0001`),
+    "Pessoa Exemplo",
+  ]);
+}
+
+/** A workbook from a sheet the test shapes (its range, stray formatted cells). */
+function workbookFrom(sheet: XLSX.WorkSheet): Uint8Array {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, "Dados");
+  return new Uint8Array(
+    XLSX.write(wb, { type: "array", bookType: "xlsx", compression: true }),
+  );
+}
+
+describe("ADR-0012 Amendment 3 (QA-M5-001): the row limit counts non-blank rows", () => {
+  it("190 rows with formatting down to row 12,000 → a preview of 190", async () => {
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["CNPJ", "Responsável"],
+      ...dataRows(190),
+    ]);
+    // Formatted empty cells far below the data, as Excel leaves them.
+    for (const ref of ["A5000", "B9000", "A12000"])
+      sheet[ref] = { t: "s", v: "" };
+    sheet["!ref"] = "A1:C12000";
+    const result = await readWorkbook(workbookFrom(sheet), "xlsx");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.rows).toHaveLength(191);
+  });
+
+  it("a stale dimension A1:C20000 → a preview", async () => {
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["CNPJ", "Responsável"],
+      ...dataRows(190),
+    ]);
+    sheet["!ref"] = "A1:C20000";
+    const result = await readWorkbook(workbookFrom(sheet), "xlsx");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.rows).toHaveLength(191);
+  });
+
+  it.each(["formatado-ate-12000.xlsx", "dimensao-antiga.xlsx"])(
+    "the committed fixture %s previews its 190 rows",
+    async (name) => {
+      expect(await rows(name, "xlsx")).toHaveLength(191);
+    },
+  );
+
+  it("5,001 non-blank data rows → too_many", async () => {
+    expect(
+      await readWorkbook(
+        workbook([["CNPJ", "Responsável"], ...dataRows(5001)]),
+        "xlsx",
+      ),
+    ).toEqual({ ok: false, error: "too_many" });
+  }, 60_000);
+
+  it("5,000 non-blank rows spread over 10,001 physical rows → a preview of 5,000", async () => {
+    const spread = dataRows(5000).flatMap((row) => [row, ["", ""]]);
+    const aoa = [["CNPJ", "Responsável"], ...spread];
+    expect(aoa).toHaveLength(10_001);
+    const result = await readWorkbook(workbook(aoa), "xlsx");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.rows).toHaveLength(5001);
+  }, 60_000);
+});
+
