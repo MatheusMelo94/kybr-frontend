@@ -8,6 +8,10 @@ const MAX_LENGTH = 512;
 // A fixed origin stands in for the panel host: what matters is that the
 // resolved URL keeps it (PANEL_HOST itself never changes the answer).
 const BASE = "https://panel.kybr.invalid";
+// Security M5C-03: a batch's CSV download is a Route Handler, not a screen.
+// Returning there after a login would run the export twice and leave Renata
+// on /entrar with a file; she lands on the batch's page instead.
+const DOWNLOAD = /^(\/lote\/[^/]+)\/(?:resultado|erros)\.csv$/;
 
 /** The validated path + query to return to, or null. Decodes once. */
 export function safeReturnPath(
@@ -36,5 +40,7 @@ export function safeReturnPath(
     return null;
   }
   if (url.origin !== BASE || !isPanelScreen(url.pathname)) return null;
+  const download = DOWNLOAD.exec(url.pathname);
+  if (download !== null) return download[1] ?? null;
   return url.pathname + url.search;
 }

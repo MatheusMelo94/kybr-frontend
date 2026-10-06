@@ -11,6 +11,7 @@ import { MOCK_API } from "../fixtures/mock-api.ts";
 import {
   LINK_URL,
   PANEL_URL,
+  callsFor,
   createAccount,
   createBatch,
   logIn,
@@ -236,4 +237,21 @@ test.describe("Lote: CSV downloads @feature-ops-panel @panel-lote", () => {
     expect(expired.headers()["location"]).toMatch(/^\/entrar\?motivo=sessao/);
     await stale.dispose();
   });
+
+  test("M5C-03: a download link opened logged out → /entrar → after the login, the batch page; no export runs", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("lote-csv-volta", testInfo);
+    await createAccount(request, email, "pago");
+    const id = await createBatch(request, email, "ac16", { finish: true });
+    await logIn(page, email, undefined, `/lote/${id}/resultado.csv`);
+    await expect(page).toHaveURL(new RegExp(`/lote/${id}$`));
+    await expect(page.getByRole("heading", { name: "Resultado" })).toBeVisible();
+    const exports = (await callsFor(request, email)).filter((call) =>
+      call.path.endsWith(".csv"),
+    );
+    expect(exports).toEqual([]);
+  });
 });
+
