@@ -145,6 +145,8 @@ test.describe("Fila collapse at 1280 (T114) @feature-ops-panel @panel-fila", () 
     });
     await decide.click();
     await expect(page).toHaveURL(new RegExp(`/fila/${open[1]?.id}$`));
+    // The next case's list has streamed in (Suspense): there is a list to collapse.
+    await expect(options(page)).toHaveCount(24);
     await decide.click();
     await expect(options(page)).toHaveCount(23);
     await expect(page).toHaveURL(new RegExp(`/fila/${open[2]?.id}$`));
