@@ -31,6 +31,21 @@ describe("lint boundaries for Lote's parser", () => {
     expect(await rules(IMPORT, filePath)).toContain("no-restricted-imports");
   });
 
+  it.each([
+    "xlsx/xlsx.mjs",
+    "xlsx/dist/xlsx.full.min.js",
+    "xlsx/dist/xlsx.core.min",
+    "xlsx/dist/xlsx.mini.min.js",
+  ])("M5C-02: a subpath import (%s) outside the parser fails too", async (specifier) => {
+    const code = `import { read } from "${specifier}";\nexport const r = read;\n`;
+    expect(await rules(code, "lib/api/panel/batches.ts")).toContain(
+      "no-restricted-imports",
+    );
+    expect(
+      await rules(code, "features/panel-lote/parser/sheet.ts"),
+    ).not.toContain("no-restricted-imports");
+  });
+
   it("the parser may import it", async () => {
     expect(
       await rules(IMPORT, "features/panel-lote/parser/sheet.ts"),

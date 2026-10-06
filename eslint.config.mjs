@@ -44,6 +44,14 @@ const eslintConfig = [
                 "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
             },
           ],
+          // Security M5C-02: the package's subpath exports too (xlsx.mjs, dist/*).
+          patterns: [
+            {
+              group: ["xlsx/*"],
+              message:
+                "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
+            },
+          ],
         },
       ],
     },
