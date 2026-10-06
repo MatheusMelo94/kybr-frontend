@@ -86,6 +86,25 @@ describe("batchSchema (D-B2 + C1)", () => {
   });
 });
 
+describe("batch timestamps (P5-003)", () => {
+  it.each(["ontem", "2026-13-45T10:00:00-03:00", "2026-10-05", ""])(
+    "rejects iniciado_em / concluido_em %j",
+    (value) => {
+      expect(batchSchema.safeParse({ ...RUNNING, iniciado_em: value }).success).toBe(false);
+      expect(batchSchema.safeParse({ ...DONE, concluido_em: value }).success).toBe(false);
+      expect(
+        batchHistorySchema.safeParse([
+          { id: ID, total: 1, estado: "concluido", iniciado_em: value },
+        ]).success,
+      ).toBe(false);
+    },
+  );
+
+  it("accepts an offset or Z", () => {
+    expect(batchSchema.safeParse({ ...DONE, concluido_em: "2026-10-05T13:02:41.123Z" }).success).toBe(true);
+  });
+});
+
 describe("batchRowsPageSchema (D-B3 + C2)", () => {
   const ROW = {
     cnpj: "12ABC34501DE35",

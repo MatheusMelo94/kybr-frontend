@@ -53,7 +53,8 @@ export function formatDate(iso: string): string {
  * "2 dias", each unit rounded down from the one below it.
  */
 export function formatDuration(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
+  // P5-003: a duration from a bad date is 0 s, never "NaN s".
+  const seconds = Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 1000)) : 0;
   if (seconds < 60) return `${seconds} s`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes} min`;

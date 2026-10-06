@@ -17,6 +17,9 @@ export const BATCH_STATES = [
 ] as const;
 
 /** D-B1 201 */
+/** P5-003: an ISO 8601 date-time with an offset or Z (Pre-Contract format). */
+const isoDateTime = z.iso.datetime({ offset: true });
+
 export const batchStartedSchema = z.object({ id: batchIdSchema });
 
 /** D-B2 (+ C1 `motivos_contagem` on concluido*). */
@@ -27,8 +30,8 @@ export const batchSchema = z
     total: count,
     processados: count,
     contagens: z.object({ ok: count, warn: count, bad: count, erro: count }),
-    iniciado_em: z.string().max(64),
-    concluido_em: z.string().max(64).optional(),
+    iniciado_em: isoDateTime,
+    concluido_em: isoDateTime.optional(),
     monitorado: z.boolean(),
     enviado_para_fila: z.boolean(),
     casos_criados: count.optional(),
@@ -66,8 +69,8 @@ export const batchHistorySchema = z
       id: batchIdSchema,
       total: count,
       estado: z.enum(BATCH_STATES),
-      iniciado_em: z.string().max(64),
-      concluido_em: z.string().max(64).optional(),
+      iniciado_em: isoDateTime,
+      concluido_em: isoDateTime.optional(),
     }),
   )
   .max(10);

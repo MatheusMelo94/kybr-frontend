@@ -47,6 +47,17 @@ const deferred = () => {
 };
 
 describe("csvFilename (Security C9)", () => {
+  it("P5-003: an invalid date falls back to today, never a throw", () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(DONE) });
+    try {
+      expect(csvFilename("result", new Date("não é data"))).toBe(
+        "kybr-lote-2026-10-05-resultado.csv",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("is built from the batch's end in São Paulo, never from a header", () => {
     expect(csvFilename("result", new Date(DONE))).toBe(
       "kybr-lote-2026-10-05-resultado.csv",

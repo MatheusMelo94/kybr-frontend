@@ -137,6 +137,17 @@ describe("BatchResult (AC 20, 21; QA Q4)", () => {
     ).toBeVisible();
   });
 
+  it("P5-003: a timestamp that isn't a date never reads NaN", () => {
+    render(
+      <Shell>
+        <BatchFocusKeeper>
+          <BatchResult batch={{ ...BATCH, concluido_em: "x" }} />
+        </BatchFocusKeeper>
+      </Shell>,
+    );
+    expect(document.body.textContent).not.toContain("NaN");
+  });
+
   it("no errors line without erro rows", () => {
     render(
       <Shell>
