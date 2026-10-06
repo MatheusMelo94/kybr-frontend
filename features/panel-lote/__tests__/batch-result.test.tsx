@@ -128,6 +128,13 @@ describe("BatchResult (AC 20, 21; QA Q4)", () => {
         "3 CNPJs não foram consultados e não consumiram verificações.",
       ),
     ).toBeVisible();
+    // T86: both downloads, the errors one next to its line.
+    expect(
+      screen.getByRole("button", { name: "Baixar resultado (CSV)" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Baixar erros (CSV)" }),
+    ).toBeVisible();
   });
 
   it("no errors line without erro rows", () => {
@@ -146,6 +153,12 @@ describe("BatchResult (AC 20, 21; QA Q4)", () => {
     );
     expect(
       screen.queryByText(/não foram consultados|não foi consultado/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Baixar resultado (CSV)" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Baixar erros (CSV)" }),
     ).not.toBeInTheDocument();
   });
 });
