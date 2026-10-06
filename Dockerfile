@@ -14,6 +14,9 @@ FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# SheetJS is vendored (ADR-0012 C4): the lockfile resolves `xlsx` to this
+# tarball, so it must be in the deps stage before the frozen install.
+COPY vendor/sheetjs/ ./vendor/sheetjs/
 RUN pnpm install --frozen-lockfile
 
 FROM ${NODE_IMAGE} AS build
