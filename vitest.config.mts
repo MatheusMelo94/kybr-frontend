@@ -26,6 +26,9 @@ export default defineConfig({
       LEGAL_TERMS_VERSION: "teste-1",
       // Cloudflare's always-pass test site key.
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      // The cases mock's signed document URLs (D-C6): an https origin of
+      // their own here; the HTTP mock uses its loopback origin.
+      MOCK_DOCS_ORIGIN: "https://documentos.exemplo.test",
     },
     // Playwright owns tests/e2e. Agent worktrees under .claude/ hold other
     // branches' copies of the suite and must never be collected here.

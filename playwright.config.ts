@@ -135,7 +135,8 @@ export default defineConfig({
     },
     // Starts after the build above is ready (webServers start in order).
     {
-      command: `pnpm start -p ${DARK_PORT}`,
+      // QA G12 (M6): its output is kept for the PII grep too.
+      command: `mkdir -p e2e-logs && pnpm start -p ${DARK_PORT} 2>&1 | tee e2e-logs/next-server-dark.log`,
       port: DARK_PORT,
       reuseExistingServer: !process.env.CI,
       env: { ...SERVER_ENV, LINK_HOST: `localhost:${DARK_PORT}` },

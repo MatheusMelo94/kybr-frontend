@@ -1,7 +1,12 @@
 import { delay, http, type RequestHandler } from "msw";
 
-import { CATEGORIES, type ContatoVendedor } from "../../factories/panel.ts";
 import {
+  CATEGORIES,
+  DEFAULT_DOCUMENTOS,
+  type ContatoVendedor,
+} from "../../factories/panel.ts";
+import {
+  caseCounts,
   hasRunningBatch,
   takeFault,
   scenarioApplies,
@@ -20,9 +25,14 @@ function workspaceView(account: Account): Record<string, unknown> {
   const stored = scenarioApplies("contagens-falham", account.email)
     ? undefined
     : account.workspace.contagens;
-  // PB17: true while a batch of this workspace is processando.
+  // PB17: true while a batch of this workspace is processando. QA G3: the
+  // Fila counts add the account's cases in the store to the static ones.
+  const cases = caseCounts(account.email);
   const contagens = stored && {
     ...stored,
+    fila_abertos: stored.fila_abertos + cases.abertos,
+    fila_vencidos: stored.fila_vencidos + cases.vencidos,
+    fila_aguardando: (stored.fila_aguardando ?? 0) + cases.aguardando,
     lote_em_andamento: hasRunningBatch(account.email),
   };
   delete (workspace as { contagens?: unknown }).contagens;
@@ -31,6 +41,10 @@ function workspaceView(account: Account): Record<string, unknown> {
     link_url: `https://kybr.com.br/v/${workspace.slug}`,
     ...(plano && { plano }),
     ...(contagens && { contagens }),
+    // C-M6-4: the default four until a test sets them (QA G10).
+    documentos_habilitados: [
+      ...(account.workspace.documentos_habilitados ?? DEFAULT_DOCUMENTOS),
+    ],
   };
 }
 

@@ -1,4 +1,9 @@
 import {
+  CASE_PRESETS,
+  casesForPreset,
+  foreignCase,
+  type CasePreset,
+  type CaseRecord,
   BATCH_DURATION_MS,
   BATCH_SETS,
   FOREIGN_BATCH_ID,
@@ -57,6 +62,58 @@ export type CallRecord = {
   withExtId?: number;
   /** QA G6: the request carried X-Kybr-Poll: 1. */
   poll?: boolean;
+  /** M6 (QA G5): a decide's type and reason, a request's types (never the note or a link). */
+  decisao?: string;
+  motivoCodigo?: string;
+  tipos?: string[];
+  /** F7: the page the Server Action was posted from (x-kybr-panel-path). */
+  pagePath?: string;
+};
+
+/** QA G2 / G9 / G11: the case endpoints a per-account fault can target. */
+export type CaseEndpoint =
+  | "list"
+  | "poll"
+  | "case"
+  | "eventos"
+  | "documentos"
+  | "decide"
+  | "request-documents"
+  | "certificate"
+  | "documento"
+  | "doc-url"
+  /** G11 lista-atrasada: armed for the next decision. */
+  | "lag";
+export type CaseFault = {
+  kind:
+    | "delay"
+    | "500"
+    | "503"
+    | "drop"
+    /** F5: applied, then the socket is destroyed (the outcome is unknown). */
+    | "drop-after"
+    /** eventos / documentos left out of the case (partial). */
+    | "omit"
+    /** G11: a case that breaks the schema. */
+    | "invalido"
+    | "link-estranho"
+    | "link-invalido"
+    | "lista-atrasada"
+    /** The certificate / a document: HTML, over 5 MB, or cut short. */
+    | "html"
+    | "grande"
+    | "truncado"
+    /** G9 / PC20: a signed URL the documents allowlist must refuse. */
+    | "host-estranho"
+    | "userinfo"
+    | "host-parecido"
+    | "porta"
+    | "http-externo";
+  ms?: number;
+  /** How many requests it applies to (unlimited when missing). */
+  times?: number;
+  /** lista-atrasada: how many list reads still show the decided case. */
+  reads?: number;
 };
 
 /** QA G4: a per-account fault on one batch endpoint. */
@@ -155,6 +212,21 @@ type Store = {
   faults: Map<string, BatchFault>;
   /** Scenario → the e-mails it applies to, or "all". */
   scenarios: Map<Scenario, Set<string> | "all">;
+  /** M6: every case, by id (owner in the record). */
+  cases: Map<string, CaseRecord>;
+  /** A-X7 for D-C3/D-C4: "e-mail|key" → the first reply and its body. */
+  caseKeys: Map<
+    string,
+    { fingerprint: string; status: number; reply: unknown }
+  >;
+  /** QA G2: "e-mail|endpoint" → its fault. */
+  caseFaults: Map<string, CaseFault>;
+  /** QA G4: an account's fixed "now" (ms). */
+  caseClocks: Map<string, number>;
+  /** D-C6: a signed URL's sig → what it opens (a new sig per read, QA G9). */
+  docSigs: Map<string, { email: string; caseId: string; docId: string }>;
+  /** QA G11 lista-atrasada: the decided case the list still shows, n more reads. */
+  lagging: Map<string, { snapshot: CaseRecord; reads: number }>;
 };
 
 const SEEDED: Record<
@@ -286,6 +358,26 @@ function createStore(): Store {
       "Outra Plataforma",
     ),
   );
+  // M6 (PC1, PC3, PC4): the Fila's accounts. Their Fila counts come from the
+  // case store alone (QA G3).
+  for (const [email, nome, webhook] of [
+    [PANEL_EMAILS.fila, "Fila Exemplo", true],
+    [PANEL_EMAILS.filavazia, "Fila Vazia Exemplo", true],
+    [PANEL_EMAILS.semwebhook, "Sem Webhook Exemplo", false],
+  ] as const) {
+    const account = accountFor("renata", email, nome, `Plataforma ${nome}`);
+    account.workspace.webhook_configurado = webhook;
+    zeroFilaCounts(account);
+    accounts.set(email, account);
+  }
+  const now = Date.now();
+  const cases = new Map<string, CaseRecord>();
+  for (const record of [
+    ...casesForPreset("pc1", PANEL_EMAILS.fila, now),
+    ...casesForPreset("um", PANEL_EMAILS.semwebhook, now),
+    foreignCase(now),
+  ])
+    cases.set(record.id, record);
   return {
     accounts,
     sessions: new Map(),
@@ -302,6 +394,25 @@ function createStore(): Store {
     pollFailures: new Map(),
     faults: new Map(),
     scenarios: new Map(),
+    cases,
+    caseKeys: new Map(),
+    caseFaults: new Map(),
+    caseClocks: new Map(),
+    docSigs: new Map(),
+    lagging: new Map(),
+  };
+}
+
+/** The account's static Fila counts become 0: the case store is the only source. */
+function zeroFilaCounts(account: Account): void {
+  const contagens = account.workspace.contagens;
+  if (!contagens) return;
+  // A copy: presets share their counts object.
+  account.workspace.contagens = {
+    ...contagens,
+    fila_abertos: 0,
+    fila_vencidos: 0,
+    fila_aguardando: 0,
   };
 }
 
@@ -583,4 +694,110 @@ export function takePollFailure(email: string): boolean {
 
 export function seedPollFailures(n: number, email?: string): void {
   store.pollFailures.set(email?.toLowerCase() ?? "*", n);
+}
+
+// --- Cases (M6) ---------------------------------------------------------------
+
+/** QA G4: the account's "now" (fixed by /__mock/panel/case-clock), in ms. */
+export function caseNow(email: string): number {
+  return store.caseClocks.get(email) ?? Date.now();
+}
+
+export function setCaseClock(email: string, now: number | undefined): void {
+  if (now === undefined) store.caseClocks.delete(email);
+  else store.caseClocks.set(email, now);
+}
+
+export function casesOf(email: string): CaseRecord[] {
+  return [...store.cases.values()].filter((record) => record.email === email);
+}
+
+/** The case if it exists AND belongs to `email`: otherwise undefined (the same 404). */
+export function ownCase(id: string, email: string): CaseRecord | undefined {
+  const record = store.cases.get(id);
+  return record?.email === email ? record : undefined;
+}
+
+export function addCase(record: CaseRecord): void {
+  store.cases.set(record.id, record);
+}
+
+export function isCasePreset(value: unknown): value is CasePreset {
+  return (CASE_PRESETS as readonly unknown[]).includes(value);
+}
+
+/**
+ * QA G1: replaces an account's cases with a preset (creating the account
+ * from the renata preset if needed); its Fila counts then come from the
+ * store alone.
+ */
+export function seedCases(email: string, preset: CasePreset): CaseRecord[] {
+  const normalized = email.toLowerCase();
+  const account =
+    store.accounts.get(normalized) ?? createAccount({ email: normalized });
+  zeroFilaCounts(account);
+  for (const record of casesOf(normalized)) store.cases.delete(record.id);
+  const records = casesForPreset(preset, normalized, caseNow(normalized));
+  for (const record of records) store.cases.set(record.id, record);
+  return records;
+}
+
+/** QA G3: the Fila counts of the account's cases (added to its static ones). */
+export function caseCounts(email: string): {
+  abertos: number;
+  vencidos: number;
+  aguardando: number;
+} {
+  const now = caseNow(email);
+  const own = casesOf(email);
+  const abertos = own.filter((record) => record.estado === "aberto");
+  return {
+    abertos: abertos.length,
+    vencidos: abertos.filter((record) => record.sla_ate < now).length,
+    aguardando: own.filter((record) => record.estado === "aguardando_doc")
+      .length,
+  };
+}
+
+/** QA G2: sets (or, with undefined, clears) a per-account case fault. */
+export function setCaseFault(
+  email: string,
+  endpoint: CaseEndpoint,
+  fault: CaseFault | undefined,
+): void {
+  const key = `${email.toLowerCase()}|${endpoint}`;
+  if (fault === undefined) store.caseFaults.delete(key);
+  else store.caseFaults.set(key, fault);
+}
+
+/** The fault for this request, if any (one fewer left when it's counted). */
+export function takeCaseFault(
+  email: string,
+  endpoint: CaseEndpoint,
+): CaseFault | undefined {
+  const key = `${email}|${endpoint}`;
+  const fault = store.caseFaults.get(key);
+  if (fault === undefined) return undefined;
+  if (fault.times !== undefined) {
+    if (fault.times <= 1) store.caseFaults.delete(key);
+    else store.caseFaults.set(key, { ...fault, times: fault.times - 1 });
+  }
+  return fault;
+}
+
+/** D-C6: a fresh sig for one document read (never logged). */
+export function mintDocSig(
+  email: string,
+  caseId: string,
+  docId: string,
+): string {
+  const sig = randomToken(16);
+  store.docSigs.set(sig, { email, caseId, docId });
+  return sig;
+}
+
+export function docForSig(
+  sig: string,
+): { email: string; caseId: string; docId: string } | undefined {
+  return store.docSigs.get(sig);
 }
