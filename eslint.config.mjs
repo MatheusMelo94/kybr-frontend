@@ -54,6 +54,22 @@ const eslintConfig = [
           ],
         },
       ],
+      // Security M5C-05: dynamic import("xlsx") / import("xlsx/…") too,
+      // as a string or a template literal.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "ImportExpression[source.value=/^xlsx(\\/|$)/]",
+          message:
+            "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
+        },
+        {
+          selector:
+            "ImportExpression > TemplateLiteral.source > TemplateElement:first-child[value.raw=/^xlsx(\\/|$)/]",
+          message:
+            "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
+        },
+      ],
     },
   },
   // Security C8: nothing from a spreadsheet is logged (SheetJS errors can

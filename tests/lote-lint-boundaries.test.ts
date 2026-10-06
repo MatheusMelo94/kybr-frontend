@@ -46,6 +46,36 @@ describe("lint boundaries for Lote's parser", () => {
     ).not.toContain("no-restricted-imports");
   });
 
+  it.each(["xlsx", "xlsx/xlsx.mjs", "xlsx/dist/xlsx.full.min.js"])(
+    "M5C-05: a dynamic import(%j) outside the parser fails too",
+    async (specifier) => {
+      const code = `export const load = () => import("${specifier}");\n`;
+      expect(await rules(code, "lib/api/panel/batches.ts")).toContain(
+        "no-restricted-syntax",
+      );
+      expect(
+        await rules(code, "features/panel-lote/components/drop-zone.tsx"),
+      ).toContain("no-restricted-syntax");
+      expect(
+        await rules(code, "features/panel-lote/parser/parser.worker.ts"),
+      ).not.toContain("no-restricted-syntax");
+    },
+  );
+
+  it("M5C-05: a template-literal import(`xlsx/…`) outside the parser fails", async () => {
+    const code = "const f = 'xlsx.mjs';\nexport const load = () => import(`xlsx/${f}`);\n";
+    expect(await rules(code, "lib/api/panel/batches.ts")).toContain(
+      "no-restricted-syntax",
+    );
+  });
+
+  it("M5C-05: a dynamic import of anything else is fine", async () => {
+    const code = 'export const load = () => import("xlsx-lookalike-not");\n';
+    expect(await rules(code, "lib/api/panel/batches.ts")).not.toContain(
+      "no-restricted-syntax",
+    );
+  });
+
   it("the parser may import it", async () => {
     expect(
       await rules(IMPORT, "features/panel-lote/parser/sheet.ts"),
