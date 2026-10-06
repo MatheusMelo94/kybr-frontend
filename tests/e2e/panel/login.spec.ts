@@ -140,8 +140,12 @@ test.describe("/entrar @feature-ops-panel @panel-access @panel-smoke @panel-phon
     await page.getByRole("button", { name: "Entrar" }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/entrar"));
 
-    const calls = await callsFor(request, email);
-    expect(calls.at(-1)).toMatchObject({
+    // The last login call (the shell's /me calls are logged for the
+    // account too, since the T92 follow-up).
+    const logins = (await callsFor(request, email)).filter(
+      (call) => call.path === "/v1/auth/login",
+    );
+    expect(logins.at(-1)).toMatchObject({
       path: "/v1/auth/login",
       turnstile: TURNSTILE_PASS,
     });
