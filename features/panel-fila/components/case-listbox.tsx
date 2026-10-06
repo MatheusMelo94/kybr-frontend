@@ -53,6 +53,7 @@ export function CaseListbox({
     reportList,
     visibleIds,
     observeList,
+    online,
   } = useFila();
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -123,6 +124,9 @@ export function CaseListbox({
         selectedId={removal === null ? selectedId : removal.next}
         labelledBy={FILA_TAB_ACTIVE_ID}
         onOpen={onOpen}
+        // Offline nothing opens: a soft navigation would fall back to a full
+        // load, the browser's offline page (D8, G9).
+        disabled={!online}
       />
       {children}
     </div>

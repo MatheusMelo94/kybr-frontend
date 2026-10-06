@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { SoftLink } from "@/components/panel/soft-link";
+import { FilaSoftLink } from "@/features/panel-fila/components/fila-soft-link";
 import { filaCopy } from "@/features/panel-fila/copy";
 import {
   FILA_PAGE,
@@ -27,11 +27,11 @@ export function LoadMoreLink({
   remaining,
 }: Props): JSX.Element {
   return (
-    <SoftLink
+    <FilaSoftLink
       href={filaHref(base, { aba, ate: ate + FILA_PAGE })}
       className={`${PANEL_LINK} self-start`}
     >
       {fill(filaCopy["fila.more"], { n: Math.min(remaining, FILA_PAGE) })}
-    </SoftLink>
+    </FilaSoftLink>
   );
 }

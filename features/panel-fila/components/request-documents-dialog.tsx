@@ -25,6 +25,8 @@ type Props = {
   tipos: readonly DocumentoTipo[];
   /** The case's vendedor_tem_email: the lead, and advance or stay (D11). */
   vendedorTemEmail: boolean;
+  /** Offline (T111): the trigger is disabled and described by offline.actions. */
+  offline?: { disabled: true; describedBy: string } | undefined;
 };
 
 /**
@@ -42,6 +44,7 @@ export function RequestDocumentsDialog({
   razao,
   tipos,
   vendedorTemEmail,
+  offline,
 }: Props): JSX.Element {
   const { target, request, advance, conflict, unknown } = useDecisionFlow();
   const { setFlash } = useFila();
@@ -119,6 +122,8 @@ export function RequestDocumentsDialog({
         type="button"
         variant="secondary"
         size="panel"
+        disabled={offline?.disabled}
+        aria-describedby={offline?.describedBy}
         onClick={() => setOpen(true)}
       >
         {filaCopy["fila.action.request"]}

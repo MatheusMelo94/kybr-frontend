@@ -81,16 +81,19 @@ beforeEach(() => {
 
 function Screen({
   caseId,
+  renderedAt = 1,
   webhook = true,
 }: {
   caseId: string;
+  /** The layout's server render: a re-read moves it (T106, T111). */
+  renderedAt?: number;
   webhook?: boolean;
 }): JSX.Element {
   return (
     <ShellStatusProvider initial={{ contagens: undefined, plano: undefined }}>
       <ShellProbe />
       <ToastProvider closeLabel="Fechar">
-        <FilaProvider renderedAt={1}>
+        <FilaProvider renderedAt={renderedAt}>
           <span id={FILA_TAB_ACTIVE_ID}>Para decidir (3)</span>
           <div key={caseId}>
             <CaseListbox
@@ -275,8 +278,9 @@ describe("Bloquear dialog (T107; AC 38; D10; F5, F6, F7)", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(NETWORK_ERROR);
     expect(router.refresh).toHaveBeenCalledTimes(1);
     // The re-read remounts the page; the dialog reopens with the same body.
-    rerender(<Screen caseId="caso-b" />);
-    rerender(<Screen caseId="caso-a" />);
+    // A server render: it also ends T111's offline hint.
+    rerender(<Screen caseId="caso-b" renderedAt={2} />);
+    rerender(<Screen caseId="caso-a" renderedAt={2} />);
     decideAction.mockResolvedValueOnce({ ok: true });
     await openWith("Outro motivo", "x");
     await act(async () => fireEvent.click(submit()));

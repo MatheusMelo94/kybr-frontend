@@ -22,6 +22,8 @@ type Props = {
   razao: string;
   /** /me's webhook_configurado: which lead the dialog shows. */
   webhook: boolean;
+  /** Offline (T111): the trigger is disabled and described by offline.actions. */
+  offline?: { disabled: true; describedBy: string } | undefined;
 };
 
 const REASONS = MOTIVO_CODIGOS.map((codigo) => ({
@@ -37,7 +39,12 @@ const REASONS = MOTIVO_CODIGOS.map((codigo) => ({
  * the dialog with error.network and the values (D10); a 409 closes it on
  * T106's conflict state. Cancelar and Esc discard the draft (Q9).
  */
-export function BlockDialog({ caseId, razao, webhook }: Props): JSX.Element {
+export function BlockDialog({
+  caseId,
+  razao,
+  webhook,
+  offline,
+}: Props): JSX.Element {
   const { target, call, advance, conflict, unknown } = useDecisionFlow();
   const arm = useNavigationGuard();
   const expire = useSessionExpiry();
@@ -114,6 +121,8 @@ export function BlockDialog({ caseId, razao, webhook }: Props): JSX.Element {
         type="button"
         variant="secondary"
         size="panel"
+        disabled={offline?.disabled}
+        aria-describedby={offline?.describedBy}
         onClick={() => setOpen(true)}
       >
         {filaCopy["fila.action.block"]}

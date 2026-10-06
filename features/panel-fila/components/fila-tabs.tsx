@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { SoftLink } from "@/components/panel/soft-link";
+import { FilaSoftLink } from "@/features/panel-fila/components/fila-soft-link";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { filaHref, type FilaAba } from "@/features/panel-fila/search-params";
 import { fill } from "@/features/panel-shell/format";
@@ -39,7 +39,7 @@ export function FilaTabs({ aba, contagens }: Props): JSX.Element {
       {tabs.map((tab) => {
         const active = tab.aba === aba;
         return (
-          <SoftLink
+          <FilaSoftLink
             key={tab.aba}
             href={filaHref("/fila", { aba: tab.aba, ate: 25 })}
             id={active ? FILA_TAB_ACTIVE_ID : undefined}
@@ -54,7 +54,7 @@ export function FilaTabs({ aba, contagens }: Props): JSX.Element {
             {tab.n === undefined
               ? filaCopy[`${tab.key}.nocount`]
               : fill(filaCopy[tab.key], { n: tab.n })}
-          </SoftLink>
+          </FilaSoftLink>
         );
       })}
     </div>

@@ -16,20 +16,27 @@ import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
 
 /**
  * The Fila's new-case poll (T110, AC 40; ADR-0011 rule 3): every 60 s while
- * the tab is visible and online, once on becoming visible, never two at
+ * the tab is visible and online, once on becoming visible or online (T111), never two at
  * once and not while a decision has paused the shell's polls. A layout leaf,
  * so both Fila pages own pollNewCasesAction. It only sets the notice's
  * count, for the snapshot generation it asked about (E4); never a refresh.
- * A failure keeps the last state; SESSAO_EXPIRADA takes the session-expiry
+ * A poll that gets through ends T111's NETWORK hint. A failure keeps the
+ * last state; SESSAO_EXPIRADA takes the session-expiry
  * path once (Addendum 2) and stops.
  */
 export function NewCasesPoller(): null {
-  const { pollTarget, reportNovos } = useFila();
+  const { pollTarget, reportNovos, reachable } = useFila();
   const { isPaused } = useShellStatus();
   const expire = useSessionExpiry();
-  const latest = useRef({ pollTarget, reportNovos, isPaused, expire });
+  const latest = useRef({
+    pollTarget,
+    reportNovos,
+    reachable,
+    isPaused,
+    expire,
+  });
   useEffect(() => {
-    latest.current = { pollTarget, reportNovos, isPaused, expire };
+    latest.current = { pollTarget, reportNovos, reachable, isPaused, expire };
   });
 
   useEffect(() => {
@@ -49,6 +56,7 @@ export function NewCasesPoller(): null {
       }
       inFlight = false;
       if (result.ok) {
+        latest.current.reachable();
         latest.current.reportNovos(result.novos, at.gen);
       } else if (result.code === "SESSAO_EXPIRADA") {
         expired = true;
@@ -60,10 +68,13 @@ export function NewCasesPoller(): null {
     const onVisible = (): void => {
       if (document.visibilityState === "visible") void poll();
     };
+    const onOnline = (): void => void poll();
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
     return () => {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
     };
   }, []);
 

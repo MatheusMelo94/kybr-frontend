@@ -26,6 +26,18 @@ describe("SoftLink", () => {
     });
   });
 
+  it("disabled (offline, G9): aria-disabled, and a click goes nowhere", () => {
+    render(
+      <SoftLink href="/fila?ate=50" className="x" disabled>
+        Carregar mais 5
+      </SoftLink>,
+    );
+    const link = screen.getByRole("link", { name: "Carregar mais 5" });
+    expect(link).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(link);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
   it("a modified click is the browser's (new tab)", () => {
     render(
       <SoftLink href="/fila" className="x">

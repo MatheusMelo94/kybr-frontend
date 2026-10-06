@@ -11,6 +11,8 @@ type Props = {
   children: ReactNode;
   id?: string | undefined;
   "aria-current"?: "page" | undefined;
+  /** aria-disabled, and a click goes nowhere (the Fila offline, G9). */
+  disabled?: boolean | undefined;
 };
 
 /**
@@ -25,6 +27,7 @@ export function SoftLink({
   children,
   id,
   "aria-current": ariaCurrent,
+  disabled = false,
 }: Props): JSX.Element {
   const navigate = useSoftNavigate();
   return (
@@ -34,8 +37,13 @@ export function SoftLink({
       scroll={false}
       id={id}
       aria-current={ariaCurrent}
+      aria-disabled={disabled || undefined}
       className={className}
       onClick={(event) => {
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
         if (
           event.metaKey ||
           event.ctrlKey ||

@@ -18,7 +18,7 @@ type Props = { aba: FilaAba };
  * the snapshot; nothing else refreshes the list.
  */
 export function NewCasesNotice({ aba }: Props): JSX.Element {
-  const { novos, showNew } = useFila();
+  const { novos, showNew, online } = useFila();
   const visible = aba === "aberto" && novos > 0;
   return (
     <div role="status" aria-live="polite">
@@ -33,6 +33,7 @@ export function NewCasesNotice({ aba }: Props): JSX.Element {
             type="button"
             variant="secondary"
             size="panel"
+            disabled={!online}
             onClick={showNew}
           >
             {filaCopy["fila.new.cta"]}

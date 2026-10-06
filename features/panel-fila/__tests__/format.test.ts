@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDataHora, formatRelativo } from "@/features/panel-fila/format";
+import {
+  formatDataHora,
+  formatHora,
+  formatRelativo,
+} from "@/features/panel-fila/format";
 import { formatDuration } from "@/features/panel-shell/format";
 
 // A fixed clock: 2026-03-10 14:00 in Brasília (UTC-3 all year, no DST since 2019).
@@ -33,7 +37,11 @@ describe("formatRelativo (feed and timeline: hoje, ontem, há N dias)", () => {
   it.each([
     ["earlier today", "2026-03-10T14:37:00Z", "hoje, 11:37"],
     ["just after Brasília midnight", "2026-03-10T03:00:00Z", "hoje, 00:00"],
-    ["just before Brasília midnight (UTC is already the 10th)", "2026-03-10T02:59:00Z", "ontem"],
+    [
+      "just before Brasília midnight (UTC is already the 10th)",
+      "2026-03-10T02:59:00Z",
+      "ontem",
+    ],
     ["yesterday morning", "2026-03-09T12:00:00Z", "ontem"],
     ["two calendar days ago", "2026-03-08T23:00:00Z", "há 2 dias"],
     ["three days ago", "2026-03-07T15:00:00Z", "há 3 dias"],
@@ -54,5 +62,12 @@ describe("formatRelativo (feed and timeline: hoje, ontem, há N dias)", () => {
 
   it("a date on a later day falls back to dd/mm, hh:mm", () => {
     expect(formatRelativo("2026-03-12T12:00:00Z", NOW)).toBe("12/03, 09:00");
+  });
+});
+
+describe("formatHora (offline.panel's {hora}: hh:mm, 24 h, Brasília)", () => {
+  it("reads the instant in Brasília time", () => {
+    expect(formatHora(Date.parse("2026-10-06T13:05:00.000Z"))).toBe("10:05");
+    expect(formatHora(Date.parse("2026-10-07T02:59:00.000Z"))).toBe("23:59");
   });
 });

@@ -94,10 +94,13 @@ const TIPOS = [
 
 function Screen({
   caseId,
+  renderedAt = 1,
   email = true,
   tipos = TIPOS,
 }: {
   caseId: string;
+  /** The layout's server render: a re-read moves it (T106, T111). */
+  renderedAt?: number;
   email?: boolean;
   /** null: /me sent no documentos_habilitados. */
   tipos?: readonly (typeof TIPOS)[number][] | null;
@@ -106,7 +109,7 @@ function Screen({
     <ShellStatusProvider initial={{ contagens: undefined, plano: undefined }}>
       <ShellProbe />
       <ToastProvider closeLabel="Fechar">
-        <FilaProvider renderedAt={1}>
+        <FilaProvider renderedAt={renderedAt}>
           <span id={FILA_TAB_ACTIVE_ID}>Para decidir (3)</span>
           <div key={caseId}>
             <CaseListbox
@@ -373,8 +376,9 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     await flush();
     expect(screen.getByRole("alert")).toHaveTextContent(NETWORK_ERROR);
     expect(router.refresh).toHaveBeenCalledTimes(1);
-    rerender(<Screen caseId="caso-b" />);
-    rerender(<Screen caseId="caso-a" />);
+    // A server render: it also ends T111's offline hint.
+    rerender(<Screen caseId="caso-b" renderedAt={2} />);
+    rerender(<Screen caseId="caso-a" renderedAt={2} />);
     requestDocumentsAction.mockResolvedValueOnce({ ok: true });
     await openWith(["Cartão CNPJ atualizado"], "x");
     await act(async () => fireEvent.click(submit()));

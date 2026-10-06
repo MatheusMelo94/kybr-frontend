@@ -11,15 +11,24 @@ type Props = {
   decisao: QuickDecisao;
   /** The toast's {razao_social}: the masked CNPJ when there is none (G3). */
   razao: string;
+  /** Offline (T111): the trigger is disabled and described by offline.actions. */
+  offline?: { disabled: true; describedBy: string } | undefined;
 };
 
 /** fila.action.approve, or .keep on an alert: one click, no confirmation (AC 31). */
-export function ApproveButton({ caseId, decisao, razao }: Props): JSX.Element {
+export function ApproveButton({
+  caseId,
+  decisao,
+  razao,
+  offline,
+}: Props): JSX.Element {
   const { decide, busy } = useDecide();
   return (
     <Button
       type="button"
       busy={busy}
+      disabled={offline?.disabled}
+      aria-describedby={offline?.describedBy}
       onClick={() => decide(caseId, decisao, razao)}
     >
       {

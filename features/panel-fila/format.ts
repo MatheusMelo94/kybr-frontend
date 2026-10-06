@@ -30,6 +30,12 @@ export function formatDataHora(iso: string): string {
   return `${day}/${month}, ${hour}:${minute}`;
 }
 
+/** `{hora}` (offline.panel): "hh:mm" on a 24 h clock, from an epoch ms. */
+export function formatHora(ms: number): string {
+  const { hour, minute } = brasiliaParts(new Date(ms));
+  return `${hour}:${minute}`;
+}
+
 /**
  * The feed's and timeline's relative date: "hoje, 11:37", "ontem",
  * "há 3 dias", by Brasília calendar day. A later day (clock skew) shows

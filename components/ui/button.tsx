@@ -11,11 +11,11 @@ type Props = {
   /** Pending async work: shows `busyLabel`, keeps the width, ignores presses. */
   busy?: boolean;
   busyLabel?: string;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   className?: string;
   id?: string;
-  "aria-describedby"?: string;
+  "aria-describedby"?: string | undefined;
   ref?: Ref<HTMLButtonElement>;
 };
 

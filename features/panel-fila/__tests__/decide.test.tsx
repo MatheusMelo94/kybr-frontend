@@ -312,8 +312,10 @@ describe("Aprovar / Manter aprovado (AC 31, AC 33; D13; F5, F6, F7)", () => {
     const { rerender } = render(<Screen caseId="caso-a" ids={IDS} />);
     await act(async () => fireEvent.click(approve()));
     // The re-read remounts the page (a new Page key); the provider stays.
-    rerender(<Screen caseId="caso-b" ids={IDS} />);
-    rerender(<Screen caseId="caso-a" ids={IDS} />);
+    // It's a server render (renderedAt moves), which also ends T111's
+    // offline hint, so Aprovar is enabled again.
+    rerender(<Screen caseId="caso-b" ids={IDS} renderedAt={2} />);
+    rerender(<Screen caseId="caso-a" ids={IDS} renderedAt={2} />);
     decideAction.mockResolvedValueOnce({ ok: true });
     await act(async () => fireEvent.click(approve()));
     const [first, second] = decideAction.mock.calls.map(
@@ -336,7 +338,7 @@ describe("Aprovar / Manter aprovado (AC 31, AC 33; D13; F5, F6, F7)", () => {
     try {
       const call = deferred();
       decideAction.mockReturnValueOnce(call.promise);
-      render(<Screen caseId="caso-a" ids={IDS} />);
+      const { rerender } = render(<Screen caseId="caso-a" ids={IDS} />);
       await act(async () => fireEvent.click(approve()));
       await act(async () => {
         await vi.advanceTimersByTimeAsync(DECIDE_TIMEOUT_MS);
@@ -350,8 +352,11 @@ describe("Aprovar / Manter aprovado (AC 31, AC 33; D13; F5, F6, F7)", () => {
       expect(router.push).not.toHaveBeenCalled();
       expect(router.replace).not.toHaveBeenCalled();
 
+      // The re-read lands (a server render ends T111's offline hint).
+      rerender(<Screen caseId="caso-a" ids={IDS} renderedAt={2} />);
       decideAction.mockResolvedValueOnce({ ok: true });
       await act(async () => fireEvent.click(approve()));
+      expect(decideAction).toHaveBeenCalledTimes(2);
       const [first, second] = decideAction.mock.calls.map(
         ([input]) => (input as { idempotencyKey: string }).idempotencyKey,
       );

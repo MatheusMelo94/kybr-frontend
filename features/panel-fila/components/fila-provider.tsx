@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import type { FilaAba } from "@/features/panel-fila/search-params";
+import { useOnline } from "@/features/panel-fila/use-online";
 import { useRefreshUntil } from "@/lib/navigation/refresh-until";
 
 // The Fila's layout-scoped client state (plan-m6 § 5), kept across the page
@@ -23,7 +24,8 @@ import { useRefreshUntil } from "@/lib/navigation/refresh-until";
 // Idempotency-Keys (F5, T105), the decide flashes, the offline hint and the
 // re-read after a failed decision (T106), and the new-case snapshot (T110,
 // D3): the ids Renata has been shown, the poll's desde and generation, and
-// the notice's count. The online state arrives with T111.
+// the notice's count; and the online state (T111, D8): the browser's, or
+// offline after a decision's NETWORK until a poll gets through.
 
 /** /fila's key for the pane (DetailPane's caseId null): case ids are never empty. */
 export const FILA_NO_CASE = "";
@@ -101,9 +103,15 @@ type FilaValue = {
   /** The flash per case: until the case is opened again or decided. */
   flash: Readonly<Record<string, Flash>>;
   setFlash: (id: string, flash: Flash | null) => void;
-  /** A decision's call didn't get through (NETWORK); T111 reads it. */
+  /** A decision's call didn't get through (NETWORK): offline until reachable(). */
   offlineHint: boolean;
   hintOffline: () => void;
+  /** A poll got through: the NETWORK hint is over. */
+  reachable: () => void;
+  /** D8: online by the browser and with no NETWORK hint. */
+  online: boolean;
+  /** The layout's last server render (offline.panel's {hora}). */
+  renderedAt: number;
   /** Re-read the current page until the server re-renders it (renderedAt). */
   reread: () => void;
   /** D3: the ids of a rendered list Renata may see (the open case always). */
@@ -157,6 +165,9 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
 
   useEffect(() => {
     rendered.current = renderedAt;
+    // A server render got through (the re-read after a NETWORK, T106):
+    // the hint is over, like after a successful poll.
+    setOfflineHint(false);
   }, [renderedAt]);
 
   const setFlash = useCallback((id: string, next: Flash | null) => {
@@ -169,10 +180,15 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
     });
   }, []);
   const hintOffline = useCallback(() => setOfflineHint(true), []);
+  const reachable = useCallback(() => setOfflineHint(false), []);
+  const online = useOnline() && !offlineHint;
   const refreshUntilRendered = useRefreshUntil(
     useCallback(() => rendered.current !== rereadFrom.current, []),
   );
   const reread = useCallback(() => {
+    // D8: offline, a refresh's failed RSC fetch falls back to a full load
+    // (the browser's offline page). OfflineBanner re-reads on reconnect.
+    if (!navigator.onLine) return;
     rereadFrom.current = rendered.current;
     refreshUntilRendered();
   }, [refreshUntilRendered]);
@@ -283,6 +299,9 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       setFlash,
       offlineHint,
       hintOffline,
+      reachable,
+      online,
+      renderedAt,
       reread,
       visibleIds,
       observeList,
@@ -310,6 +329,9 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       setFlash,
       offlineHint,
       hintOffline,
+      reachable,
+      online,
+      renderedAt,
       reread,
       visibleIds,
       observeList,
@@ -320,6 +342,11 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
     ],
   );
   return <FilaContext.Provider value={value}>{children}</FilaContext.Provider>;
+}
+
+/** D8's online state; true outside the Fila (the tabs' tests, Lote). */
+export function useFilaOnline(): boolean {
+  return useContext(FilaContext)?.online ?? true;
 }
 
 /** The Fila's state; only inside fila/layout.tsx. */
