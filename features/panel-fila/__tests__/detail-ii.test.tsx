@@ -55,7 +55,7 @@ describe("SellerBlock (AC 29)", () => {
   it("responsável, the ext_id with its help (aria-describedby), the e-mail yes", () => {
     render(<SellerBlock view={view()} />);
     expect(
-      screen.getByRole("heading", { name: "Vendedor" }),
+      screen.getByRole("heading", { level: 3, name: "Vendedor" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Responsável informado: Maria Exemplo"),
@@ -153,7 +153,7 @@ describe("Timeline (AC 29, G1)", () => {
       />,
     );
     expect(
-      screen.getByRole("heading", { name: "Histórico" }),
+      screen.getByRole("heading", { level: 3, name: "Histórico" }),
     ).toBeInTheDocument();
     const items = screen.getAllByRole("listitem").map((li) => li.textContent);
     expect(items).toEqual([
@@ -239,6 +239,18 @@ describe("CaseDetail II: sections, partial, decided", () => {
       .map((h) => h.textContent);
     expect(names).toEqual(["Vendedor", "Documentos", "Histórico"]);
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("each section heading is an h2 below lg (under the case's h1) and an h3 at lg (under its h2): no skipped level (D9, P6-002)", () => {
+    render(<CaseDetail view={view()} now={NOW} />);
+    for (const name of ["Vendedor", "Documentos", "Histórico"]) {
+      expect(screen.getByRole("heading", { level: 2, name })).toHaveClass(
+        "lg:hidden",
+      );
+      expect(screen.getByRole("heading", { level: 3, name })).toHaveClass(
+        "max-lg:hidden",
+      );
+    }
   });
 
   it("history missing (eventos-falha): that block omitted, fila.detail.partial shown", () => {

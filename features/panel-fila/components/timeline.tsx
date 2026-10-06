@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { formatRelativo } from "@/features/panel-fila/format";
 import { fill } from "@/features/panel-shell/format";
@@ -41,9 +42,7 @@ export function Timeline({ eventos, now }: Props): JSX.Element {
   );
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-body font-strong text-ink">
-        {filaCopy["fila.history.h"]}
-      </h3>
+      <SectionHeading>{filaCopy["fila.history.h"]}</SectionHeading>
       <ol className="flex flex-col gap-2">
         {sorted.map((evento, i) => (
           <li

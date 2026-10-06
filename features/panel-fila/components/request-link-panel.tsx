@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
 import { FormAlert } from "@/components/panel/form-alert";
 import { useToast } from "@/components/panel/toast";
 import { Button } from "@/components/ui/button";
 import { useFila } from "@/features/panel-fila/components/fila-provider";
+import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { globalCopy } from "@/features/panel-shell/copy/global";
 
@@ -26,8 +27,7 @@ type Props = {
 export function RequestLinkPanel({ caseId, link }: Props): JSX.Element | null {
   const { flash } = useFila();
   const { show } = useToast();
-  const headingId = useId();
-  const heading = useRef<HTMLHeadingElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [failed, setFailed] = useState(false);
   const requested = flash[caseId]?.kind === "requested" ? flash[caseId] : null;
@@ -38,7 +38,18 @@ export function RequestLinkPanel({ caseId, link }: Props): JSX.Element | null {
   // returns focus to its trigger (and an open modal keeps focus inside).
   useEffect(() => {
     if (!fresh) return;
-    const frame = requestAnimationFrame(() => heading.current?.focus());
+    const frame = requestAnimationFrame(() => {
+      // An h2 below lg and an h3 at lg (P6-002): focus the one displayed.
+      const headings = [
+        ...(panel.current?.querySelectorAll<HTMLElement>(
+          "[data-section-heading]",
+        ) ?? []),
+      ];
+      (
+        headings.find((heading) => heading.getClientRects().length > 0) ??
+        headings[0]
+      )?.focus();
+    });
     return () => cancelAnimationFrame(frame);
   }, [fresh, requested]);
 
@@ -59,25 +70,21 @@ export function RequestLinkPanel({ caseId, link }: Props): JSX.Element | null {
   }
 
   return (
+    // Named by the copy, not by the heading: two heading elements render
+    // (one is display: none), and aria-labelledby would read both.
     <section
-      aria-labelledby={headingId}
+      ref={panel}
+      aria-label={filaCopy["doc.link.h"]}
       className="flex flex-col gap-2 rounded-lg border border-field-line p-4"
     >
-      <h3
-        ref={heading}
-        id={headingId}
-        tabIndex={-1}
-        className="text-body font-strong text-ink"
-      >
-        {filaCopy["doc.link.h"]}
-      </h3>
+      <SectionHeading focusable>{filaCopy["doc.link.h"]}</SectionHeading>
       <div className="flex flex-wrap items-center gap-2">
         <input
           ref={input}
           type="text"
           readOnly
           value={shown}
-          aria-labelledby={headingId}
+          aria-label={filaCopy["doc.link.h"]}
           autoComplete="off"
           spellCheck={false}
           autoCorrect="off"

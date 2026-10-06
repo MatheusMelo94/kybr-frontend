@@ -10,8 +10,13 @@ import { cn } from "@/lib/utils";
 type Props = {
   /** /me's counts; missing → no pills (spec S5, AC 11). */
   contagens: Contagens | undefined;
-  /** On /fila/{id} below lg the case's name is the h1: this one is sr-only. */
+  /** On /fila/{id} below lg the case's name is the h1: this one is display: none (D9). */
   caseOpen?: boolean;
+  /**
+   * Whether the open case renders its own h1 (false when its detail failed):
+   * without one this title stays the page's h1, visually hidden below lg.
+   */
+  caseHeading?: boolean | undefined;
 };
 
 const PILL =
@@ -21,6 +26,7 @@ const PILL =
 export function FilaHeader({
   contagens,
   caseOpen = false,
+  caseHeading = true,
 }: Props): JSX.Element {
   const abertos = contagens?.fila_abertos;
   const vencidos = contagens?.fila_vencidos ?? 0;
@@ -28,7 +34,10 @@ export function FilaHeader({
     <div className="flex flex-col gap-3">
       <div
         data-fila-title
-        className={cn("flex flex-col gap-2", caseOpen && "max-lg:sr-only")}
+        className={cn(
+          "flex flex-col gap-2",
+          caseOpen && (caseHeading ? "max-lg:hidden" : "max-lg:sr-only"),
+        )}
       >
         <h1 className="text-title font-title text-ink">
           {filaCopy["fila.h1"]}

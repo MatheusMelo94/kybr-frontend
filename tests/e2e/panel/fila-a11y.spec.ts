@@ -135,11 +135,31 @@ async function notTabular(page: Page): Promise<string[]> {
   );
 }
 
+/** P6-002: the headings in the accessibility tree, in document order. */
+async function outline(page: Page): Promise<number[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6")]
+      .filter(
+        (heading) =>
+          heading.getClientRects().length > 0 &&
+          heading.closest("[aria-hidden=true], [inert]") === null,
+      )
+      .map((heading) => Number(heading.tagName.slice(1))),
+  );
+}
+
 async function check(page: Page, label: string): Promise<void> {
   await expect(
     page.locator("h1:visible, h2:visible").first(),
     label,
   ).toBeVisible();
+  // One h1 per screen (spec § Accessibility Acceptance), h1…h6 in order.
+  await expect(page.getByRole("heading", { level: 1 }), label).toHaveCount(1);
+  const levels = await outline(page);
+  expect(
+    levels.filter((level, index) => level > (levels[index - 1] ?? 0) + 1),
+    `${label}: skipped heading level in ${levels.join(" ")}`,
+  ).toEqual([]);
   const text = await page.locator("body").innerText();
   expect(text, `${label}: AC 67`).not.toContain(SENTINEL);
   expect(text, `${label}: AC 72`).not.toMatch(GENDERED);

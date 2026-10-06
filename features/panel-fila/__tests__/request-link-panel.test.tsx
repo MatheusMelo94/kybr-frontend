@@ -62,8 +62,10 @@ const nextFrame = () =>
     async () =>
       new Promise<void>((done) => requestAnimationFrame(() => done())),
   );
+// jsdom has no layout: the h2 (below lg) is the one focused (P6-002).
 const heading = () =>
   screen.queryByRole("heading", {
+    level: 2,
     name: "Pedido criado. Envie este link ao vendedor:",
   });
 const input = () =>

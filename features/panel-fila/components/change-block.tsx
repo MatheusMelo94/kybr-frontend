@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 
+import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { fill, formatDate } from "@/features/panel-shell/format";
 import type { CaseView } from "@/lib/api/panel/cases";
@@ -10,9 +11,7 @@ type Props = { mudanca: NonNullable<CaseView["mudanca"]> };
 export function ChangeBlock({ mudanca }: Props): JSX.Element {
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-line p-4">
-      <h3 className="text-body font-strong text-ink">
-        {filaCopy["fila.change.h"]}
-      </h3>
+      <SectionHeading>{filaCopy["fila.change.h"]}</SectionHeading>
       <p className="text-body break-words text-ink">
         {fill(filaCopy["fila.change.row"], {
           campo: mudanca.campo,

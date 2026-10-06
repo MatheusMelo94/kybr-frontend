@@ -343,6 +343,7 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     );
     expect(
       screen.getByRole("heading", {
+        level: 2,
         name: "Pedido criado. Envie este link ao vendedor:",
       }),
     ).toHaveFocus();

@@ -242,7 +242,10 @@ describe("CaseDetail (AC 31, 32)", () => {
         })}
       />,
     );
-    const change = screen.getByRole("heading", { name: "O que mudou" });
+    const change = screen.getByRole("heading", {
+      level: 3,
+      name: "O que mudou",
+    });
     expect(
       screen.getByText("Situação: antes ATIVA, agora SUSPENSA"),
     ).toBeInTheDocument();

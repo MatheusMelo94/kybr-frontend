@@ -54,6 +54,7 @@ export default async function CasePage({
       plano={me.workspace.plano}
       contratarHref={contratarHref()}
       caseOpen
+      caseHeading={result.ok}
       list={
         <>
           <FilaTabs aba={search.aba} contagens={me.workspace.contagens} />

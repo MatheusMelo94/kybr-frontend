@@ -2,6 +2,7 @@ import type { JSX } from "react";
 
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { DocumentDownload } from "@/features/panel-fila/components/document-download";
+import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { formatDataHora } from "@/features/panel-fila/format";
 import { globalCopy } from "@/features/panel-shell/copy/global";
@@ -32,9 +33,7 @@ export function DocumentList({
 }: Props): JSX.Element {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-body font-strong text-ink">
-        {filaCopy["fila.docs.h"]}
-      </h3>
+      <SectionHeading>{filaCopy["fila.docs.h"]}</SectionHeading>
       {documentos.length === 0 ? (
         <p className="text-body text-ink-muted">
           {filaCopy["fila.docs.empty"]}

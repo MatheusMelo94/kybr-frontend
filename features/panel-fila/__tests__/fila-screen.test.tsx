@@ -54,10 +54,20 @@ describe("FilaHeader (T97, spec S6)", () => {
     expect(container.querySelector("[data-pill]")).toBeNull();
   });
 
-  it("on a case (below lg) the h1 is visually hidden, not removed", () => {
+  it("on a case (below lg) the title is display: none, so the case's name is the only h1 (D9, P6-002)", () => {
     render(<FilaHeader contagens={COUNTS} caseOpen />);
     const heading = screen.getByRole("heading", { level: 1 });
-    expect(heading.closest("[data-fila-title]")).toHaveClass("max-lg:sr-only");
+    const title = heading.closest("[data-fila-title]");
+    expect(title).toHaveClass("max-lg:hidden");
+    expect(title).not.toHaveClass("max-lg:sr-only");
+  });
+
+  it("on a case whose detail failed (no case name to head it) the title stays the h1, visually hidden below lg", () => {
+    render(<FilaHeader contagens={COUNTS} caseOpen caseHeading={false} />);
+    const heading = screen.getByRole("heading", { level: 1 });
+    const title = heading.closest("[data-fila-title]");
+    expect(title).toHaveClass("max-lg:sr-only");
+    expect(title).not.toHaveClass("max-lg:hidden");
   });
 });
 

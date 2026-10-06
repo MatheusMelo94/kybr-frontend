@@ -1,5 +1,6 @@
 import { useId, type JSX } from "react";
 
+import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { fill } from "@/features/panel-shell/format";
 import type { CaseView } from "@/lib/api/panel/cases";
@@ -15,9 +16,7 @@ export function SellerBlock({ view }: Props): JSX.Element {
   const helpId = useId();
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-body font-strong text-ink">
-        {filaCopy["fila.seller.h"]}
-      </h3>
+      <SectionHeading>{filaCopy["fila.seller.h"]}</SectionHeading>
       {view.responsavel_informado !== undefined && (
         <p className="text-body break-words text-ink">
           {fill(filaCopy["fila.seller.responsavel"], {

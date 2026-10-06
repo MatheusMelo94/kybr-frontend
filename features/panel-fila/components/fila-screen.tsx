@@ -13,6 +13,8 @@ type Props = {
   detail: ReactNode;
   /** /fila/{id}: below lg the detail is the one pane; on /fila, the list. */
   caseOpen: boolean;
+  /** False when the open case's detail failed: it has no h1 of its own. */
+  caseHeading?: boolean;
 };
 
 /**
@@ -27,10 +29,15 @@ export function FilaScreen({
   list,
   detail,
   caseOpen,
+  caseHeading,
 }: Props): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
-      <FilaHeader contagens={contagens} caseOpen={caseOpen} />
+      <FilaHeader
+        contagens={contagens}
+        caseOpen={caseOpen}
+        caseHeading={caseHeading}
+      />
       <PlanBanner plano={plano} contratarHref={contratarHref} />
       <div className="grid items-start gap-6 lg:grid-cols-[2fr_3fr]">
         <section
