@@ -173,7 +173,8 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
           preview={preview}
           column={column}
           onColumn={(picked) => setChoice({ preview, column: picked })}
-          columnLocked={builtFor === preview}
+          // P5-014: also while the rows are being built (busy).
+          columnLocked={busy || builtFor === preview}
           left={left}
           gate={planGate(plano)}
           contratarHref={contratarHref}

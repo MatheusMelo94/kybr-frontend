@@ -282,6 +282,22 @@ describe("BatchUpload: starting a batch (T80, AC 16, 18, 19)", () => {
     expect(screen.getByRole("combobox")).toBeDisabled();
   });
 
+  it("P5-014: the select is locked while the rows are being built", async () => {
+    let done: (linhas: typeof LINHAS) => void = () => undefined;
+    hook.build.mockReturnValueOnce(
+      new Promise((resolve) => {
+        done = resolve;
+      }),
+    );
+    start.mockResolvedValue({ ok: false, code: "NETWORK" });
+    startPreview();
+    expect(screen.getByRole("combobox")).toBeEnabled();
+    fireEvent.click(cta());
+    expect(screen.getByRole("combobox")).toBeDisabled();
+    await act(async () => done(LINHAS));
+    expect(screen.getByRole("combobox")).toBeDisabled();
+  });
+
   it("a payload the worker can't build → lote.error.unreadable, nothing sent", async () => {
     startPreview();
     hook.build.mockResolvedValue(undefined);

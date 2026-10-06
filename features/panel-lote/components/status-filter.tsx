@@ -21,9 +21,10 @@ import {
 // A change re-renders the table section through its in-page Suspense
 // boundary (T83), whose fallback can hide the subtree while the server
 // renders, and that drops focus. This one-shot flag gives the select its
-// focus back once the new status arrives. (Module state, so one per page;
-// P5-008's move into a ref waits on Security's C8 ruling for the
-// sessionStorage path below.)
+// focus back once the new status arrives. (Module state, so one per page.
+// Security ruled the sessionStorage flag below OK under C8 as it stands: the
+// constant "1" under a fixed key, set only before the fallback's reload,
+// cleared on read, every access in try/catch. Never store data in it.)
 let refocus = false;
 // The same, across the fallback's full reload (a UI flag only, never data).
 const REFOCUS_KEY = "kybr-lote-filter-focus";
