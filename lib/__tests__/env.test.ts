@@ -402,6 +402,114 @@ describe("parseServerEnv", () => {
     });
   });
 
+  describe("the documents origin and mode (D-C6, F2, Q1)", () => {
+    const panel = {
+      ...production,
+      PANEL_HOST: "app.kybr.test",
+      LEGAL_TERMS_URL: "https://kybr.com.br/termos",
+      LEGAL_PRIVACY_URL: "https://kybr.com.br/privacidade",
+      LEGAL_TERMS_VERSION: "2026-10-04",
+      TURNSTILE_SITE_KEY: "0x4AAAAAAAexampleKey",
+    };
+
+    it("keeps an https: origin as its normalized origin", () => {
+      expect(
+        parseServerEnv({
+          ...panel,
+          PANEL_DOCUMENTS_ORIGIN: "https://Docs.Exemplo-Arquivos.test",
+        }).PANEL_DOCUMENTS_ORIGIN,
+      ).toBe("https://docs.exemplo-arquivos.test");
+    });
+
+    it.each([
+      ["a path", "https://docs.exemplo.test/arquivos"],
+      ["a trailing slash", "https://docs.exemplo.test/"],
+      ["a query", "https://docs.exemplo.test?x=1"],
+      ["a fragment", "https://docs.exemplo.test#x"],
+      ["userinfo", "https://user:pass@docs.exemplo.test"],
+      ["not a URL", "docs.exemplo.test"],
+      ["another scheme", "ftp://docs.exemplo.test"],
+    ])("refuses an origin with %s", (_name, value) => {
+      expect(parseError({ ...panel, PANEL_DOCUMENTS_ORIGIN: value })).toContain(
+        "PANEL_DOCUMENTS_ORIGIN",
+      );
+    });
+
+    it.each([
+      ["the panel host", "https://app.kybr.test"],
+      ["the link host", "https://kybr.com.br"],
+      ["kybr.com.br's apex", "https://kybr.com.br:8443"],
+      ["a kybr.com.br subdomain", "https://docs.kybr.com.br"],
+      ["a deeper kybr.com.br subdomain", "https://a.docs.kybr.com.br"],
+    ])(
+      "refuses %s, so user content is never same-site (F2)",
+      (_name, value) => {
+        expect(
+          parseError({ ...panel, PANEL_DOCUMENTS_ORIGIN: value }),
+        ).toContain("PANEL_DOCUMENTS_ORIGIN");
+      },
+    );
+
+    it("compares the panel and link hosts with their ports (Q1b)", () => {
+      expect(
+        parseServerEnv({
+          ...panel,
+          PANEL_HOST: "localhost:3000",
+          LINK_HOST: "localhost:3001",
+          API_BASE_URL: "http://localhost:4010",
+          API_ALLOW_LOOPBACK_HTTP: "true",
+          PANEL_DOCUMENTS_ORIGIN: "http://localhost:4010",
+        }).PANEL_DOCUMENTS_ORIGIN,
+      ).toBe("http://localhost:4010");
+      expect(
+        parseError({
+          ...panel,
+          PANEL_HOST: "localhost:3000",
+          API_ALLOW_LOOPBACK_HTTP: "true",
+          PANEL_DOCUMENTS_ORIGIN: "http://localhost:3000",
+        }),
+      ).toContain("PANEL_DOCUMENTS_ORIGIN");
+    });
+
+    it("refuses a loopback http: origin in production unless loopback http is allowed (Q1)", () => {
+      expect(
+        parseError({
+          ...panel,
+          PANEL_DOCUMENTS_ORIGIN: "http://localhost:4010",
+        }),
+      ).toContain("PANEL_DOCUMENTS_ORIGIN");
+    });
+
+    it("allows a loopback http: origin outside production", () => {
+      expect(
+        parseServerEnv({
+          ...development,
+          PANEL_DOCUMENTS_ORIGIN: "http://127.0.0.1:4010",
+        }).PANEL_DOCUMENTS_ORIGIN,
+      ).toBe("http://127.0.0.1:4010");
+    });
+
+    it("never allows a non-loopback http: origin", () => {
+      expect(
+        parseError({
+          ...development,
+          API_ALLOW_LOOPBACK_HTTP: "true",
+          PANEL_DOCUMENTS_ORIGIN: "http://docs.exemplo.test",
+        }),
+      ).toContain("PANEL_DOCUMENTS_ORIGIN");
+    });
+
+    it("takes redirect or attachment as the mode, nothing else", () => {
+      expect(
+        parseServerEnv({ ...panel, PANEL_DOCUMENTS_MODE: "redirect" })
+          .PANEL_DOCUMENTS_MODE,
+      ).toBe("redirect");
+      expect(
+        parseError({ ...panel, PANEL_DOCUMENTS_MODE: "inline" }),
+      ).toContain("PANEL_DOCUMENTS_MODE");
+    });
+  });
+
   it("never echoes a variable's value in the error", () => {
     const leaky = "s3cr3t-value-that-must-not-leak";
     expect(parseError({ ...production, API_BFF_KEY: leaky })).not.toContain(

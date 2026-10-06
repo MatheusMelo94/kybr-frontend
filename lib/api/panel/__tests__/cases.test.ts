@@ -291,12 +291,14 @@ describe("getCaseForPage (F1, F11)", () => {
 });
 
 describe("getDocumentUrl (D-C6)", () => {
-  it("reads the case and returns that document's fresh signed URL", async () => {
+  it("reads the case and returns that document's fresh signed URL and its type", async () => {
     const id = idOf("decidido-com-documentos");
     const docId =
       casesOf(email).find((record) => record.id === id)?.documentos[0]?.id ??
       "";
-    expect(await getDocumentUrl(id, docId)).toMatch(/\?sig=/);
+    const doc = await getDocumentUrl(id, docId);
+    expect(doc.url).toMatch(/\?sig=/);
+    expect(doc.tipo).toBe("CARTAO_CNPJ");
   });
 
   it("a document that isn't on the case → RECURSO_NAO_ENCONTRADO", async () => {

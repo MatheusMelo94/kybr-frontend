@@ -16,6 +16,8 @@ type Props = {
   view: CaseView;
   /** The render's clock (the history's relative dates). */
   now: Date;
+  /** PANEL_DOCUMENTS_MODE, read by the page (Q1, Q19). */
+  documentsMode?: "redirect" | "attachment" | undefined;
 };
 
 /**
@@ -24,7 +26,7 @@ type Props = {
  * (eventos / documentos, D-C2) is left out with fila.detail.partial. T104+
  * add the actions.
  */
-export function CaseDetail({ view, now }: Props): JSX.Element {
+export function CaseDetail({ view, now, documentsMode }: Props): JSX.Element {
   const partial = view.eventos === undefined || view.documentos === undefined;
   return (
     <article className="@container/detail flex flex-col gap-6">
@@ -44,7 +46,11 @@ export function CaseDetail({ view, now }: Props): JSX.Element {
       <SellerBlock view={view} />
       {partial && <PartialNotice />}
       {view.documentos && (
-        <DocumentList caseId={view.id} documentos={view.documentos} />
+        <DocumentList
+          caseId={view.id}
+          documentos={view.documentos}
+          mode={documentsMode}
+        />
       )}
       {view.eventos && <Timeline eventos={view.eventos} now={now} />}
     </article>

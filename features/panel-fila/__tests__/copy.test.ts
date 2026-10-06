@@ -70,6 +70,7 @@ const SPEC_S6: Record<string, string> = {
   "fila.docs.h": "Documentos",
   "fila.docs.item": "{documento}, enviado em {data_hora}",
   "fila.docs.open": "Abrir",
+  "fila.docs.download": "Baixar",
   "fila.docs.empty": "Nenhum documento enviado.",
   "fila.history.h": "Histórico",
   "fila.event.criado.link": "Caso aberto pelo link",

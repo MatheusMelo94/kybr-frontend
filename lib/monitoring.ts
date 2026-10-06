@@ -101,7 +101,8 @@ export function initMonitoring(dsn: string | undefined): void {
  *   refused the token).
  * - The Fila's (M6, F8, F11): CASE_SCHEMA_INVALID (a case response failed
  *   its schema; paths only), LINK_VENDEDOR_INVALID (a seller link failed
- *   parseLinkVendedor and was dropped).
+ *   parseLinkVendedor and was dropped), DOCUMENT_ORIGIN_REFUSED (a signed
+ *   document URL off PANEL_DOCUMENTS_ORIGIN, F2; the case id only).
  */
 export const MARKERS = [
   "REDIRECT_REFUSED",
@@ -111,6 +112,7 @@ export const MARKERS = [
   "TURNSTILE_FAILED",
   "CASE_SCHEMA_INVALID",
   "LINK_VENDEDOR_INVALID",
+  "DOCUMENT_ORIGIN_REFUSED",
 ] as const;
 
 export type Marker = (typeof MARKERS)[number];

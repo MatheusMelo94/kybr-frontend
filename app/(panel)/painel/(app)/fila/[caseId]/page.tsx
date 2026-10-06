@@ -11,6 +11,7 @@ import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
 import { FilaTabs } from "@/features/panel-fila/components/fila-tabs";
 import { ListSkeleton } from "@/features/panel-fila/components/list-skeleton";
 import { filaCopy } from "@/features/panel-fila/copy";
+import { documentsSettings } from "@/features/panel-fila/document-route";
 import { parseFilaSearch } from "@/features/panel-fila/search-params";
 import { getCaseForPage } from "@/lib/api/panel/cases";
 import { AppError } from "@/lib/api/errors";
@@ -65,7 +66,11 @@ export default async function CasePage({
               always={result.ok && result.case.estado === "decidido"}
             />
             {result.ok ? (
-              <CaseDetail view={result.case} now={new Date()} />
+              <CaseDetail
+                view={result.case}
+                now={new Date()}
+                documentsMode={documentsSettings().mode}
+              />
             ) : (
               <CaseDetailError />
             )}

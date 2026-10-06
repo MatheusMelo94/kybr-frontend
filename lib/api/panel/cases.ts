@@ -298,13 +298,13 @@ export async function getCaseForPage(
 export async function getDocumentUrl(
   caseId: string,
   docId: string,
-): Promise<string> {
+): Promise<{ url: string; tipo: DocumentoTipo }> {
   const record = await getCase(caseId);
   if (record.documentos === undefined)
     throw new AppError({ code: "UNAVAILABLE" });
   const doc = record.documentos.find((candidate) => candidate.id === docId);
   if (!doc) throw new AppError({ code: "RECURSO_NAO_ENCONTRADO" });
-  return doc.url;
+  return { url: doc.url, tipo: doc.tipo };
 }
 
 /**

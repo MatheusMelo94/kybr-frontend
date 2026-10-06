@@ -7,6 +7,8 @@ const PANEL_URL = "http://127.0.0.1:3000";
 // The same build with PANEL_HOST unset (P-U2, QA's G7): the panel is "dark".
 const DARK_PORT = 3001;
 const DARK_PANEL_URL = `http://127.0.0.1:${DARK_PORT}`;
+// The same build, lit, with documents as F4 attachments (QA G9).
+const ATTACHMENT_PORT = 3002;
 const MOCK_API_PORT = 4010;
 const MOCK_API_URL = `http://localhost:${MOCK_API_PORT}`;
 
@@ -20,6 +22,18 @@ const SERVER_ENV = {
   API_BFF_KEY: "e2e-only-bff-key-for-the-local-mock-api",
   CLIENT_IP_HEADER: "x-forwarded-for",
   CLIENT_IP_TRUSTED_HOPS: "1",
+};
+
+// The lit servers' panel config: placeholders only.
+const PANEL_ENV = {
+  LEGAL_TERMS_URL: "https://example.invalid/termos",
+  LEGAL_PRIVACY_URL: "https://example.invalid/privacidade",
+  LEGAL_TERMS_VERSION: "e2e-1",
+  // Cloudflare's always-pass Turnstile test site key.
+  TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+  // The mock's documents origin (QA G9, Q1: loopback http: allowed by
+  // API_ALLOW_LOOPBACK_HTTP).
+  PANEL_DOCUMENTS_ORIGIN: MOCK_API_URL,
 };
 
 // Production posture matrix (frontend-qa-conventions.md § Browser & Device Matrix).
@@ -123,14 +137,11 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: {
         ...SERVER_ENV,
-        // Hosts (ADR-0008) and the panel's config: placeholders only.
+        ...PANEL_ENV,
+        // Hosts (ADR-0008): placeholders only.
         LINK_HOST: "localhost:3000",
         PANEL_HOST: "127.0.0.1:3000",
-        LEGAL_TERMS_URL: "https://example.invalid/termos",
-        LEGAL_PRIVACY_URL: "https://example.invalid/privacidade",
-        LEGAL_TERMS_VERSION: "e2e-1",
-        // Cloudflare's always-pass Turnstile test site key.
-        TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+        PANEL_DOCUMENTS_MODE: "redirect",
       },
     },
     // Starts after the build above is ready (webServers start in order).
@@ -140,6 +151,19 @@ export default defineConfig({
       port: DARK_PORT,
       reuseExistingServer: !process.env.CI,
       env: { ...SERVER_ENV, LINK_HOST: `localhost:${DARK_PORT}` },
+    },
+    // QA G9: the documents' attachment mode (F4) on its own lit server.
+    {
+      command: `mkdir -p e2e-logs && pnpm start -p ${ATTACHMENT_PORT} 2>&1 | tee e2e-logs/next-server-attachment.log`,
+      port: ATTACHMENT_PORT,
+      reuseExistingServer: !process.env.CI,
+      env: {
+        ...SERVER_ENV,
+        ...PANEL_ENV,
+        LINK_HOST: `localhost:${ATTACHMENT_PORT}`,
+        PANEL_HOST: `127.0.0.1:${ATTACHMENT_PORT}`,
+        PANEL_DOCUMENTS_MODE: "attachment",
+      },
     },
   ],
 });

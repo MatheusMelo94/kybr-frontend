@@ -250,6 +250,26 @@ describe("CaseDetail II: sections, partial, decided", () => {
     expect(screen.getByText(/^Parte do histórico não carregou/)).toBeVisible();
   });
 
+  it("passes the documents mode down: attachment → Baixar, not Abrir (Q19)", () => {
+    render(
+      <CaseDetail
+        view={view({
+          documentos: [
+            {
+              id: "doc_00000000000000001",
+              tipo: "CARTAO_CNPJ",
+              enviadoEm: "2026-10-05T13:37:00Z",
+            },
+          ],
+        })}
+        now={NOW}
+        documentsMode="attachment"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Baixar" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: /^Abrir/ })).toBeNull();
+  });
+
   it("a decided case shows the banner", () => {
     render(
       <CaseDetail
