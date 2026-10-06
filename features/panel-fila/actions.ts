@@ -11,6 +11,7 @@ import { AppError, type DecisaoAnterior } from "@/lib/api/errors";
 import { decideCase, requestDocuments } from "@/lib/api/panel/cases";
 import { assertPanelHost } from "@/lib/api/panel/host";
 import { requireSession, sessionExpiredResult } from "@/lib/api/panel/session";
+import { env } from "@/lib/env";
 import { panelPath } from "@/lib/panel-paths";
 import { safeReturnPath } from "@/lib/safe-return-path";
 
@@ -42,9 +43,12 @@ export type DecideResult =
 
 /**
  * F7: the page the POST came from, as the middleware set it (never the
- * client's), path only. It lets the request log show which page owned it.
+ * client's), path only. It lets the mock's request log show which page
+ * owned it. Test plumbing: sent only to the local mock API (behind the
+ * local-only API_ALLOW_LOOPBACK_HTTP flag), never to a real API (M6C-05).
  */
 async function pagePath(): Promise<string | undefined> {
+  if (env.API_ALLOW_LOOPBACK_HTTP !== "true") return undefined;
   const path = safeReturnPath((await headers()).get("x-kybr-panel-path"));
   return path === null ? undefined : path.split("?")[0];
 }

@@ -15,6 +15,8 @@ import { server } from "@/tests/fixtures/msw/server";
 const state = vi.hoisted(() => ({
   headers: new Headers(),
   token: undefined as string | undefined,
+  /** M6C-05: the local mock API (the E2E build) vs a real API. */
+  loopback: "true" as "true" | undefined,
 }));
 const revalidatePath = vi.hoisted(() => vi.fn());
 const reportMarker = vi.hoisted(() => vi.fn());
@@ -32,6 +34,17 @@ vi.mock("@/lib/api/panel/cookies", () => ({
   readSessionToken: async () => state.token,
 }));
 vi.mock("@/lib/monitoring", () => ({ reportMarker }));
+vi.mock("@/lib/env", async (importOriginal) => {
+  const { env } = await importOriginal<typeof import("@/lib/env")>();
+  return {
+    env: new Proxy(env, {
+      get: (target, key) =>
+        key === "API_ALLOW_LOOPBACK_HTTP"
+          ? state.loopback
+          : Reflect.get(target, key),
+    }),
+  };
+});
 
 import { decideAction } from "@/features/panel-fila/actions";
 import { DEFAULT_TIMEOUT_MS } from "@/lib/api/client";
@@ -188,6 +201,23 @@ describe("decideAction (D-C3; ADR-0011 order; ADR-0008 Addendum 2)", () => {
     state.headers.set("x-kybr-panel-path", `/fila/${id}?aba=aberto`);
     await decideAction({ caseId: id, idempotencyKey: KEY, decisao: "aprovar" });
     expect(decidePosts()[0]?.pagePath).toBe(`/fila/${id}`);
+  });
+
+  it("M6C-05: against a real API (no API_ALLOW_LOOPBACK_HTTP) the test header isn't sent", async () => {
+    const id = idOf("link");
+    state.loopback = undefined;
+    try {
+      state.headers.set("x-kybr-panel-path", `/fila/${id}`);
+      await decideAction({
+        caseId: id,
+        idempotencyKey: KEY,
+        decisao: "aprovar",
+      });
+      expect(decidePosts()).toHaveLength(1);
+      expect(decidePosts()[0]?.pagePath).toBeUndefined();
+    } finally {
+      state.loopback = "true";
+    }
   });
 
   it("F7: a page path that isn't a panel screen isn't forwarded", async () => {
