@@ -80,13 +80,19 @@ export default async function CasePage({
                     />
                   }
                 />
-                {/* The only owner of decideAction (ADR-0008 Addendum 2, F7). */}
+                {/* The only owner of decideAction and requestDocumentsAction (ADR-0008 Addendum 2, F7). */}
                 {result.case.estado !== "decidido" && (
                   <CaseActions
                     caseId={result.case.id}
                     origem={result.case.origem}
                     razao={result.case.razao_social ?? result.case.cnpj}
                     webhook={me.workspace.webhook_configurado}
+                    request={
+                      me.workspace.documentos_habilitados && {
+                        tipos: me.workspace.documentos_habilitados,
+                        vendedorTemEmail: result.case.vendedor_tem_email,
+                      }
+                    }
                   />
                 )}
               </>

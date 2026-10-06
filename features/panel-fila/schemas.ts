@@ -3,6 +3,7 @@ import { z } from "zod";
 import { NOTA_VENDEDOR_MAX } from "@/features/panel-fila/limits";
 import {
   DECISAO_TIPOS,
+  DOCUMENTO_TIPOS,
   MOTIVO_CODIGOS,
   isPanelId,
 } from "@/lib/panel-api-values";
@@ -30,3 +31,22 @@ export const decideSchema = z
   );
 
 export type DecideInput = z.infer<typeof decideSchema>;
+
+/**
+ * requestDocumentsAction's input (D-C4): 1–5 unique document types and an
+ * optional note.
+ */
+export const requestDocumentsSchema = z
+  .object({
+    caseId: z.string().refine(isPanelId),
+    idempotencyKey: z.uuid(),
+    tipos: z
+      .array(z.enum(DOCUMENTO_TIPOS))
+      .min(1)
+      .max(DOCUMENTO_TIPOS.length)
+      .refine((tipos) => new Set(tipos).size === tipos.length),
+    notaVendedor: z.string().max(NOTA_VENDEDOR_MAX).optional(),
+  })
+  .strict();
+
+export type RequestDocumentsInput = z.infer<typeof requestDocumentsSchema>;

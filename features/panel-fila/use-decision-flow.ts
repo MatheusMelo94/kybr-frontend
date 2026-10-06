@@ -3,15 +3,26 @@
 import { useCallback } from "react";
 
 import { useToast } from "@/components/panel/toast";
-import { decideAction, type DecideResult } from "@/features/panel-fila/actions";
-import { callAction } from "@/features/panel-fila/call-action";
+import {
+  decideAction,
+  requestDocumentsAction,
+  type DecideResult,
+  type RequestDocumentsResult,
+} from "@/features/panel-fila/actions";
+import {
+  callAction,
+  type NetworkResult,
+} from "@/features/panel-fila/call-action";
 import {
   FILA_NO_CASE,
   useFila,
 } from "@/features/panel-fila/components/fila-provider";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { nextCaseId } from "@/features/panel-fila/next-case";
-import type { DecideInput } from "@/features/panel-fila/schemas";
+import type {
+  DecideInput,
+  RequestDocumentsInput,
+} from "@/features/panel-fila/schemas";
 import { useIntentKey } from "@/features/panel-fila/use-intent-key";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
 import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
@@ -20,7 +31,7 @@ import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
  * ok, a 409, a 4xx or the API's 5xx (UNAVAILABLE, T106: a definitive
  * failure): the key is spent. NETWORK (a dropped call, a timeout): unknown.
  */
-function definitive(result: DecideResult): boolean {
+function definitive(result: { ok: boolean; code?: string }): boolean {
   return result.ok || result.code !== "NETWORK";
 }
 
@@ -29,15 +40,20 @@ export type DecisionTarget = { next: string | null; query: string };
 
 /**
  * The steps every Fila decision shares (plan-m6 § 3.3), optimistic
- * (useDecide) or not (BlockDialog, T107): the call with its intent key (F5)
- * and bound (F6), the shell poller paused meanwhile (rule 3), and what each
- * outcome does. The callers decide what "still here" means (E3).
+ * (useDecide) or not (BlockDialog, T107; RequestDocumentsDialog, T108):
+ * the call with its intent key (F5) and bound (F6), the shell poller paused
+ * meanwhile (rule 3), and what each outcome does. The callers decide what
+ * "still here" means (E3).
  */
 export function useDecisionFlow(): {
   /** Before the call: the next case, from the list as rendered. */
   target: (caseId: string) => DecisionTarget;
   /** decideAction with the intent's key; a result after the bound only releases it. */
   call: (input: Omit<DecideInput, "idempotencyKey">) => Promise<DecideResult>;
+  /** requestDocumentsAction, under the same key and bound rules (T108). */
+  request: (
+    input: Omit<RequestDocumentsInput, "idempotencyKey">,
+  ) => Promise<RequestDocumentsResult>;
   /** ok: the toast and a shell poll; then, if still here, the next case. */
   advance: (
     caseId: string,
@@ -82,14 +98,18 @@ export function useDecisionFlow(): {
     [list, wasDecided],
   );
 
-  const call = useCallback(
-    async (input: Omit<DecideInput, "idempotencyKey">) => {
+  const run = useCallback(
+    async <I extends { caseId: string }, R extends { ok: boolean }>(
+      action: (input: I & { idempotencyKey: string }) => Promise<R>,
+      name: string,
+      input: I,
+    ): Promise<R | NetworkResult> => {
       const { caseId, ...body } = input;
-      const intent = { caseId, action: "decide", body };
+      const intent = { caseId, action: name, body };
       const idempotencyKey = take(intent);
       pause();
       const result = await callAction(
-        decideAction,
+        action,
         { ...input, idempotencyKey },
         {
           onLate: (late) => {
@@ -102,6 +122,18 @@ export function useDecisionFlow(): {
       return result;
     },
     [take, release, pause, resume],
+  );
+
+  const call = useCallback(
+    (input: Omit<DecideInput, "idempotencyKey">) =>
+      run(decideAction, "decide", input),
+    [run],
+  );
+
+  const request = useCallback(
+    (input: Omit<RequestDocumentsInput, "idempotencyKey">) =>
+      run(requestDocumentsAction, "request-documents", input),
+    [run],
   );
 
   const advance = useCallback(
@@ -143,5 +175,5 @@ export function useDecisionFlow(): {
     [hintOffline, reread],
   );
 
-  return { target, call, advance, conflict, unknown };
+  return { target, call, request, advance, conflict, unknown };
 }

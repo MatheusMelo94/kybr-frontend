@@ -367,6 +367,7 @@ export async function requestDocuments(
   id: string,
   request: { tipos: DocumentoTipo[]; notaVendedor?: string | undefined },
   idempotencyKey: string,
+  options: { pagePath?: string | undefined } = {},
 ): Promise<{ case: Case; linkVendedor?: string }> {
   const operation = "case-request-documents";
   const data = await send({
@@ -379,7 +380,13 @@ export async function requestDocuments(
         nota_vendedor: request.notaVendedor,
       }),
     },
-    headers: { "idempotency-key": idempotencyKey },
+    headers: {
+      "idempotency-key": idempotencyKey,
+      // F7: the page that posted the action (the request log's pagePath).
+      ...(options.pagePath !== undefined && {
+        "x-kybr-panel-path": options.pagePath,
+      }),
+    },
   });
   const result = parse(requestDocumentsResultSchema, data, {
     operation,
