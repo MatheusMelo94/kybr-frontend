@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
-  caseFault,
   caseSeed,
   casesFor,
   decideElsewhere,
@@ -14,6 +13,7 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { SETTLE, holdNextAction } from "../fixtures/fila-timing.ts";
 
 // T108: Pedir documento (AC 36, AC 37 before half; D10, D11; Security F5,
 // F6, F7). Non-optimistic: nothing leaves the list before ok. With a seller
@@ -60,10 +60,6 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     await createAccount(request, email);
     await seedCases(request, email, "dois");
     const [first, second] = await openCases(request, email);
-    await caseFault(request, email, "request-documents", "delay", {
-      ms: 1_500,
-      times: 1,
-    });
     await logIn(page, email);
     await page.goto(`/fila/${first?.id}`);
     const open = page.getByRole("link", { name: /^Para decidir/ });
@@ -101,6 +97,8 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
       .getByRole("checkbox", { name: "Contrato social ou CCMEI" })
       .check();
     await expect(submitButton(page)).toHaveAccessibleName("Pedir 2 documentos");
+    // P6-005: the call is held until released, not raced against a delay.
+    const release = await holdNextAction(page, first?.id ?? "");
     await submitButton(page).click();
 
     await expect(
@@ -110,6 +108,7 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     await expect(dialog).toBeVisible();
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(2);
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
+    release();
 
     await expect(dialog).toBeHidden();
     await expect(
@@ -117,8 +116,10 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
         hasText: `Documento pedido: ${first?.razao_social}`,
       }),
     ).toContainText("Registrado na trilha de auditoria.");
-    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
-    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
+    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`), SETTLE);
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused(
+      SETTLE,
+    );
     await expect(open).toHaveText(/\(1\)$/);
     await expect(waiting).toHaveText(/\(1\)$/);
     const [post] = await requestPosts(request, email);
@@ -293,7 +294,7 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     await expect(note).toHaveValue("Nota.");
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(2);
     await submitButton(page).click();
-    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`), SETTLE);
     const keys = (await requestPosts(request, email)).map(
       (call) => call.idempotencyKey,
     );
@@ -323,7 +324,7 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     await submitButton(page).click();
     await expect(dialog.getByRole("alert")).toHaveText(NETWORK_ERROR);
     await submitButton(page).click();
-    await expect(dialog).toBeHidden();
+    await expect(dialog).toBeHidden(SETTLE);
     await expect(page).toHaveURL(new RegExp(`/fila/${target?.id}$`));
     const posts = await requestPosts(request, email);
     expect(posts).toHaveLength(2);
@@ -354,7 +355,7 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     await expect(dialog).toBeHidden();
     await expect(
       page.getByText(/^Este caso já tinha sido decidido em /),
-    ).toBeVisible();
+    ).toBeVisible(SETTLE);
     await expect(page.getByText(/^Decidido: /)).toBeVisible();
     // P6-003: focus on the case's heading, not <body>.
     await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();

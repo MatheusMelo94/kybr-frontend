@@ -8,6 +8,11 @@ import {
   useRefreshUntil,
   useRefreshUntilReplaced,
 } from "@/lib/navigation/refresh-until";
+import {
+  EVERY_MS,
+  MAX_REFRESHES,
+  REFRESH_SETTLE_MS,
+} from "@/lib/navigation/refresh-timing";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -139,5 +144,14 @@ describe("useRefreshUntil (the Fila's decided id / renderedAt, T90)", () => {
     act(() => vi.advanceTimersByTime(60_000));
     expect(router.refresh).toHaveBeenCalledTimes(2);
     expect(giveUp).not.toHaveBeenCalled();
+  });
+});
+
+describe("the workaround's timing (P6-005)", () => {
+  it("a refresh every 2 s, at most 5, and the specs' settle budget covers them all plus the full load (≥ 12 s)", () => {
+    expect(EVERY_MS).toBe(2_000);
+    expect(MAX_REFRESHES).toBe(5);
+    expect(REFRESH_SETTLE_MS).toBe(EVERY_MS * MAX_REFRESHES + 5_000);
+    expect(REFRESH_SETTLE_MS).toBeGreaterThanOrEqual(12_000);
   });
 });

@@ -14,6 +14,7 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { SETTLE, holdNextAction, twoFrames } from "../fixtures/fila-timing.ts";
 
 // T105: Aprovar / Manter aprovado (AC 31 action half, AC 33; plan-m6 § 3.3,
 // D13 "await, then navigate"; Security F5, F6, F7; risk R1). The case
@@ -56,10 +57,9 @@ test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", (
     await createAccount(request, email);
     await seedCases(request, email, "dois");
     const [first, second] = await openCases(request, email);
-    await caseSeed(request, email, "decide-lento", { ms: 1_500, n: 1 });
     await logIn(page, email);
     await page.goto("/fila");
-    await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`), SETTLE);
     const tab = page.getByRole("link", { name: /^Para decidir/ });
     await expect(tab).toHaveText(/\(2\)$/);
     const nav = page
@@ -67,24 +67,38 @@ test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", (
       .getByRole("link", { name: /^Fila de revisão/ });
     await expect(nav).toHaveAccessibleName(/^Fila de revisão 2 casos/);
 
+    const release = await holdNextAction(page, first?.id ?? "");
     await page.getByRole("button", { name: "Aprovar" }).click();
     const options = page.getByRole("listbox").getByRole("option");
     await expect(options).toHaveCount(1);
     await expect(options.first()).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByTestId("fila-detail-skeleton")).toBeVisible();
-    // D13 / F7: the URL stays on the owner until the result arrives.
+    // The visible detail pane's skeleton (an old instance may still be
+    // streaming out of the DOM).
+    await expect(
+      page
+        .locator("[data-pane='detail']")
+        .getByTestId("fila-detail-skeleton")
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
+    // D13 / F7: while the call is held, the URL stays on the owner and
+    // nothing reports done.
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
     await expect(
       page.getByRole("status").filter({ hasText: "Aprovado:" }),
     ).toHaveCount(0);
+    expect(await decidePosts(request, email)).toHaveLength(0);
+    release();
 
     await expect(
       page.getByRole("status").filter({
         hasText: `Aprovado: ${first?.razao_social}`,
       }),
     ).toContainText("Registrado na trilha de auditoria.");
-    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
-    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
+    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`), SETTLE);
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused(
+      SETTLE,
+    );
     await expect(tab).toHaveText(/\(1\)$/);
     await expect(nav).toHaveAccessibleName(/^Fila de revisão 1 caso/);
   });
@@ -148,13 +162,15 @@ test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", (
         const next = ids[i + 1];
         await expect(page).toHaveURL(
           next === undefined ? /\/fila$/ : new RegExp(`/fila/${next}$`),
+          SETTLE,
         );
       }
+      // The empty /fila streams in after the last navigation (P6-005).
       await expect(
         page.locator("[data-detail-heading]:visible", {
           hasText: "Nenhum caso aberto",
         }),
-      ).toBeFocused();
+      ).toBeFocused(SETTLE);
     } finally {
       await dump();
     }
@@ -261,7 +277,7 @@ test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @fea
     ).toBe(true);
 
     await approve.click();
-    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`), SETTLE);
     const keys = (await decidePosts(request, email)).map(
       (call) => call.idempotencyKey,
     );
@@ -303,13 +319,16 @@ test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @fea
     await logIn(page, email);
     await page.goto(`/fila/${first?.id}`);
     await page.getByRole("button", { name: "Aprovar" }).click();
-    await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible();
+    await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible(SETTLE);
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
     await expect(page.getByRole("button", { name: "Aprovar" })).toHaveCount(0);
     await expect(
       page.getByText(/^Este caso já tinha sido decidido/),
     ).toHaveCount(0);
-    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(
+      1,
+      SETTLE,
+    );
     expect(await decidePosts(request, email)).toHaveLength(1);
   });
 
@@ -330,7 +349,7 @@ test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @fea
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(2);
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
     await approve.click();
-    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`), SETTLE);
     const keys = (await decidePosts(request, email)).map(
       (call) => call.idempotencyKey,
     );
@@ -350,11 +369,18 @@ test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @fea
     await caseSeed(request, email, "decide-lento", { ms: 16_000, n: 1 });
     await logIn(page, email);
     await page.goto(`/fila/${first?.id}`);
+    // The positive marker (P6-005): the late action's own response.
+    const late = page.waitForResponse(
+      (response) =>
+        response.request().headers()["next-action"] !== undefined &&
+        (response.request().postData() ?? "").includes(first?.id ?? ""),
+      { timeout: 30_000 },
+    );
     await page.getByRole("button", { name: "Aprovar" }).click();
-    await expect(decideError(page)).toHaveCount(0);
     await expect(decideError(page)).toBeVisible({ timeout: 20_000 });
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
-    await page.waitForTimeout(2_000);
+    await late;
+    await twoFrames(page);
     await expect(
       page.getByRole("status").filter({ hasText: "Aprovado:" }),
     ).toHaveCount(0);
@@ -378,8 +404,8 @@ test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @fea
 
     await expect(
       page.getByText(/^Este caso já tinha sido decidido em /),
-    ).toBeVisible();
-    await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible();
+    ).toBeVisible(SETTLE);
+    await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible(SETTLE);
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
     // P6-003: focus on the case's heading, not <body>.
     await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();

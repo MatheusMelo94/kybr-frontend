@@ -14,6 +14,7 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { SETTLE, holdNextAction } from "../fixtures/fila-timing.ts";
 
 // T107: Bloquear (AC 38; D10; Q8/Q9; Security F5, F6, F7). Non-optimistic:
 // nothing leaves the list before ok. The heading is [data-detail-heading]:visible.
@@ -95,7 +96,6 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     await createAccount(request, email);
     await seedCases(request, email, "dois");
     const [first, second] = await openCases(request, email);
-    await caseSeed(request, email, "decide-lento", { ms: 1_500, n: 1 });
     await logIn(page, email);
     await page.goto(`/fila/${first?.id}`);
     const tab = page.getByRole("link", { name: /^Para decidir/ });
@@ -109,6 +109,8 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     await note.fill("x".repeat(281));
     await expect(note).toHaveValue("x".repeat(280));
     await note.fill("Procure o suporte.");
+    // P6-005: the call is held until released, not raced against a delay.
+    const release = await holdNextAction(page, first?.id ?? "");
     await dialog.getByRole("button", { name: "Bloquear vendedor" }).click();
 
     await expect(
@@ -118,6 +120,7 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     await expect(dialog).toBeVisible();
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(2);
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));
+    release();
 
     await expect(dialog).toBeHidden();
     await expect(
@@ -125,8 +128,10 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
         hasText: `Bloqueado: ${first?.razao_social}`,
       }),
     ).toContainText("Registrado na trilha de auditoria.");
-    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
-    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
+    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`), SETTLE);
+    await expect(page.locator("[data-detail-heading]:visible")).toBeFocused(
+      SETTLE,
+    );
     await expect(tab).toHaveText(/\(1\)$/);
     const [post] = await decidePosts(request, email);
     expect(post?.pagePath).toBe(`/fila/${first?.id}`);
@@ -158,7 +163,7 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     await expect(note).toHaveValue("Nota.");
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(2);
     await dialog.getByRole("button", { name: "Bloquear vendedor" }).click();
-    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`), SETTLE);
     const keys = (await decidePosts(request, email)).map(
       (call) => call.idempotencyKey,
     );
@@ -184,8 +189,8 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     await expect(dialog).toBeHidden();
     await expect(
       page.getByText(/^Este caso já tinha sido decidido em /),
-    ).toBeVisible();
-    await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible();
+    ).toBeVisible(SETTLE);
+    await expect(page.getByText(/^Decidido: Aprovado em /)).toBeVisible(SETTLE);
     // P6-003: focus on the case's heading, not <body>.
     await expect(page.locator("[data-detail-heading]:visible")).toBeFocused();
     await expect(page).toHaveURL(new RegExp(`/fila/${first?.id}$`));

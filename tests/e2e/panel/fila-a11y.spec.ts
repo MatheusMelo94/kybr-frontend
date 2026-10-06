@@ -21,6 +21,7 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { SETTLE } from "../fixtures/fila-timing.ts";
 
 // T115: the Fila's accessibility pass (AC 45, 67, 69, 70, 71, 72, 73, 74,
 // 76; spec § Accessibility Acceptance; QA J4). The J4 keyboard path at 1280,
@@ -377,9 +378,7 @@ test.describe("Fila accessibility: every state (T115) @feature-ops-panel @panel-
     await page.getByRole("button", { name: "Aprovar", exact: true }).click();
     await expect(
       page.getByText(/^Este caso já tinha sido decidido/),
-    ).toBeVisible({
-      timeout: 15_000,
-    });
+    ).toBeVisible(SETTLE);
     await check(page, "conflict");
 
     // A case created after the list rendered is "new" (D3).

@@ -7,6 +7,7 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { twoFrames } from "../fixtures/fila-timing.ts";
 
 // T111: offline (AC 44; D8; ADR-0011 rule 8; F10 residual; F14). The tree
 // stays; decisions, list activation, the tabs, Mostrar and Carregar mais
@@ -107,11 +108,17 @@ test.describe("Fila offline (T111) @feature-ops-panel @panel-fila", () => {
     await expect(dialog.getByRole("alert")).toHaveText(
       "Não conseguimos falar com o servidor. Confira sua conexão e tente de novo.",
     );
+    // P6-005: the positive marker is the reconnect's one re-read (an RSC
+    // render); a retry would have fired by then.
+    const reread = page.waitForResponse(
+      (response) => response.request().headers()["rsc"] === "1",
+    );
     await context.setOffline(false);
     await expect(
       page.getByRole("status").filter({ hasText: "Conexão de volta." }),
     ).toBeVisible();
-    await page.waitForTimeout(1_500);
+    await reread;
+    await twoFrames(page);
     expect(await writePosts(request, email)).toHaveLength(0);
     await expect(dialog).toBeVisible();
   });

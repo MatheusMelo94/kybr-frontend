@@ -4,10 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
 import { currentUrl } from "@/lib/navigation/navigation-guard";
+import { EVERY_MS, MAX_REFRESHES } from "@/lib/navigation/refresh-timing";
 import { fullNavigate } from "@/lib/navigation/soft-navigate";
-
-const EVERY_MS = 2_000;
-const MAX_REFRESHES = 5;
 
 /**
  * router.refresh() for a view the server is about to replace (a stopped

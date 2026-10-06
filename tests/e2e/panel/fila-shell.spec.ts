@@ -86,7 +86,12 @@ test.describe("Fila routes and shell (T97) @feature-ops-panel @panel-fila", () =
     const skeleton = page.getByTestId("fila-list-skeleton");
     await expect(skeleton).toBeVisible();
     await expect(skeleton.locator("[data-skeleton-item]")).toHaveCount(5);
-    await expect(page.getByTestId("fila-detail-skeleton")).toBeVisible();
+    await expect(
+      page
+        .getByTestId("fila-detail-skeleton")
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
     await expect(skeleton).toBeHidden({ timeout: 10_000 });
     expect(
       await page.evaluate(

@@ -8,6 +8,7 @@ import {
   seedCases,
 } from "../fixtures/fila-mock.ts";
 import { createAccount, logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
+import { SETTLE } from "../fixtures/fila-timing.ts";
 
 // T98: the list, its tabs, "Carregar mais", the empty states and ListError
 // (AC 27 list half, AC 28 error half, AC 46).
@@ -30,7 +31,7 @@ test.describe("Fila list (T98) @feature-ops-panel @panel-fila", () => {
     await logIn(page, email);
     await page.goto("/fila");
     // At lg /fila opens the oldest case (D4, T99); the list stays.
-    await expect(page).toHaveURL(new RegExp(`/fila/${open[0]?.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/fila/${open[0]?.id}$`), SETTLE);
 
     const tabOpen = page.getByRole("link", { name: /^Para decidir/ });
     await expect(tabOpen).toHaveAttribute("aria-current", "page");
@@ -57,12 +58,17 @@ test.describe("Fila list (T98) @feature-ops-panel @panel-fila", () => {
     expect(before).toBeGreaterThan(0);
     await more.click();
     // The open case stays open.
-    await expect(page).toHaveURL(new RegExp(`/fila/${open[0]?.id}\\?ate=50$`));
-    await expect(options).toHaveCount(30);
+    await expect(page).toHaveURL(
+      new RegExp(`/fila/${open[0]?.id}\\?ate=50$`),
+      SETTLE,
+    );
+    await expect(options).toHaveCount(30, SETTLE);
     await expect(
       page.getByRole("link", { name: /^Carregar mais/ }),
     ).toHaveCount(0);
-    expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    await expect
+      .poll(() => scroller.evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
 
     await expectNoAxeViolations(page);
   });
@@ -176,7 +182,10 @@ test.describe("Fila list (T98) @feature-ops-panel @panel-fila", () => {
     ).toBeVisible();
     await caseFault(request, email, "list", "none");
     await banner.getByRole("button", { name: "Tentar de novo" }).click();
-    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(
+      1,
+      SETTLE,
+    );
     await expect(banner).toHaveCount(0);
   });
 });

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { caseFault, casesFor, seedCases } from "../fixtures/fila-mock.ts";
 import { createAccount, logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
+import { twoFrames } from "../fixtures/fila-timing.ts";
 
 // T99: selection — the listbox opens cases, /fila auto-selects the oldest at
 // lg (D4), the case-switch skeleton, focus and scroll (AC 27 selection
@@ -83,7 +84,12 @@ test.describe("Fila selection (T99) @feature-ops-panel @panel-fila", () => {
     await expect(page.locator("[data-detail-heading]:visible")).toBeVisible();
     await caseFault(request, email, "case", "delay", { ms: 2_500, times: 1 });
     await page.getByRole("option").nth(1).click();
-    await expect(page.getByTestId("fila-detail-skeleton")).toBeVisible();
+    await expect(
+      page
+        .getByTestId("fila-detail-skeleton")
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
     await expect(page.getByRole("listbox")).toBeVisible();
     await expect(page.getByRole("option")).toHaveCount(25);
     await expect(page).toHaveURL(new RegExp(`/fila/${ids[1]}$`), {
@@ -138,7 +144,10 @@ test.describe("Fila selection on phones (T99) @feature-ops-panel @panel-fila @pa
       await expect(page).toHaveURL(new RegExp(`/fila/${ids[0]}$`));
     } else {
       await expect(page.getByRole("option")).toHaveCount(2);
-      await page.waitForTimeout(1_000);
+      // P6-005: AutoSelectOldest's effect runs on the hydrating commit; once
+      // the document loaded and two frames passed, it has had its chance.
+      await page.waitForLoadState("load");
+      await twoFrames(page);
       await expect(page).toHaveURL(/\/fila$/);
       await page.getByRole("option").nth(1).click();
       await expect(page).toHaveURL(new RegExp(`/fila/${ids[1]}$`));

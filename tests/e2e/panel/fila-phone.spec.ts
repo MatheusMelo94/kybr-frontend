@@ -140,13 +140,20 @@ test.describe("the Fila on a phone (T112) @feature-ops-panel @panel-fila @panel-
     await logIn(page, email);
     test.skip(!(await coarse(page)), "coarse pointers only");
 
+    // P6-005: measure once the fonts and the layout settled, not one shot.
     await page.goto("/fila");
     await expect(options(page)).toHaveCount(2);
-    expect(await smallTargets(page, "main")).toEqual([]);
+    await page.evaluate(() => document.fonts.ready);
+    await expect
+      .poll(() => smallTargets(page, "main"), { message: "/fila" })
+      .toEqual([]);
 
     await page.goto(`/fila/${first?.id}`);
     await expect(bar(page)).toBeVisible();
-    expect(await smallTargets(page, "main")).toEqual([]);
+    await page.evaluate(() => document.fonts.ready);
+    await expect
+      .poll(() => smallTargets(page, "main"), { message: "/fila/{id}" })
+      .toEqual([]);
 
     for (const name of ["Pedir documento", "Bloquear"]) {
       const trigger = page.getByRole("button", { name });

@@ -16,6 +16,7 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { twoFrames } from "../fixtures/fila-timing.ts";
 
 // T110: new cases (AC 39, AC 40; D3; ADR-0011 rule 3 + Addendum 2; E4; F10).
 // The poll runs every 60 s and once on becoming visible: the tests fire the
@@ -188,9 +189,17 @@ test.describe("Fila: new cases (T110) @feature-ops-panel @panel-fila", () => {
       (await callsFor(request, email)).filter((call) =>
         call.path.includes("desde="),
       ).length;
+    // P6-005: the positive marker is the failed poll's own response in the
+    // browser (its body carries desde), then two frames for React.
+    const failedPoll = page.waitForResponse(
+      (response) =>
+        response.request().headers()["next-action"] !== undefined &&
+        (response.request().postData() ?? "").includes("desde"),
+    );
     await poll(page);
     await expect.poll(counts).toBeGreaterThanOrEqual(1);
-    await page.waitForTimeout(500);
+    await failedPoll;
+    await twoFrames(page);
     await expect(notice(page)).toHaveCount(0);
     await expect(page.getByRole("alert").filter({ hasText: /./ })).toHaveCount(
       0,
