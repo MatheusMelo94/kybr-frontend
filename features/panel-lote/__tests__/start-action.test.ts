@@ -109,11 +109,11 @@ describe("startBatchAction (D-B1; ADR-0011 order; ADR-0012 item 8)", () => {
     expect(batchPosts()).toEqual([]);
   });
 
-  it("no session: requireSession() redirects to /entrar, no API call", async () => {
+  it("no session: SESSAO_EXPIRADA as a result (ADR-0011 Addendum 2), no API call", async () => {
     state.token = undefined;
-    await expect(
-      startBatchAction({ idempotencyKey: KEY, linhas: TUDO_OK }),
-    ).rejects.toThrow("NEXT_REDIRECT /entrar?motivo=sessao");
+    expect(
+      await startBatchAction({ idempotencyKey: KEY, linhas: TUDO_OK }),
+    ).toEqual({ ok: false, code: "SESSAO_EXPIRADA" });
     expect(batchPosts()).toEqual([]);
   });
 

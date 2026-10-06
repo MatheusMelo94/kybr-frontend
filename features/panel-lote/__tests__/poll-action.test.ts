@@ -97,11 +97,12 @@ describe("pollBatchAction (D-B2, ADR-0011 rule 3)", () => {
     });
   });
 
-  it("no session: requireSession() redirects", async () => {
+  it("no session: SESSAO_EXPIRADA as a result (ADR-0011 Addendum 2)", async () => {
     state.token = undefined;
-    await expect(
-      pollBatchAction({ batchId: FOREIGN_BATCH_ID }),
-    ).rejects.toThrow("NEXT_REDIRECT /entrar?motivo=sessao");
+    expect(await pollBatchAction({ batchId: FOREIGN_BATCH_ID })).toEqual({
+      ok: false,
+      code: "SESSAO_EXPIRADA",
+    });
   });
 
   it("a failed read (PB11) → FAILED", async () => {

@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   createAccount,
+  createBatch,
   expireSessions,
   logIn,
   uniqueEmail,
@@ -82,5 +83,53 @@ test.describe("session expiry mid-task @feature-ops-panel @panel-access", () => 
       page.getByRole("status").filter({ hasText: "Sua sessão expirou." }),
     ).toBeVisible();
     expect(logins).toHaveLength(1);
+  });
+});
+
+// T118 (ADR-0011 Addendum 2): the M4/M5 session actions return
+// SESSAO_EXPIRADA and the leaf sends Renata to /entrar, exactly as before
+// (no dialog draft, so no perdido). Security's regression: the M4 shell
+// poll above, and an M5 action here.
+test.describe("session expiry in a Server Action (T118) @feature-ops-panel @panel-access @panel-lote", () => {
+  test("an onboarding save with the session gone ends on /entrar?motivo=sessao&volta=%2Fcomecar, no perdido", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("t118-onb", testInfo);
+    await createAccount(request, email, "nova");
+    await logIn(page, email);
+    await expect(page).toHaveURL(/\/comecar$/);
+    await page
+      .getByLabel("E-mail para vendedores")
+      .fill("suporte@exemplo.test");
+    await page.getByRole("radio", { name: "Lojas de peças" }).check();
+    await expireSessions(request, email);
+    await page.getByRole("button", { name: "Continuar" }).click();
+
+    await expect(page).toHaveURL(/\/entrar\?motivo=sessao&volta=%2Fcomecar$/);
+    await expect(
+      page.getByRole("status").filter({ hasText: "Sua sessão expirou." }),
+    ).toBeVisible();
+  });
+
+  test("a batch poll (pollBatchAction) with the session gone ends on /entrar?motivo=sessao&volta=%2Flote%2F{id}, no perdido", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("t118-lote", testInfo);
+    await createAccount(request, email, "pago");
+    const id = await createBatch(request, email, "ac16", { hold: true });
+    await logIn(page, email);
+    await page.goto(`/lote/${id}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expireSessions(request, email);
+
+    await expect(page).toHaveURL(
+      new RegExp(`/entrar\\?motivo=sessao&volta=%2Flote%2F${id}$`),
+      { timeout: 15_000 },
+    );
+    await expect(
+      page.getByRole("status").filter({ hasText: "Sua sessão expirou." }),
+    ).toBeVisible();
   });
 });
