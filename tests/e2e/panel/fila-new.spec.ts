@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 import {
-  caseSeed,
+  caseFault,
   casesFor,
   seedCases,
   type MockCase,
@@ -169,7 +169,7 @@ test.describe("Fila: new cases (T110) @feature-ops-panel @panel-fila", () => {
     expect(documents).toEqual([]);
   });
 
-  test("a failed poll (poll-falha) keeps the last state silently", async ({
+  test("a failed poll keeps the last state silently; the next good one shows the notice", async ({
     page,
     request,
   }, testInfo) => {
@@ -179,20 +179,23 @@ test.describe("Fila: new cases (T110) @feature-ops-panel @panel-fila", () => {
     const [first] = await openCases(request, email);
     await logIn(page, email);
     await page.goto(`/fila/${first?.id}`);
+    await expect(options(page)).toHaveCount(2);
+    // Every count fails until cleared, so a poll the browser fires on its
+    // own (a visibilitychange under load) can't make the notice show early.
+    await caseFault(request, email, "poll", "503", { times: 100 });
     await createCase(request, email, 60_000);
-    await caseSeed(request, email, "poll-falha", { n: 1 });
     const counts = async () =>
       (await callsFor(request, email)).filter((call) =>
         call.path.includes("desde="),
       ).length;
     await poll(page);
-    // The failed count landed (and its action returned) before the next poll.
-    await expect.poll(counts).toBe(1);
+    await expect.poll(counts).toBeGreaterThanOrEqual(1);
     await page.waitForTimeout(500);
     await expect(notice(page)).toHaveCount(0);
     await expect(page.getByRole("alert").filter({ hasText: /./ })).toHaveCount(
       0,
     );
+    await caseFault(request, email, "poll", "none");
     await poll(page);
     await expect(notice(page)).toHaveText(/1 caso novo/);
   });
