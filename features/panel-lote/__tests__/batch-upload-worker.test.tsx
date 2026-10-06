@@ -82,6 +82,7 @@ async function pickFile() {
   });
 }
 
+const LOCKED = "Para usar outra coluna, escolha o arquivo de novo.";
 const cta = () => screen.getByRole("button", { name: /^Verificar \d+ CNPJ/ });
 const select = () => screen.getByRole("combobox", { name: "Coluna do CNPJ" });
 
@@ -94,6 +95,7 @@ describe("BatchUpload + useBatchFile (P5-002)", () => {
     });
     await pickFile();
     expect(select()).toBeEnabled();
+    expect(select()).not.toHaveAccessibleDescription(LOCKED);
 
     await act(async () => fireEvent.click(cta()));
     expect(start).toHaveBeenCalledTimes(1);
@@ -103,6 +105,8 @@ describe("BatchUpload + useBatchFile (P5-002)", () => {
     );
     // The worker is gone: the column can't change any more.
     expect(select()).toBeDisabled();
+    // P5-002: the hint says how to choose another column.
+    expect(select()).toHaveAccessibleDescription(LOCKED);
 
     await act(async () => fireEvent.click(cta()));
     expect(start).toHaveBeenCalledTimes(2);
@@ -137,5 +141,6 @@ describe("BatchUpload + useBatchFile (P5-002)", () => {
     });
     expect(select()).toBeEnabled();
     expect(FakeWorker.instances).toHaveLength(2);
+    expect(screen.queryByText(LOCKED)).toBeNull();
   });
 });

@@ -93,6 +93,12 @@ test.describe("Lote: starting a batch @feature-ops-panel @panel-lote", () => {
       "Não conseguimos falar com o servidor. Confira sua conexão e tente de novo.",
     );
     await expect(page.getByRole("heading", { name: "Confira antes de verificar" })).toBeVisible();
+    // P5-002: the rows are built, so the column is locked, with its hint.
+    const column = page.getByRole("combobox", { name: "Coluna do CNPJ" });
+    await expect(column).toBeDisabled();
+    await expect(column).toHaveAccessibleDescription(
+      "Para usar outra coluna, escolha o arquivo de novo.",
+    );
 
     await unseed(request, "queda-de-rede-lote", email);
     await cta(page).click();

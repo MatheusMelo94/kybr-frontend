@@ -29,6 +29,8 @@ export const loteCopy = {
   "lote.preview.h": "Confira antes de verificar",
   "lote.preview.found": 'Encontramos {validos} CNPJs na coluna "{coluna}".',
   "lote.preview.column.label": "Coluna do CNPJ",
+  "lote.preview.column.locked":
+    "Para usar outra coluna, escolha o arquivo de novo.",
   "lote.preview.dupes.one": "1 CNPJ repetido: verificamos uma vez só.",
   "lote.preview.dupes.other": "{n} CNPJs repetidos: verificamos uma vez só.",
   "lote.preview.invalid.one": "1 CNPJ inválido: não será consultado.",

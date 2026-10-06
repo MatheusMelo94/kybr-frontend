@@ -144,6 +144,9 @@ export function BatchPreview({
         value={column === undefined ? "" : String(column)}
         onChange={(value) => onColumn(Number(value))}
         disabled={columnLocked}
+        {...(columnLocked && {
+          hint: loteCopy["lote.preview.column.locked"],
+        })}
         error={columnError}
         className="max-w-sm"
       >
