@@ -21,6 +21,15 @@
 //   PANEL_HOST set (any environment), the legal pages (https:), the terms
 //   version and the Turnstile site key are required; Production refuses
 //   Cloudflare's test keys.
+// - Documents (T116; Security F2, F3; QA Q1): with PANEL_HOST set in
+//   Production, PANEL_DOCUMENTS_ORIGIN is required. Wherever it's set it is a
+//   bare https: origin (never loopback http:, which only API_ALLOW_LOOPBACK_HTTP
+//   allows), not the panel or link host (host:port), and not under
+//   kybr.com.br (CR-P7: a separate registrable domain).
+//   PANEL_DOCUMENTS_MODE=redirect ships to Production only once the F3 check
+//   (scripts/check-documents-domain.sh) has passed and its timestamp is
+//   recorded in DOCUMENTS_DOMAIN_CHECKED_AT; until then the F4 attachment
+//   fallback ships.
 //
 // It names variables, never their values.
 
@@ -40,6 +49,10 @@ const LEGAL_URL_KEYS = ["LEGAL_TERMS_URL", "LEGAL_PRIVACY_URL"];
 // Cloudflare's documented test site keys (always pass / block / interactive).
 const TURNSTILE_TEST_KEY = /^[123]x0{20}[A-Z]{2}$/;
 const API_URL_KEYS = ["API_BASE_URL", "API_PUBLIC_BASE_URL"];
+const SITE_DOMAIN = "kybr.com.br";
+const DOCUMENTS_MODES = ["redirect", "attachment"];
+// What scripts/check-documents-domain.sh prints on a pass.
+const CHECKED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 // What `vercel env pull` writes in place of a Sensitive value: vercel@60.1.3
 // defines SENSITIVE_ENV_VALUE_PLACEHOLDER = "[SENSITIVE]"
@@ -56,6 +69,9 @@ const PLAIN_KEYS = [
   "PANEL_HOST",
   ...PANEL_REQUIRED,
   "COMMERCIAL_CONTACT_EMAIL",
+  "PANEL_DOCUMENTS_ORIGIN",
+  "PANEL_DOCUMENTS_MODE",
+  "DOCUMENTS_DOMAIN_CHECKED_AT",
 ];
 
 /**
@@ -153,6 +169,7 @@ export function checkDeployEnv(env, { target, productionApiOrigin }) {
     problems.push("CLIENT_IP_TRUSTED_HOPS must not be set");
   }
   problems.push(...hostProblems(env, target, markedSensitive));
+  problems.push(...documentsProblems(env, target, markedSensitive));
   for (const key of Object.keys(env)) {
     if (key.startsWith("NEXT_PUBLIC_")) {
       problems.push(`${key}: no NEXT_PUBLIC_* variable is allowed`);
@@ -202,6 +219,84 @@ function hostProblems(env, target, markedSensitive) {
   ) {
     problems.push(
       "TURNSTILE_SITE_KEY must not be a Cloudflare test key in production",
+    );
+  }
+  return problems;
+}
+
+/**
+ * The documents domain and the F3 gate (T116; Security F2, F3, F4; QA Q1).
+ * @param {Record<string, string | undefined>} env
+ * @param {"preview" | "production"} target
+ * @param {Set<string>} markedSensitive
+ * @returns {string[]}
+ */
+function documentsProblems(env, target, markedSensitive) {
+  /** @type {string[]} */
+  const problems = [];
+  const set = (/** @type {string} */ key) =>
+    env[key] !== undefined && env[key] !== "" && !markedSensitive.has(key);
+  const panelLit = set("PANEL_HOST");
+
+  if (set("PANEL_DOCUMENTS_ORIGIN")) {
+    const value = env.PANEL_DOCUMENTS_ORIGIN ?? "";
+    const url = toUrl(value);
+    const bare =
+      url !== undefined &&
+      url.username === "" &&
+      url.password === "" &&
+      url.pathname === "/" &&
+      !/[?#]/.test(value);
+    if (!bare) {
+      problems.push(
+        "PANEL_DOCUMENTS_ORIGIN must be an origin with no credentials, path, query or fragment",
+      );
+    } else if (url.protocol !== "https:") {
+      problems.push("PANEL_DOCUMENTS_ORIGIN must be https:");
+    } else {
+      const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+      if (hostname === SITE_DOMAIN || hostname.endsWith(`.${SITE_DOMAIN}`)) {
+        problems.push(
+          `PANEL_DOCUMENTS_ORIGIN must not be ${SITE_DOMAIN} or under it (a separate registrable domain)`,
+        );
+      } else if (
+        (panelLit && url.host === env.PANEL_HOST?.toLowerCase()) ||
+        (set("LINK_HOST") && url.host === env.LINK_HOST?.toLowerCase())
+      ) {
+        problems.push(
+          "PANEL_DOCUMENTS_ORIGIN must not be the panel or link host",
+        );
+      }
+    }
+  } else if (
+    target === "production" &&
+    panelLit &&
+    !markedSensitive.has("PANEL_DOCUMENTS_ORIGIN")
+  ) {
+    problems.push(
+      "PANEL_DOCUMENTS_ORIGIN is required when PANEL_HOST is set in production",
+    );
+  }
+
+  if (!set("PANEL_DOCUMENTS_MODE")) return problems;
+  const mode = env.PANEL_DOCUMENTS_MODE ?? "";
+  if (!DOCUMENTS_MODES.includes(mode)) {
+    problems.push("PANEL_DOCUMENTS_MODE must be redirect or attachment");
+    return problems;
+  }
+  if (target !== "production" || mode !== "redirect") return problems;
+  if (markedSensitive.has("DOCUMENTS_DOMAIN_CHECKED_AT")) return problems;
+  const checkedAt = env.DOCUMENTS_DOMAIN_CHECKED_AT ?? "";
+  if (checkedAt === "") {
+    problems.push(
+      "PANEL_DOCUMENTS_MODE=redirect needs DOCUMENTS_DOMAIN_CHECKED_AT (the F3 check: scripts/check-documents-domain.sh)",
+    );
+  } else if (
+    !CHECKED_AT.test(checkedAt) ||
+    Number.isNaN(Date.parse(checkedAt))
+  ) {
+    problems.push(
+      "DOCUMENTS_DOMAIN_CHECKED_AT must be the UTC timestamp scripts/check-documents-domain.sh prints",
     );
   }
   return problems;
