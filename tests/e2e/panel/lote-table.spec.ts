@@ -137,3 +137,41 @@ test.describe("Lote: an empty filter (P5-005) @feature-ops-panel @panel-lote", (
   });
 });
 
+test.describe("Lote: the result table's width (QA-M5-002) @feature-ops-panel @panel-lote @panel-phone", () => {
+  test("at 1280 the table fits its card with room for Motivos; below lg it scrolls in its card; no page scroll at 200 % text", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("lote-tabela-largura", testInfo);
+    await createAccount(request, email, "pago");
+    const id = await createBatch(request, email, "ac16", { finish: true });
+    await logIn(page, email);
+    await page.goto(`/lote/${id}`);
+    const card = page.getByRole("region", { name: "Resultado" }).last();
+    await expect(card.locator("tbody tr").first()).toBeVisible();
+    const geometry = () =>
+      card.evaluate((el) => {
+        const motivos = el.querySelector("thead th:last-child");
+        return {
+          scroll: el.scrollWidth,
+          client: el.clientWidth,
+          motivos: motivos?.getBoundingClientRect().width ?? 0,
+        };
+      });
+    const width = page.viewportSize()?.width ?? 1280;
+    const sizes = await geometry();
+    if (width >= 1024) {
+      expect(sizes.scroll, "no clipped column at 1280").toBeLessThanOrEqual(
+        sizes.client,
+      );
+      expect(sizes.motivos, "Motivos isn't squeezed").toBeGreaterThanOrEqual(240);
+    } else if (sizes.client < 560) {
+      expect(sizes.scroll).toBeGreaterThan(sizes.client);
+    }
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+  });
+});
+

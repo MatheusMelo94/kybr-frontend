@@ -63,17 +63,26 @@ async function BatchBody({
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
         <div className="flex min-w-0 flex-col gap-6">
           <BatchState batch={batch} contratarHref={contratarHref()} />
-          {finished && (
-            <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-              <ResultTableSection batchId={batchId} query={query} />
-            </Suspense>
-          )}
         </div>
         <div className="flex min-w-0 flex-col gap-6">
-          {finished && <WhyCard motivos={batch.motivos_contagem} />}
-          <HistoryList history={history} />
+          {finished ? (
+            <WhyCard motivos={batch.motivos_contagem} />
+          ) : (
+            <HistoryList history={history} />
+          )}
         </div>
       </div>
+      {/* QA-M5-002: the result table spans the page below the two columns,
+          so Motivos has room at 1280 (it still scrolls in its card on
+          phones); the history follows it, keeping J3's order (T87). */}
+      {finished && (
+        <>
+          <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <ResultTableSection batchId={batchId} query={query} />
+          </Suspense>
+          <HistoryList history={history} />
+        </>
+      )}
     </div>
   );
 }
