@@ -1,3 +1,5 @@
+import { SLUG_PATTERN, TOKEN_PATTERN } from "@/lib/link-values";
+
 // The panel API's id, cursor and batch-row status rules (contract A-X3, A-X6,
 // D-B3) as plain functions: the server's path builders (lib/api/path.ts) and
 // the panel's client leaves share them (no zod in panel client code, ADR-0010
@@ -120,10 +122,21 @@ export const CHECK_CHAVES = [
 ] as const;
 export type CheckChave = (typeof CHECK_CHAVES)[number];
 
-// The seller's case link: /v/{slug}/c/{token}, with the link contract's slug
-// and token patterns (X3; the token is ≥ 128 bits).
-const LINK_VENDEDOR_PATH =
-  /^\/v\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/c\/[A-Za-z0-9_-]{22,64}$/;
+// The seller's case link: /v/{slug}/c/{token}, each segment checked with the
+// link contract's own anchored pattern (X3, imported, never retyped: F8).
+function isLinkVendedorPath(pathname: string): boolean {
+  const [empty, v, slug, c, token, ...rest] = pathname.split("/");
+  return (
+    empty === "" &&
+    v === "v" &&
+    c === "c" &&
+    rest.length === 0 &&
+    slug !== undefined &&
+    token !== undefined &&
+    SLUG_PATTERN.test(slug) &&
+    TOKEN_PATTERN.test(token)
+  );
+}
 
 /**
  * F8: a D-C2/D-C4 `link_vendedor` the panel may show (as an input value
@@ -148,7 +161,7 @@ export function parseLinkVendedor(
     url.password === "" &&
     !value.includes("?") &&
     !value.includes("#") &&
-    LINK_VENDEDOR_PATH.test(url.pathname) &&
+    isLinkVendedorPath(url.pathname) &&
     url.href === value;
   return ok ? value : null;
 }

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { SLUG_PATTERN, TOKEN_PATTERN } from "@/lib/link-values";
 import {
   CASE_TAB_ESTADOS,
   isBatchId,
@@ -15,8 +16,6 @@ import {
 // a request that carries the BFF key. Anything else throws, so it never reaches
 // fetch.
 
-const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/; // contract X3
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{22,64}$/; // contract X3
 const CNPJ_PATTERN = /^[0-9A-Z]{12}[0-9]{2}$/; // contract X5 wire format
 
 export function isValidSlug(value: string): boolean {

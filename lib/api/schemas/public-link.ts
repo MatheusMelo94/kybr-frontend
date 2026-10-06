@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { maskCpf } from "@/lib/cpf";
+import { TOKEN_PATTERN } from "@/lib/link-values";
 import { toSafeHttpsUrl, type SafeHttpsUrl } from "@/lib/safe-url";
 
 // Response schemas for the seller link's public API (contract D1–D3). Server
@@ -56,7 +57,7 @@ export type CompanyLookup = z.output<typeof companyLookupSchema>;
 
 /** D3: an opaque case token (contract X3), checked before it can steer router.push. */
 export const verificationSchema = z.object({
-  token: z.string().regex(/^[A-Za-z0-9_-]{22,64}$/),
+  token: z.string().regex(TOKEN_PATTERN),
 });
 
 // --- D4: the case --------------------------------------------------------------
