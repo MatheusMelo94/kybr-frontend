@@ -307,4 +307,66 @@ describe("BatchProgress (AC 19)", () => {
     await tick();
     expect(router.refresh).toHaveBeenCalledTimes(1);
   });
+
+  describe("E2 (plan-m6 § 18): a poll that settles after Renata left never moves her", () => {
+    beforeEach(() => {
+      window.history.replaceState(null, "", `/lote/${ID}`);
+    });
+
+    function pending() {
+      let resolve: (value: unknown) => void = () => undefined;
+      poll.mockReturnValueOnce(new Promise((done) => (resolve = done)));
+      return (value: unknown) => resolve(value);
+    }
+
+    it("unmounted during an in-flight poll that ends terminal: no refresh, no full load", async () => {
+      const settle = pending();
+      const { unmount } = renderProgress();
+      await tick();
+      unmount();
+      await act(async () =>
+        settle({
+          ok: true,
+          batch: {
+            estado: "concluido",
+            total: 200,
+            processados: 200,
+            contagens: NONE,
+          },
+        }),
+      );
+      expect(router.refresh).not.toHaveBeenCalled();
+      expect(fullNavigate).not.toHaveBeenCalled();
+    });
+
+    it("the location moved during an in-flight poll: no refresh, and later ticks don't refresh either", async () => {
+      const settle = pending();
+      renderProgress();
+      await tick();
+      window.history.pushState(null, "", "/fila");
+      await act(async () =>
+        settle({
+          ok: true,
+          batch: {
+            estado: "concluido",
+            total: 200,
+            processados: 200,
+            contagens: NONE,
+          },
+        }),
+      );
+      for (let i = 0; i < 8; i++) await tick();
+      expect(router.refresh).not.toHaveBeenCalled();
+      expect(fullNavigate).not.toHaveBeenCalled();
+    });
+
+    it("SESSAO_EXPIRADA after she left: no expiry navigation from here", async () => {
+      const settle = pending();
+      renderProgress();
+      await tick();
+      window.history.pushState(null, "", "/fila");
+      await act(async () => settle({ ok: false, code: "SESSAO_EXPIRADA" }));
+      expect(expire).not.toHaveBeenCalled();
+    });
+  });
 });

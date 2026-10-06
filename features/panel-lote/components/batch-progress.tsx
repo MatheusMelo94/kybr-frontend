@@ -11,6 +11,7 @@ import {
 import { useBatchFocus } from "@/features/panel-lote/components/batch-focus-keeper";
 import { BatchLegend } from "@/features/panel-lote/components/batch-legend";
 import { loteCopy } from "@/features/panel-lote/copy";
+import { useNavigationGuard } from "@/lib/navigation/navigation-guard";
 import { fullNavigate } from "@/lib/navigation/soft-navigate";
 import { isBatchId } from "@/features/panel-lote/validation";
 import { fill, formatNumber } from "@/features/panel-shell/format";
@@ -69,6 +70,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
   const done = useRef(false);
   const refreshes = useRef(0);
   const reloaded = useRef(false);
+  const arm = useNavigationGuard();
 
   // QA Q6: after the start, focus lands on this heading, once per view.
   useEffect(() => {
@@ -79,6 +81,10 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
 
   useEffect(() => {
     let inFlight = false;
+    // E2 (plan-m6 § 18): the view this effect serves. A poll that settles
+    // after Renata left (unmounted, another URL, a newer soft navigation)
+    // never refreshes, reloads or expires from here.
+    const view = arm();
 
     function apply(result: PollResult): void {
       if (!result.ok) {
@@ -94,7 +100,12 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
         } else setStale(true);
         return;
       }
-      const { estado, processados, total: batchTotal, contagens } = result.batch;
+      const {
+        estado,
+        processados,
+        total: batchTotal,
+        contagens,
+      } = result.batch;
       setStale(!navigator.onLine);
       setProgress({ processados, total: batchTotal, contagens });
       const now = step(processados, batchTotal);
@@ -119,6 +130,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
     }
 
     function refresh(): void {
+      if (!view.stillHere()) return;
       if (refreshes.current < MAX_REFRESHES) {
         refreshes.current += 1;
         router.refresh();
@@ -149,6 +161,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
         result = { ok: false, code: "FAILED" };
       }
       inFlight = false;
+      if (!view.stillHere()) return;
       apply(result);
     }
 
@@ -167,7 +180,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [batchId, expire, focus, router, setLoteRunning]);
+  }, [arm, batchId, expire, focus, router, setLoteRunning]);
 
   const ratio =
     progress.total === 0
