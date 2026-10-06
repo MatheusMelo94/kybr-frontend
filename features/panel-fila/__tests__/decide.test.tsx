@@ -89,6 +89,7 @@ function Page({
           caseId={caseId}
           origem={origem}
           razao={`Empresa ${caseId}`}
+          webhook
         />
       </DetailPane>
     </>

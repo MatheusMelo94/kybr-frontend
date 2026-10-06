@@ -86,6 +86,7 @@ export default async function CasePage({
                     caseId={result.case.id}
                     origem={result.case.origem}
                     razao={result.case.razao_social ?? result.case.cnpj}
+                    webhook={me.workspace.webhook_configurado}
                   />
                 )}
               </>

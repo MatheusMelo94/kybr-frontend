@@ -84,3 +84,19 @@ export async function decideElsewhere(
   if (response.status() !== 204)
     throw new Error(`decideElsewhere: ${response.status()}`);
 }
+
+/** QA G10: the workspace's documentos_habilitados / webhook_configurado. */
+export async function setWorkspace(
+  request: APIRequestContext,
+  email: string,
+  workspace: {
+    documentos_habilitados?: string[];
+    webhook_configurado?: boolean;
+  },
+): Promise<void> {
+  const response = await request.post(`${CONTROLS}/workspace`, {
+    data: { email, ...workspace },
+  });
+  if (response.status() !== 204)
+    throw new Error(`setWorkspace: ${response.status()}`);
+}

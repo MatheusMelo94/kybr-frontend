@@ -2,39 +2,17 @@
 
 import { startTransition, useCallback, useState } from "react";
 
-import { useToast } from "@/components/panel/toast";
-import { decideAction, type DecideResult } from "@/features/panel-fila/actions";
-import { callAction } from "@/features/panel-fila/call-action";
-import {
-  FILA_NO_CASE,
-  useFila,
-} from "@/features/panel-fila/components/fila-provider";
+import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { filaCopy } from "@/features/panel-fila/copy";
-import { nextCaseId } from "@/features/panel-fila/next-case";
-import { useIntentKey } from "@/features/panel-fila/use-intent-key";
+import { useDecisionFlow } from "@/features/panel-fila/use-decision-flow";
 import { fill } from "@/features/panel-shell/format";
-import { useShellStatus } from "@/features/panel-shell/shell-status-context";
 import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
-import {
-  useNavigationGuard,
-  type NavigationGuard,
-} from "@/lib/navigation/navigation-guard";
-import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
+import { useNavigationGuard } from "@/lib/navigation/navigation-guard";
 
 /** The optimistic decisions (plan-m6 § 3.3): bloquear is a dialog (T107). */
 export type QuickDecisao = "aprovar" | "manter";
 
 const TOAST = { aprovar: "toast.approved", manter: "toast.kept" } as const;
-
-/**
- * ok, a 409, a 4xx or the API's 5xx (UNAVAILABLE, T106: a definitive
- * failure): the key is spent. NETWORK (a dropped call, a timeout): unknown.
- */
-function definitive(result: DecideResult): boolean {
-  return result.ok || result.code !== "NETWORK";
-}
-
-type Failure = Exclude<DecideResult, { ok: true }>;
 
 /**
  * Aprovar / Manter aprovado, plan-m6 § 3.3 (D13: await, then navigate):
@@ -59,113 +37,57 @@ export function useDecide(): {
   decide: (caseId: string, decisao: QuickDecisao, razao: string) => void;
   busy: boolean;
 } {
-  const {
-    setRemoval,
-    list,
-    openCase,
-    focusCase,
-    markDecided,
-    wasDecided,
-    setFlash,
-    hintOffline,
-    reread,
-  } = useFila();
-  const { take, release } = useIntentKey();
-  const { show } = useToast();
-  const { pause, resume, pollNow } = useShellStatus();
-  const navigate = useSoftNavigate();
+  const { setRemoval, focusCase, setFlash } = useFila();
+  const flow = useDecisionFlow();
   const arm = useNavigationGuard();
   const expire = useSessionExpiry();
   const [busy, setBusy] = useState(false);
-
-  const fail = useCallback(
-    (caseId: string, result: Failure, guard: NavigationGuard) => {
-      if (result.code === "SESSAO_EXPIRADA") {
-        expire();
-        return;
-      }
-      const here = guard.onOrigin();
-      if (result.code === "CASO_JA_DECIDIDO") {
-        markDecided(caseId);
-        setFlash(caseId, { kind: "conflict", decididoEm: result.decididoEm });
-        if (here) reread();
-      } else {
-        setFlash(caseId, { kind: "decide-error" });
-        if (result.code === "NETWORK") {
-          hintOffline();
-          if (here) reread();
-        }
-      }
-      if (here) focusCase(caseId);
-    },
-    [expire, markDecided, setFlash, reread, hintOffline, focusCase],
-  );
+  const { target, call, advance, conflict, unknown } = flow;
 
   const decide = useCallback(
     (caseId: string, decisao: QuickDecisao, razao: string) => {
-      const intent = { caseId, action: "decide", body: { decisao } };
-      const idempotencyKey = take(intent);
       const guard = arm();
-      const { ids, query } = list();
-      // R1: a list that lags (or a stale snapshot) may still show a case
-      // decided here; it is never the next one.
-      const next = nextCaseId(
-        ids.filter((id) => !wasDecided(id)),
-        caseId,
-      );
+      const to = target(caseId);
       setFlash(caseId, null);
       setBusy(true);
-      pause();
       startTransition(async () => {
-        setRemoval({ id: caseId, next });
-        const result = await callAction(
-          decideAction,
-          { caseId, idempotencyKey, decisao },
-          {
-            onLate: (late) => {
-              if (definitive(late)) release(intent);
-            },
-          },
-        );
-        if (definitive(result)) release(intent);
-        resume();
+        setRemoval({ id: caseId, next: to.next });
+        const result = await call({ caseId, decisao });
         setBusy(false);
-        if (!result.ok) {
-          fail(caseId, result, guard);
+        const here = guard.onOrigin();
+        if (result.ok) {
+          advance(
+            caseId,
+            to,
+            here,
+            fill(filaCopy[TOAST[decisao]], { razao_social: razao }),
+          );
           return;
         }
-        markDecided(caseId);
-        show(
-          fill(filaCopy[TOAST[decisao]], { razao_social: razao }),
-          filaCopy["toast.audit"],
-        );
-        pollNow();
-        if (!guard.onOrigin()) return;
-        openCase(next ?? FILA_NO_CASE);
-        navigate(
-          next === null
-            ? `/fila${query}`
-            : `/fila/${encodeURIComponent(next)}${query}`,
-          { push: true, scroll: false },
-        );
+        if (result.code === "SESSAO_EXPIRADA") {
+          expire();
+          return;
+        }
+        if (result.code === "CASO_JA_DECIDIDO")
+          conflict(caseId, result.decididoEm, here);
+        else {
+          setFlash(caseId, { kind: "decide-error" });
+          if (result.code === "NETWORK") unknown(here);
+        }
+        if (here) focusCase(caseId);
       });
     },
     [
-      fail,
       arm,
-      take,
-      release,
-      list,
-      wasDecided,
-      markDecided,
+      target,
+      call,
+      advance,
+      conflict,
+      unknown,
+      expire,
       setFlash,
       setRemoval,
-      pause,
-      resume,
-      show,
-      pollNow,
-      openCase,
-      navigate,
+      focusCase,
     ],
   );
 
