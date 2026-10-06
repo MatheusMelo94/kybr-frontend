@@ -253,15 +253,21 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     await openWith();
     await act(async () => fireEvent.click(submit()));
     const group = screen.getByRole("group", { name: "Quais documentos?" });
-    expect(group).toHaveAttribute("aria-invalid", "true");
     expect(group).toHaveAccessibleDescription(
       "Escolha pelo menos um documento.",
     );
-    expect(screen.getAllByRole("checkbox")[0]).toHaveFocus();
+    // AC 36: the checkbox that takes focus announces the error itself.
+    const first = screen.getAllByRole("checkbox")[0];
+    expect(first).toHaveFocus();
+    expect(first).toHaveAttribute("aria-invalid", "true");
+    expect(first).toHaveAccessibleDescription(
+      "Escolha pelo menos um documento.",
+    );
     expect(requestDocumentsAction).not.toHaveBeenCalled();
     // Checking one clears it.
     fireEvent.click(box("Cartão CNPJ atualizado"));
-    expect(group).not.toHaveAttribute("aria-invalid");
+    expect(first).not.toHaveAttribute("aria-invalid");
+    expect(first).not.toHaveAttribute("aria-describedby");
   });
 
   it("the plural submit: doc.submit.one with one, doc.submit.other with two", async () => {

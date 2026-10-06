@@ -58,7 +58,7 @@ describe("CheckboxGroup", () => {
     expect(onChange).toHaveBeenLastCalledWith(["a"]);
   });
 
-  it("an error marks the group invalid, describes it, and the ref lands on the first checkbox", () => {
+  it("an error marks each checkbox invalid and describes it (the focus target too), and the ref lands on the first checkbox", () => {
     const ref = createRef<HTMLInputElement>();
     render(
       <CheckboxGroup
@@ -71,12 +71,34 @@ describe("CheckboxGroup", () => {
       />,
     );
     const group = screen.getByRole("group", { name: "Quais documentos?" });
-    expect(group).toHaveAttribute("aria-invalid", "true");
+    // aria-invalid isn't supported on a group: it sits on the checkboxes.
+    expect(group).not.toHaveAttribute("aria-invalid");
     expect(group).toHaveAccessibleDescription(
       "Escolha pelo menos um documento.",
     );
+    for (const box of within(group).getAllByRole("checkbox")) {
+      expect(box).toHaveAttribute("aria-invalid", "true");
+      expect(box).toHaveAccessibleDescription(
+        "Escolha pelo menos um documento.",
+      );
+    }
     expect(ref.current).toBe(
       screen.getByRole("checkbox", { name: "Cartão CNPJ" }),
     );
+  });
+
+  it("without an error, the checkboxes carry no description and aren't invalid", () => {
+    render(
+      <CheckboxGroup
+        legend="Quais documentos?"
+        name="tipos"
+        options={OPTIONS}
+        values={[]}
+      />,
+    );
+    for (const box of screen.getAllByRole("checkbox")) {
+      expect(box).not.toHaveAttribute("aria-invalid");
+      expect(box).not.toHaveAttribute("aria-describedby");
+    }
   });
 });

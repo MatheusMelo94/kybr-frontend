@@ -80,7 +80,13 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     await expect(group.getByRole("checkbox")).toHaveCount(4);
     await expect(group.getByRole("checkbox").first()).toBeFocused();
     await submitButton(page).click();
-    await expect(group).toHaveAttribute("aria-invalid", "true");
+    await expect(group.getByRole("checkbox").first()).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    await expect(
+      group.getByRole("checkbox").first(),
+    ).toHaveAccessibleDescription("Escolha pelo menos um documento.");
     await expect(
       dialog.getByText("Escolha pelo menos um documento."),
     ).toBeVisible();

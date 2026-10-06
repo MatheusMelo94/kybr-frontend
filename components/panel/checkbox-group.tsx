@@ -13,7 +13,7 @@ type Props = {
   /** The checked values; onChange reports them in the options' order. */
   values: readonly string[];
   onChange?: (values: string[]) => void;
-  /** Group error copy: the group is marked invalid and described by it. */
+  /** Group error copy: each checkbox is marked invalid and described by it. */
   error?: string | undefined;
   disabled?: boolean;
   className?: string;
@@ -48,7 +48,8 @@ export function CheckboxGroup({
 
   return (
     <fieldset
-      aria-invalid={error ? true : undefined}
+      // aria-invalid isn't valid on a group: the checkboxes carry it, and each
+      // is described by the error so the one that takes focus announces it.
       aria-describedby={error ? errorId : undefined}
       className={cn("flex flex-col gap-2", className)}
       disabled={disabled}
@@ -71,6 +72,8 @@ export function CheckboxGroup({
                 value={option.value}
                 checked={values.includes(option.value)}
                 onChange={(event) => toggle(option.value, event.target.checked)}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? errorId : undefined}
                 className={cn(
                   "size-6 shrink-0 accent-accent",
                   "hover:cursor-pointer",
