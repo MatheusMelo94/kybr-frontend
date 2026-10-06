@@ -29,14 +29,9 @@ const REASONS = MOTIVO_CODIGOS.map((codigo) => ({
   label: filaCopy[`block.reason.${codigo}`],
 }));
 
-// The danger style lives only on the confirmation (identity.md § VerdictHeader;
-// DC § Component States). danger-ink, not danger: AA with accent-ink in both themes.
-const DANGER =
-  "bg-danger-ink text-accent-ink hover:bg-danger-ink/90 active:bg-danger-ink/80";
-
 /**
  * Bloquear (AC 38): a neutral trigger, then the dialog with the reason, the
- * optional note and the danger submit. Non-optimistic by rule (F6): the case
+ * optional note and the ink-primary submit (DDR-0003 point 3). Non-optimistic by rule (F6): the case
  * stays in the list and the URL on /fila/{id} until ok; then the dialog
  * closes, toast.blocked shows and the next case opens (D5). Failures stay in
  * the dialog with error.network and the values (D10); a 409 closes it on
@@ -172,8 +167,9 @@ export function BlockDialog({ caseId, razao, webhook }: Props): JSX.Element {
               size="panel"
               busy={busy}
               busyLabel={filaCopy["block.submit.busy"]}
-              className={DANGER}
             >
+              {/* The ink primary with the explicit verb, never red: the
+                  confirmation step carries the weight (DDR-0003 point 3). */}
               {filaCopy["block.submit"]}
             </Button>
           </div>

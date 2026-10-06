@@ -180,6 +180,14 @@ describe("Bloquear dialog (T107; AC 38; D10; F5, F6, F7)", () => {
     );
   });
 
+  it("the confirmation is the ink primary with the explicit verb, never red (DDR-0003 point 3)", async () => {
+    render(<Screen caseId="caso-a" />);
+    await openWith();
+    expect(submit()).toHaveTextContent("Bloquear vendedor");
+    expect(submit().className).toMatch(/\bbg-accent\b/);
+    expect(submit().className).not.toMatch(/danger/);
+  });
+
   it("without a webhook: block.lead.nowebhook", async () => {
     render(<Screen caseId="caso-a" webhook={false} />);
     await act(async () => fireEvent.click(trigger()));
