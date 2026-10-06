@@ -9,6 +9,7 @@ import {
   type PollResult,
 } from "@/features/panel-lote/actions";
 import { useBatchFocus } from "@/features/panel-lote/components/batch-focus-keeper";
+import { BatchLegend } from "@/features/panel-lote/components/batch-legend";
 import { loteCopy } from "@/features/panel-lote/copy";
 import { fullNavigate } from "@/features/panel-lote/soft-navigate";
 import { isBatchId } from "@/features/panel-lote/validation";
@@ -19,11 +20,12 @@ import {
 } from "@/features/panel-shell/polling";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
 import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
+import type { Batch } from "@/lib/api/schemas/panel/batches";
 
 type Props = {
   batchId: string;
   /** The server's read when the page rendered. */
-  initial: { processados: number; total: number };
+  initial: Pick<Batch, "processados" | "total" | "contagens">;
 };
 
 const TERMINAL = new Set(["concluido", "concluido_com_erros", "falhou"]);
@@ -92,9 +94,9 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
         } else setStale(true);
         return;
       }
-      const { estado, processados, total: batchTotal } = result.batch;
+      const { estado, processados, total: batchTotal, contagens } = result.batch;
       setStale(!navigator.onLine);
-      setProgress({ processados, total: batchTotal });
+      setProgress({ processados, total: batchTotal, contagens });
       const now = step(processados, batchTotal);
       if (now > announcedStep.current) {
         announcedStep.current = now;
@@ -206,6 +208,9 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
           total,
         })}
       </p>
+      {/* P5-006 (spec S7 Processing): the counts so far, text only; the
+          donut comes with the result. Announced at the 10 % cadence above. */}
+      <BatchLegend contagens={progress.contagens} />
       {stale && (
         <p className="text-secondary text-ink-muted">
           {loteCopy["lote.progress.stale"]}

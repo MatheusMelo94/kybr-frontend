@@ -40,21 +40,31 @@ function Probe() {
   return null;
 }
 
-function renderProgress(processados = 0, total = 200) {
+const NONE = { ok: 0, warn: 0, bad: 0, erro: 0 };
+
+function renderProgress(processados = 0, total = 200, contagens = NONE) {
   return render(
     <ShellStatusProvider initial={{ contagens: COUNTS, plano: undefined }}>
       <BatchFocusKeeper>
-        <BatchProgress batchId={ID} initial={{ processados, total }} />
+        <BatchProgress
+          batchId={ID}
+          initial={{ processados, total, contagens }}
+        />
         <Probe />
       </BatchFocusKeeper>
     </ShellStatusProvider>,
   );
 }
 
-function answer(processados: number, total = 200, estado = "processando") {
+function answer(
+  processados: number,
+  total = 200,
+  estado = "processando",
+  contagens = NONE,
+) {
   poll.mockResolvedValueOnce({
     ok: true,
-    batch: { estado, total, processados },
+    batch: { estado, total, processados, contagens },
   });
 }
 
@@ -120,7 +130,7 @@ describe("BatchProgress (AC 19)", () => {
           <BatchProgress
             key="again"
             batchId={ID}
-            initial={{ processados: 60, total: 200 }}
+            initial={{ processados: 60, total: 200, contagens: NONE }}
           />
           <Probe />
         </BatchFocusKeeper>
@@ -142,7 +152,12 @@ describe("BatchProgress (AC 19)", () => {
     await act(async () =>
       resolve({
         ok: true,
-        batch: { estado: "processando", total: 200, processados: 50 },
+        batch: {
+          estado: "processando",
+          total: 200,
+          processados: 50,
+          contagens: NONE,
+        },
       }),
     );
     expect(screen.getByText("50 de 200", { selector: "p" })).toBeVisible();
@@ -241,6 +256,22 @@ describe("BatchProgress (AC 19)", () => {
     for (let i = 0; i < 8; i++) await tick();
     expect(router.refresh).toHaveBeenCalledTimes(5);
     expect(poll).toHaveBeenCalledTimes(1);
+  });
+
+  it("P5-006: the legend's numbers follow each poll (text only, no donut)", async () => {
+    renderProgress(50, 200, { ok: 40, warn: 6, bad: 4, erro: 0 });
+    const legend = () =>
+      screen.getAllByRole("listitem").map((item) => item.textContent);
+    expect(legend()).toEqual(["Tudo certo40", "Atenção6", "Crítico4"]);
+    answer(100, 200, "processando", { ok: 80, warn: 10, bad: 8, erro: 2 });
+    await tick();
+    expect(legend()).toEqual([
+      "Tudo certo80",
+      "Atenção10",
+      "Crítico8",
+      "Não consultados2",
+    ]);
+    expect(document.querySelector("svg")).toBeNull();
   });
 
   it("P5-004: the refreshes spent and still here → one full load of the same /lote/{id}, once", async () => {

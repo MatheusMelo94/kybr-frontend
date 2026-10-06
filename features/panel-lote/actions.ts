@@ -67,12 +67,15 @@ export async function startBatchAction(input: unknown): Promise<StartResult> {
 }
 
 export type PollResult =
-  | { ok: true; batch: Pick<Batch, "estado" | "total" | "processados"> }
+  | {
+      ok: true;
+      batch: Pick<Batch, "estado" | "total" | "processados" | "contagens">;
+    }
   | { ok: false; code: "NOT_FOUND" | "SESSAO_EXPIRADA" | "FAILED" };
 
 /**
  * A read-only action for BatchProgress, from /lote/[batchId] (ADR-0011 rule
- * 3): the batch's progress, nothing else. requireSession() and the batch
+ * 3): the batch's progress and its counts so far, nothing else. requireSession() and the batch
  * read both carry X-Kybr-Poll, so a poll never slides the idle session
  * (M4-02, C7), with the poll's 4 s timeout. A bad, unknown or foreign id is
  * NOT_FOUND; any other failure is FAILED (the leaf shows it as stale).
@@ -87,8 +90,9 @@ export async function pollBatchAction(input: unknown): Promise<PollResult> {
     pollTimeoutMs: POLL_TIMEOUT_MS,
   });
   if (result.ok) {
-    const { estado, total, processados } = result.data;
-    return { ok: true, batch: { estado, total, processados } };
+    // P5-006: the counts so far feed the progress legend.
+    const { estado, total, processados, contagens } = result.data;
+    return { ok: true, batch: { estado, total, processados, contagens } };
   }
   if (result.error.code === "LOTE_NAO_ENCONTRADO")
     return { ok: false, code: "NOT_FOUND" };

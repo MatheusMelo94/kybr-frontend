@@ -53,7 +53,13 @@ describe("pollBatchAction (D-B2, ADR-0011 rule 3)", () => {
     const result = await pollBatchAction({ batchId: batch.id });
     expect(result).toEqual({
       ok: true,
-      batch: { estado: "processando", total: 3, processados: 1 },
+      batch: {
+        estado: "processando",
+        total: 3,
+        processados: 1,
+        // P5-006: D-B2 carries the counts so far; the legend shows them live.
+        contagens: { ok: 1, warn: 0, bad: 0, erro: 0 },
+      },
     });
     const calls = panelStore().calls.filter((call) => call.authorized);
     expect(calls.map((call) => [call.path, call.poll])).toEqual([

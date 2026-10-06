@@ -24,7 +24,11 @@ export function BatchState({ batch, contratarHref }: Props): JSX.Element {
     return (
       <BatchProgress
         batchId={batch.id}
-        initial={{ processados: batch.processados, total: batch.total }}
+        initial={{
+          processados: batch.processados,
+          total: batch.total,
+          contagens: batch.contagens,
+        }}
       />
     );
   return (
