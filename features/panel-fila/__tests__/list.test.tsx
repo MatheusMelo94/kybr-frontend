@@ -123,6 +123,30 @@ describe("CaseOption (AC 27, G3, G12)", () => {
     expect(LIST_ITEM_HEIGHT).toBe("h-19");
   });
 
+  it("P6-011 (plan § 8): read in the order status, razão social, reasons, origin, SLA", () => {
+    const { container } = render(
+      <CaseOption
+        status="warn"
+        razao="Empresa Exemplo Ltda"
+        motivos={["Sócio novo"]}
+        origem="lote"
+        slaAte="2026-10-06T20:00:00Z"
+        vencido={false}
+        now={NOW}
+      />,
+    );
+    const text = container.textContent ?? "";
+    const at = [
+      "Atenção",
+      "Empresa Exemplo Ltda",
+      "Sócio novo",
+      "Lote",
+      "Vence em 6 h",
+    ].map((part) => text.indexOf(part));
+    expect(at.every((index) => index >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+
   it("late: the SLA in danger ink, with words", () => {
     render(
       <CaseOption

@@ -37,25 +37,30 @@ export function CaseOption({
       className={cn(
         // The skeleton's h-19 as a minimum: no shift, and 200 % text grows it.
         "min-h-19",
-        "flex min-w-0 flex-col justify-center gap-1 border-b border-line px-3",
+        // DOM order = reading order (plan § 8, P6-011): status, razão social,
+        // reasons, origin, SLA. The flex order draws the status, origin and
+        // SLA on the first line (it wraps), then the name, then the reasons.
+        "flex min-w-0 flex-wrap content-center items-center gap-x-2 gap-y-1 border-b border-line px-3",
         // The open case: an ink bar, not a fill (danger ink keeps its
         // contrast in both themes, AC 69).
         "border-l-4 border-l-transparent hover:border-l-line in-aria-selected:border-l-ink",
       )}
     >
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-secondary">
+      <span className="order-1 text-secondary">
         <StatusWord status={status} />
-        <OriginChip origem={origem} />
-        <span className="ml-auto shrink-0">
-          <SlaText slaAte={slaAte} vencido={vencido} now={now} />
-        </span>
-      </div>
-      <p className="truncate text-body font-strong text-ink tabular-nums">
+      </span>
+      <p className="order-4 min-w-0 basis-full truncate text-body font-strong text-ink tabular-nums">
         {razao}
       </p>
-      <p className="truncate text-secondary text-ink-muted">
+      <p className="order-5 min-w-0 basis-full truncate text-secondary text-ink-muted">
         {motivos.join(", ")}
       </p>
+      <span className="order-2 text-secondary">
+        <OriginChip origem={origem} />
+      </span>
+      <span className="order-3 ml-auto shrink-0 text-secondary">
+        <SlaText slaAte={slaAte} vencido={vencido} now={now} />
+      </span>
     </div>
   );
 }
