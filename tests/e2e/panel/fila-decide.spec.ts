@@ -48,7 +48,7 @@ function countLoads(page: Page): () => number {
 }
 
 test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", () => {
-  test("one click: the item leaves at once, the next is selected over a skeleton while the URL waits; then the toast, /fila/{next}, focus and counts", async ({
+  test("one click: the item leaves at once, the next is selected over a skeleton while the URL waits; then the toast, /fila/{next}, focus and counts @panel-smoke", async ({
     page,
     request,
   }, testInfo) => {
