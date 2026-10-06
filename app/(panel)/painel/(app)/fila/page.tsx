@@ -1,18 +1,32 @@
 import type { Metadata } from "next";
-import type { JSX } from "react";
+import { Suspense, type JSX } from "react";
 
-import { FilaStub } from "@/features/panel-shell/components/fila-stub";
-import { shellCopy } from "@/features/panel-shell/copy/shell";
+import { CaseListSection } from "@/features/panel-fila/components/case-list-section";
+import { DetailSkeleton } from "@/features/panel-fila/components/detail-skeleton";
+import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
+import { ListSkeleton } from "@/features/panel-fila/components/list-skeleton";
+import { filaCopy } from "@/features/panel-fila/copy";
 import { requireSession } from "@/lib/api/panel/session";
 import { contratarHref } from "@/lib/panel-config";
 
-export const metadata: Metadata = { title: shellCopy["fila.h1"] };
+export const metadata: Metadata = { title: filaCopy["fila.h1"] };
 
-// M4 stub: replaced in M6 by the Fila (list + case detail). /me is the
-// layout's read (React cache(), one request), so the banner costs no call.
+// /fila: the list; at lg the detail pane waits for a case (T98, T99). /me is
+// the layout's read (React cache(), one request).
 export default async function FilaPage(): Promise<JSX.Element> {
   const me = await requireSession();
   return (
-    <FilaStub plano={me.workspace.plano} contratarHref={contratarHref()} />
+    <FilaScreen
+      contagens={me.workspace.contagens}
+      plano={me.workspace.plano}
+      contratarHref={contratarHref()}
+      caseOpen={false}
+      list={
+        <Suspense fallback={<ListSkeleton />}>
+          <CaseListSection />
+        </Suspense>
+      }
+      detail={<DetailSkeleton />}
+    />
   );
 }
