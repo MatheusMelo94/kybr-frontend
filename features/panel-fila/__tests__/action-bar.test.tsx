@@ -53,7 +53,13 @@ afterEach(() => {
   document.documentElement.style.scrollPaddingBottom = "";
 });
 
-function Actions({ request = true }: { request?: boolean }): JSX.Element {
+function Actions({
+  request = true,
+  proof = false,
+}: {
+  request?: boolean;
+  proof?: boolean;
+}): JSX.Element {
   return (
     <ShellStatusProvider initial={{ contagens: undefined, plano: undefined }}>
       <ToastProvider closeLabel="Fechar">
@@ -63,6 +69,7 @@ function Actions({ request = true }: { request?: boolean }): JSX.Element {
             origem="link"
             razao="Empresa A"
             webhook
+            proof={proof}
             request={
               request
                 ? { tipos: ["CARTAO_CNPJ"], vendedorTemEmail: true }
@@ -152,5 +159,26 @@ describe("the action bar (T112)", () => {
     lg = true;
     render(<Actions />);
     expect(document.documentElement.style.scrollPaddingBottom).toBe("");
+  });
+
+  it("T115 (spec J4 tab order): at lg Baixar comprovante is the last action, after Bloquear; below lg it stays in the body", () => {
+    render(<Actions proof />);
+    const buttons = Array.from(bar()?.querySelectorAll("button") ?? []).filter(
+      (button) => button.closest("dialog") === null,
+    );
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "Aprovar",
+      "Pedir documento",
+      "Bloquear",
+      "Baixar comprovante",
+    ]);
+    expect(buttons[3]?.parentElement).toHaveClass("max-lg:hidden");
+  });
+
+  it("no proof (DADOS_NAO_ENCONTRADOS, D7): no Baixar comprovante among the actions", () => {
+    render(<Actions />);
+    expect(
+      screen.queryByRole("button", { name: "Baixar comprovante" }),
+    ).toBeNull();
   });
 });

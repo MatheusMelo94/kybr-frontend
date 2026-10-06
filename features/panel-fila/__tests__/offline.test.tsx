@@ -136,6 +136,8 @@ describe("offline (T111; AC 44; D8; ADR-0011 rule 8; F14)", () => {
     expect(banner()).toHaveTextContent(
       "Sem conexão. Mostrando os dados de 10:05.",
     );
+    // AC 76 (T115): the time in tabular figures.
+    expect(banner()).toHaveClass("tabular-nums");
     for (const button of decisions()) {
       expect(button).toBeDisabled();
       expect(button).toHaveAccessibleDescription(OFFLINE_ACTIONS);

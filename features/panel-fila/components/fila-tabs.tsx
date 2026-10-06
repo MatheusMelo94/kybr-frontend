@@ -17,7 +17,7 @@ type Props = {
 };
 
 const TAB =
-  "inline-flex min-h-10 items-center border-b-2 px-1 text-body pointer-coarse:min-h-11 " +
+  "inline-flex min-h-10 items-center border-b-2 px-1 text-body tabular-nums pointer-coarse:min-h-11 " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
 /** Para decidir / Aguardando vendedor: soft links to ?aba= (plan D2, AC 27). */

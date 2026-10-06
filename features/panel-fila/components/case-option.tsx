@@ -50,7 +50,9 @@ export function CaseOption({
           <SlaText slaAte={slaAte} vencido={vencido} now={now} />
         </span>
       </div>
-      <p className="truncate text-body font-strong text-ink">{razao}</p>
+      <p className="truncate text-body font-strong text-ink tabular-nums">
+        {razao}
+      </p>
       <p className="truncate text-secondary text-ink-muted">
         {motivos.join(", ")}
       </p>

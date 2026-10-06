@@ -58,6 +58,12 @@ function view(patch: Partial<CaseView> = {}): CaseView {
 }
 
 describe("VerdictHeader (AC 29, identity.md § VerdictHeader, D9)", () => {
+  it("AC 76 (T115): a heading that is the CNPJ (no razão social) is in tabular figures", () => {
+    render(<VerdictHeader view={view({ razao_social: null })} />);
+    for (const heading of document.querySelectorAll("[data-detail-heading]"))
+      expect(heading).toHaveClass("tabular-nums");
+  });
+
   it("the sr prefix + the verdict word in Veredito type beside a ≈ 16 px dot", () => {
     render(<VerdictHeader view={view()} />);
     const verdict = screen.getByText("Revisar");

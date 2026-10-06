@@ -4,6 +4,7 @@ import { StatusDot, type StatusTone } from "@/components/ui/status-dot";
 import { CountsPill } from "@/features/panel-fila/components/counts-pill";
 import { filaCopy } from "@/features/panel-fila/copy";
 import type { CaseView } from "@/lib/api/panel/cases";
+import { cn } from "@/lib/utils";
 
 const VERDICTS: Record<
   CaseView["veredito"],
@@ -29,6 +30,12 @@ export function VerdictHeader({ view }: Props): JSX.Element {
   const noData = view.variante === "DADOS_NAO_ENCONTRADOS";
   const { word, tone } = VERDICTS[view.veredito];
   const name = view.razao_social ?? view.cnpj;
+  // AC 76: the masked CNPJ standing in for the name is read in columns too.
+  const heading = cn(
+    NAME,
+    "break-words",
+    view.razao_social === null && "tabular-nums",
+  );
   return (
     <div className="flex flex-col gap-3">
       <p className="flex items-center gap-3">
@@ -43,14 +50,14 @@ export function VerdictHeader({ view }: Props): JSX.Element {
         <h1
           data-detail-heading
           tabIndex={-1}
-          className={`${NAME} break-words lg:hidden`}
+          className={cn(heading, "lg:hidden")}
         >
           {name}
         </h1>
         <h2
           data-detail-heading
           tabIndex={-1}
-          className={`${NAME} break-words max-lg:hidden`}
+          className={cn(heading, "max-lg:hidden")}
         >
           {name}
         </h2>

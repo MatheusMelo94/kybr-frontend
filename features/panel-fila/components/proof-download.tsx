@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { proofFilename } from "@/features/panel-fila/proof-filename";
 import { useFileDownload } from "@/features/panel-shell/use-file-download";
+import { cn } from "@/lib/utils";
 
 type Props = {
   caseId: string;
+  /** Placement only (T115: body below lg, the last action at lg). */
+  className?: string;
 };
 
 /**
@@ -16,14 +19,14 @@ type Props = {
  * useFileDownload (no redirects followed, blob URL revoked, F12), busy with
  * its label unchanged (G14), fila.proof.error inline on any failure.
  */
-export function ProofDownload({ caseId }: Props): JSX.Element {
+export function ProofDownload({ caseId, className }: Props): JSX.Element {
   const { busy, failed, download } = useFileDownload(
     `/fila/${encodeURIComponent(caseId)}/comprovante`,
     () => proofFilename(new Date()),
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className={cn("flex flex-wrap items-center gap-3", className)}>
       <Button
         variant="secondary"
         size="panel"

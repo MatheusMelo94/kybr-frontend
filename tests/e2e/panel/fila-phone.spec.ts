@@ -153,7 +153,10 @@ test.describe("the Fila on a phone (T112) @feature-ops-panel @panel-fila @panel-
       await trigger.focus();
       await trigger.click();
       await expect(page.getByRole("dialog")).toBeVisible();
-      expect(await smallTargets(page, "dialog[open]"), name).toEqual([]);
+      // The sheet slides in (T94): measure once it settled.
+      await expect
+        .poll(() => smallTargets(page, "dialog[open]"), { message: name })
+        .toEqual([]);
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog")).toBeHidden();
     }

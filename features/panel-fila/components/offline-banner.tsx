@@ -34,7 +34,7 @@ export function OfflineBanner(): JSX.Element | null {
 
   if (online) return null;
   return (
-    <Notice tone="warning">
+    <Notice tone="warning" className="tabular-nums">
       {fill(globalCopy["offline.panel"], { hora: formatHora(renderedAt) })}
     </Notice>
   );

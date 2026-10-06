@@ -21,6 +21,12 @@ type Props = {
   documentsMode?: "redirect" | "attachment" | undefined;
   /** Under the decided banner: the page's ConflictNotice (T106). */
   decidedNotice?: ReactNode;
+  /**
+   * "below-lg" when CaseActions follows with the proof as its last action
+   * at lg (spec J4: primary, Pedir, Bloquear, Baixar comprovante); below
+   * lg it stays in the body, before the sticky bar (G8).
+   */
+  proofInBody?: "always" | "below-lg";
 };
 
 /**
@@ -34,6 +40,7 @@ export function CaseDetail({
   now,
   documentsMode,
   decidedNotice,
+  proofInBody = "always",
 }: Props): JSX.Element {
   const partial = view.eventos === undefined || view.documentos === undefined;
   return (
@@ -64,9 +71,12 @@ export function CaseDetail({
         />
       )}
       {view.eventos && <Timeline eventos={view.eventos} now={now} />}
-      {/* D7: no data means no proof. T110's action bar may move it at lg. */}
+      {/* D7: no data means no proof. */}
       {view.variante !== "DADOS_NAO_ENCONTRADOS" && (
-        <ProofDownload caseId={view.id} />
+        <ProofDownload
+          caseId={view.id}
+          {...(proofInBody === "below-lg" && { className: "lg:hidden" })}
+        />
       )}
     </article>
   );

@@ -145,6 +145,11 @@ const SPEC_S6: Record<string, string> = {
 };
 
 describe("filaCopy (T91, spec § Content & Copy › S6)", () => {
+  it("AC 72 (T115): no string addresses the user with a gendered form", () => {
+    for (const text of Object.values(filaCopy))
+      expect(text).not.toMatch(/bem-vind|obrigad|você mesm/i);
+  });
+
   it("holds every S6 key, verbatim, and nothing else", () => {
     expect(filaCopy).toEqual(SPEC_S6);
   });

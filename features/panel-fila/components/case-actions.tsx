@@ -5,6 +5,7 @@ import { useId, useRef, type JSX } from "react";
 import { ApproveButton } from "@/features/panel-fila/components/approve-button";
 import { BlockDialog } from "@/features/panel-fila/components/block-dialog";
 import { DecideError } from "@/features/panel-fila/components/decide-error";
+import { ProofDownload } from "@/features/panel-fila/components/proof-download";
 import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { RequestDocumentsDialog } from "@/features/panel-fila/components/request-documents-dialog";
 import { useStickyBar } from "@/features/panel-fila/use-sticky-bar";
@@ -25,6 +26,12 @@ type Props = {
    */
   request?:
     { tipos: readonly DocumentoTipo[]; vendedorTemEmail: boolean } | undefined;
+  /**
+   * At lg "Baixar comprovante" is the last action (spec J4); below lg it
+   * is in the body (CaseDetail proofInBody="below-lg"). False for
+   * DADOS_NAO_ENCONTRADOS (D7).
+   */
+  proof?: boolean;
 };
 
 /**
@@ -47,6 +54,7 @@ export function CaseActions({
   razao,
   webhook,
   request,
+  proof = false,
 }: Props): JSX.Element {
   const { online } = useFila();
   const offlineId = useId();
@@ -97,6 +105,7 @@ export function CaseActions({
           webhook={webhook}
           offline={off}
         />
+        {proof && <ProofDownload caseId={caseId} className="max-lg:hidden" />}
       </div>
     </>
   );

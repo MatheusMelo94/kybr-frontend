@@ -468,6 +468,10 @@ describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F
     expect(
       screen.getByText("Este caso já tinha sido decidido em 06/10, 10:05."),
     ).toBeInTheDocument();
+    // AC 76 (T115): the time in tabular figures.
+    expect(
+      screen.getByText("Este caso já tinha sido decidido em 06/10, 10:05."),
+    ).toHaveClass("tabular-nums");
     expect(screen.queryByRole("alert")).toBeNull();
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(toastText()).toBe("");

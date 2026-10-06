@@ -36,6 +36,12 @@ const COUNTS: Contagens = {
 const NOW = "2026-10-06T14:00:00Z";
 
 describe("FilaTabs (AC 27, G13)", () => {
+  it("AC 76 (T115): the counts are in tabular figures", () => {
+    render(<FilaTabs aba="aberto" contagens={COUNTS} />);
+    for (const link of screen.getAllByRole("link"))
+      expect(link).toHaveClass("tabular-nums");
+  });
+
   it("two links with /me's counts; aria-current on the active one", () => {
     render(<FilaTabs aba="aberto" contagens={COUNTS} />);
     const open = screen.getByRole("link", { name: "Para decidir (30)" });
@@ -78,6 +84,21 @@ describe("FilaTabs (AC 27, G13)", () => {
 });
 
 describe("CaseOption (AC 27, G3, G12)", () => {
+  it("AC 76 (T115): the name line (a masked CNPJ when there's no razão social) is in tabular figures", () => {
+    render(
+      <CaseOption
+        status="ok"
+        razao="12.ABC.345/01DE-35"
+        motivos={[]}
+        origem="link"
+        slaAte="2026-10-06T20:00:00Z"
+        vencido={false}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText("12.ABC.345/01DE-35")).toHaveClass("tabular-nums");
+  });
+
   it("status word, razão social, reasons joined, origin chip, SLA", () => {
     const { container } = render(
       <CaseOption

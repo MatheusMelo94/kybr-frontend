@@ -27,7 +27,7 @@ export function ConflictNotice({
   const em = conflict.decididoEm ?? decididoEm;
   if (em === undefined) return null;
   return (
-    <p className="text-body text-ink">
+    <p className="text-body text-ink tabular-nums">
       {fill(filaCopy["fila.decide.conflict"], {
         data_hora: formatDataHora(em),
       })}

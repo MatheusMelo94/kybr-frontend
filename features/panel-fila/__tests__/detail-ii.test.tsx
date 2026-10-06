@@ -171,6 +171,17 @@ describe("Timeline (AC 29, G1)", () => {
 });
 
 describe("DecidedBanner (AC 41)", () => {
+  it("AC 76 (T115): the decision's date and time are in tabular figures", () => {
+    render(
+      <DecidedBanner
+        decisao={{ tipo: "aprovar", em: "2026-10-05T13:37:00Z" }}
+      />,
+    );
+    expect(screen.getByText("Decidido: Aprovado em 05/10, 10:37.")).toHaveClass(
+      "tabular-nums",
+    );
+  });
+
   it("the decision, its reason and the note", () => {
     render(
       <DecidedBanner
@@ -268,6 +279,13 @@ describe("CaseDetail II: sections, partial, decided", () => {
     );
     expect(screen.getByRole("button", { name: "Baixar" })).toBeVisible();
     expect(screen.queryByRole("link", { name: /^Abrir/ })).toBeNull();
+  });
+
+  it("T115: with the actions beside it, the body's Baixar comprovante is the phone's only (lg:hidden); at lg it follows Bloquear", () => {
+    render(<CaseDetail view={view()} now={NOW} proofInBody="below-lg" />);
+    expect(
+      screen.getByRole("button", { name: "Baixar comprovante" }).parentElement,
+    ).toHaveClass("lg:hidden");
   });
 
   it("Baixar comprovante shows on an open and a decided case (AC 42)", () => {

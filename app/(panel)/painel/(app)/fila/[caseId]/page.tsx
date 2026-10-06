@@ -74,6 +74,9 @@ export default async function CasePage({
               <>
                 <CaseDetail
                   view={result.case}
+                  proofInBody={
+                    result.case.estado === "decidido" ? "always" : "below-lg"
+                  }
                   now={new Date()}
                   documentsMode={documentsSettings().mode}
                   decidedNotice={
@@ -95,6 +98,7 @@ export default async function CasePage({
                     origem={result.case.origem}
                     razao={result.case.razao_social ?? result.case.cnpj}
                     webhook={me.workspace.webhook_configurado}
+                    proof={result.case.variante !== "DADOS_NAO_ENCONTRADOS"}
                     request={
                       me.workspace.documentos_habilitados && {
                         tipos: me.workspace.documentos_habilitados,
