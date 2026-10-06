@@ -19,6 +19,8 @@ type Props = {
   /** The chosen CNPJ column; undefined until one is detected or picked (AC 17). */
   column: number | undefined;
   onColumn: (column: number) => void;
+  /** The rows are built and the worker has ended (P5-002): the column is fixed. */
+  columnLocked?: boolean;
   /** Checks left (limite − usadas); undefined when /me lacks the plano. */
   left: number | undefined;
   gate: PlanGate | undefined;
@@ -37,6 +39,7 @@ export function BatchPreview({
   preview,
   column,
   onColumn,
+  columnLocked = false,
   left,
   gate,
   contratarHref,
@@ -140,6 +143,7 @@ export function BatchPreview({
         label={loteCopy["lote.preview.column.label"]}
         value={column === undefined ? "" : String(column)}
         onChange={(value) => onColumn(Number(value))}
+        disabled={columnLocked}
         error={columnError}
         className="max-w-sm"
       >

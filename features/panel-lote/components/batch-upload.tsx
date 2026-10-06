@@ -54,6 +54,10 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
       }
     | undefined
   >(undefined);
+  // P5-002: the preview whose rows are built. The worker ends after the
+  // build (ADR-0012 item 1), so its column is locked; "Trocar arquivo"
+  // re-parses to choose another.
+  const [builtFor, setBuiltFor] = useState<Preview | undefined>(undefined);
   const [folderError, setFolderError] = useState(false);
   // Renata's pick, for the preview it was made on; otherwise the detected column.
   const [choice, setChoice] = useState<
@@ -118,6 +122,7 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
     try {
       current.linhas ??= await build(column);
       if (current.linhas === undefined) return;
+      setBuiltFor(preview);
       const result = await startBatchAction({
         idempotencyKey: current.key,
         linhas: current.linhas,
@@ -168,6 +173,7 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
           preview={preview}
           column={column}
           onColumn={(picked) => setChoice({ preview, column: picked })}
+          columnLocked={builtFor === preview}
           left={left}
           gate={planGate(plano)}
           contratarHref={contratarHref}
@@ -175,6 +181,7 @@ export function BatchUpload({ contratarHref }: Props): JSX.Element {
           onStart={() => void onStart()}
           onChangeFile={() => {
             attempt.current = undefined;
+            setBuiltFor(undefined);
             setServerLeft(undefined);
             setStartError(false);
             reset();

@@ -262,7 +262,7 @@ describe("BatchUpload: starting a batch (T80, AC 16, 18, 19)", () => {
     expect(expire).toHaveBeenCalledTimes(1);
   });
 
-  it("a new column renews the key", async () => {
+  it("the column picked before the start is the one built; after the build the select is locked (P5-002)", async () => {
     start.mockResolvedValue({ ok: false, code: "NETWORK" });
     hook.state = {
       status: "preview",
@@ -275,12 +275,11 @@ describe("BatchUpload: starting a batch (T80, AC 16, 18, 19)", () => {
     };
     hook.build.mockResolvedValue(LINHAS);
     renderUpload();
-    await act(async () => fireEvent.click(cta()));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
     await act(async () => fireEvent.click(cta()));
-    const [first, second] = start.mock.calls.map(([input]) => input);
-    expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
-    expect(hook.build).toHaveBeenLastCalledWith(1);
+    expect(hook.build).toHaveBeenCalledWith(1);
+    // The worker has ended (ADR-0012 item 1): "Trocar arquivo" starts over.
+    expect(screen.getByRole("combobox")).toBeDisabled();
   });
 
   it("a payload the worker can't build → lote.error.unreadable, nothing sent", async () => {
