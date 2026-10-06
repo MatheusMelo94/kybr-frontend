@@ -335,6 +335,7 @@ export async function decideCase(
     notaVendedor?: string | undefined;
   },
   idempotencyKey: string,
+  options: { pagePath?: string | undefined } = {},
 ): Promise<Case> {
   const operation = "case-decide";
   const data = await send({
@@ -350,7 +351,13 @@ export async function decideCase(
         nota_vendedor: decision.notaVendedor,
       }),
     },
-    headers: { "idempotency-key": idempotencyKey },
+    headers: {
+      "idempotency-key": idempotencyKey,
+      // F7: the page that posted the action (the request log's pagePath).
+      ...(options.pagePath !== undefined && {
+        "x-kybr-panel-path": options.pagePath,
+      }),
+    },
   });
   return parseCase(data, operation, id);
 }

@@ -5,3 +5,6 @@ export const DECIDE_TIMEOUT_MS = 15_000;
 
 /** Two panes from Tailwind's lg (64rem): matchMedia for the client's choices (D4). */
 export const LG_MEDIA = "(min-width: 64rem)";
+
+/** D-C3 / D-C4 nota_vendedor's cap (C-M6-4): the actions' schemas and the dialogs' fields. */
+export const NOTA_VENDEDOR_MAX = 280;
