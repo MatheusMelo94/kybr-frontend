@@ -40,7 +40,8 @@ export function DocumentDownload({ href, tipo }: Props): JSX.Element {
         {filaCopy["fila.docs.download"]}
       </button>
       {failed && (
-        <span role="alert" className="text-secondary text-danger-ink">
+        // DDR-0003 pt 4: ink, not red (P6-013).
+        <span role="alert" className="text-secondary text-ink">
           {globalCopy["export.error"]}
         </span>
       )}

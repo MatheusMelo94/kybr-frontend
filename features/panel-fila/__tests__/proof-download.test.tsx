@@ -95,9 +95,13 @@ describe("ProofDownload (AC 42, G14, F12)", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Baixar comprovante" }),
       );
-      expect(await screen.findByRole("alert")).toHaveTextContent(
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(
         "Não conseguimos baixar o comprovante. Tente de novo.",
       );
+      // DDR-0003 pt 4: red text is for form-field errors and form alerts only.
+      expect(alert).toHaveClass("text-ink");
+      expect(alert).not.toHaveClass("text-danger-ink");
       expect(clicked).toEqual([]);
     },
   );

@@ -64,8 +64,11 @@ async function signalText(page: Page): Promise<string[]> {
       if (own === "") continue;
       const color = getComputedStyle(element).color;
       if (forbidden.has(color)) wrong.push(`signal: ${own.slice(0, 40)}`);
+      // DDR-0003 pt 4 / QA Q3: a late SLA, a field error, or a form alert
+      // (inside a dialog's form); never an in-place action error (P6-013).
       const allowedDanger =
-        element.closest("[role=alert]") !== null ||
+        element.closest("[role=alert]")?.closest("form, [role=dialog]") !=
+          null ||
         /^Atrasado há /.test(own) ||
         (element.id !== "" &&
           document.querySelector(`[aria-describedby~="${element.id}"]`) !==

@@ -379,6 +379,9 @@ describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F
     await flush();
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent(ERROR);
+    // DDR-0003 pt 4: ink text with the danger bar, never red text.
+    expect(alert).not.toHaveClass("text-danger-ink");
+    expect(alert.querySelector(".text-danger-ink")).toBeNull();
     expect(
       alert.compareDocumentPosition(approve()) &
         Node.DOCUMENT_POSITION_FOLLOWING,

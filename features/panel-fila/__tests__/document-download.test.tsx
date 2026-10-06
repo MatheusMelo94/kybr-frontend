@@ -103,9 +103,13 @@ describe("DocumentList in attachment mode (Q19, F4)", () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 502 }));
     renderAttachment();
     fireEvent.click(screen.getByRole("button", { name: "Baixar" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
       "Não conseguimos gerar o arquivo. Tente de novo.",
     );
+    // DDR-0003 pt 4: red text is for form-field errors and form alerts only.
+    expect(alert).toHaveClass("text-ink");
+    expect(alert).not.toHaveClass("text-danger-ink");
     expect(clicked).toEqual([]);
   });
 

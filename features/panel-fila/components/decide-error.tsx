@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 
+import { Notice } from "@/components/panel/notice";
 import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { filaCopy } from "@/features/panel-fila/copy";
 
@@ -15,9 +16,11 @@ type Props = { caseId: string };
 export function DecideError({ caseId }: Props): JSX.Element | null {
   const { flash } = useFila();
   if (flash[caseId]?.kind !== "decide-error") return null;
+  // DDR-0003 pt 4: ink text with the danger bar; red text is for form
+  // fields and form alerts only (P6-013).
   return (
-    <p role="alert" className="text-body text-danger-ink">
+    <Notice role="alert" tone="danger">
       {filaCopy["fila.decide.error"]}
-    </p>
+    </Notice>
   );
 }

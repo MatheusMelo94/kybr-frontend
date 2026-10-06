@@ -36,7 +36,8 @@ export function ProofDownload({ caseId, className }: Props): JSX.Element {
         {filaCopy["fila.action.proof"]}
       </Button>
       {failed && (
-        <p role="alert" className="text-secondary text-danger-ink">
+        // DDR-0003 pt 4: ink, not red (P6-013).
+        <p role="alert" className="text-secondary text-ink">
           {filaCopy["fila.proof.error"]}
         </p>
       )}
