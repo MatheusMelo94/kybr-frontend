@@ -51,9 +51,14 @@ export function Th({ children, className }: CellProps): JSX.Element {
   );
 }
 
-export function Td({ children, className }: CellProps): JSX.Element {
+export function Td({
+  children,
+  className,
+  colSpan,
+}: CellProps & { colSpan?: number }): JSX.Element {
   return (
     <td
+      colSpan={colSpan}
       className={cn(
         "border-b border-line-soft px-4 py-3 align-top break-words",
         className,

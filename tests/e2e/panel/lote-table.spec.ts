@@ -108,3 +108,32 @@ test.describe("Lote: the table below lg @feature-ops-panel @panel-lote @panel-ph
     expect(await horizontalOverflow(page)).toBe(0);
   });
 });
+
+test.describe("Lote: an empty filter (P5-005) @feature-ops-panel @panel-lote", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("a status with no rows → lote.table.empty in the table; the filter still works", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("lote-tabela-vazia", testInfo);
+    await createAccount(request, email, "pago");
+    const id = await createBatch(request, email, "tudo-ok", { finish: true });
+    await logIn(page, email);
+    await page.goto(`/lote/${id}?status=bad`);
+    const table = page.getByRole("region", { name: "Resultado" }).last();
+    await expect(
+      table.getByRole("cell", {
+        name: "Nenhuma empresa com esse status neste lote.",
+      }),
+    ).toBeVisible();
+    await page
+      .getByRole("combobox", { name: "Mostrar" })
+      .selectOption({ label: "Todos" });
+    await expect(page).toHaveURL(new RegExp(`/lote/${id}$`), {
+      timeout: 15_000,
+    });
+    await expect(bodyRows(page)).toHaveCount(3);
+  });
+});
+

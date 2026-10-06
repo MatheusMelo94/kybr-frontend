@@ -24,6 +24,14 @@ export function ResultTable({ page }: { page: BatchRowsPage }): JSX.Element {
         </tr>
       </thead>
       <tbody>
+        {/* P5-005: a filter that matches nothing says so; the filter stays above. */}
+        {page.itens.length === 0 && (
+          <tr>
+            <Td colSpan={4} className="text-ink-muted">
+              {loteCopy["lote.table.empty"]}
+            </Td>
+          </tr>
+        )}
         {page.itens.map((row, index) => (
           <tr key={`${row.cnpj}-${index}`}>
             <Td className="whitespace-nowrap tabular-nums">

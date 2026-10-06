@@ -70,6 +70,7 @@ const SPEC_S7: Record<string, string> = {
   "lote.table.filter.all": "Todos",
   "lote.table.next": "Próximos 25",
   "lote.table.first": "Voltar ao início",
+  "lote.table.empty": "Nenhuma empresa com esse status neste lote.",
   "lote.table.cnpj": "CNPJ",
   "lote.table.razao": "Razão social",
   "lote.table.status": "Situação",

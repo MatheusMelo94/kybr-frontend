@@ -60,6 +60,16 @@ describe("ResultTable (AC 20 table, AC 76)", () => {
     expect(third?.[1]).toHaveTextContent("<img src=x onerror=alert(1)>");
     expect(document.querySelector("img")).toBeNull();
   });
+
+  it("P5-005: a filter that matches nothing → lote.table.empty in place of the body, headers kept", () => {
+    render(
+      <ResultTable page={{ itens: [], proximo_cursor: null, total: 0 }} />,
+    );
+    expect(screen.getAllByRole("columnheader")).toHaveLength(4);
+    const cell = screen.getByRole("cell");
+    expect(cell).toHaveTextContent("Nenhuma empresa com esse status neste lote.");
+    expect(cell).toHaveAttribute("colspan", "4");
+  });
 });
 
 describe("StatusFilter (AC 21 filter)", () => {
