@@ -1,11 +1,13 @@
 import "server-only";
 
 import {
+  CASE_TAB_ESTADOS,
   isBatchId,
   isBatchRowStatus,
   isPanelCursor,
   isPanelId,
   type BatchRowStatus,
+  type CaseTabEstado,
 } from "@/lib/panel-api-values";
 
 // The only place Kybr API paths and queries are built (threat model F01). Every
@@ -66,6 +68,40 @@ function batchRowsQuery(filter: {
   }
   return query.toString();
 }
+
+// C-M6-1: an ISO 8601 date-time with an offset or Z (the API's own clock).
+const ISO_DATE_TIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** D-C1's query: the tab, 1..200 items (C-M6-2), then the cursor, each checked. */
+function caseListQuery(filter: {
+  estado: CaseTabEstado;
+  limit: number;
+  cursor?: string | undefined;
+}): string {
+  if (!(CASE_TAB_ESTADOS as readonly string[]).includes(filter.estado))
+    throw new Error("Refused API query: invalid estado");
+  if (!Number.isInteger(filter.limit) || filter.limit < 1 || filter.limit > 200)
+    throw new Error("Refused API query: invalid limit");
+  const query = new URLSearchParams({
+    estado: filter.estado,
+    limit: String(filter.limit),
+  });
+  if (filter.cursor !== undefined) {
+    if (!isPanelCursor(filter.cursor))
+      throw new Error("Refused API query: invalid cursor");
+    query.set("cursor", filter.cursor);
+  }
+  return query.toString();
+}
+
+function desdeQuery(desde: string): string {
+  if (!ISO_DATE_TIME.test(desde) || Number.isNaN(Date.parse(desde)))
+    throw new Error("Refused API query: invalid desde");
+  return new URLSearchParams({ estado: "aberto", desde }).toString();
+}
+
+const casePath = (id: string): string => `/v1/cases/${panelIdSegment(id)}`;
 
 const batchPath = (id: string): string =>
   `/v1/batches/${segment("batch id", id, isBatchId)}`;
@@ -132,6 +168,30 @@ export const apiPaths = {
       monitor: (id: string): string => `${batchPath(id)}/monitor`,
       /** D-B7 */
       resume: (id: string): string => `${batchPath(id)}/resume`,
+    },
+    /** M6 cases (D-C1–D-C5); every id is checked (A-X3) first. */
+    cases: {
+      /** D-C1 (+ C-M6-2 limit ≤ 200) */
+      list: (filter: {
+        estado: CaseTabEstado;
+        limit: number;
+        cursor?: string;
+      }): string => `/v1/cases?${caseListQuery(filter)}`,
+      /** C-M6-1: the cases that entered `aberto` after `desde`. */
+      newCount: (desde: string): string => `/v1/cases?${desdeQuery(desde)}`,
+      /** D-C2 */
+      get: (id: string): string => casePath(id),
+      /** D-C3 */
+      decide: (id: string): string => `${casePath(id)}/decide`,
+      /** D-C4 */
+      requestDocuments: (id: string): string =>
+        `${casePath(id)}/request-documents`,
+      /** C-M6-10 item 3: the mint endpoint, if the backend adds it. */
+      documentUrl: (id: string, docId: string): string =>
+        `${casePath(id)}/documentos/${panelIdSegment(docId)}/url`,
+      /** D-C5: keyed by the verification the case names, never the URL. */
+      certificate: (verificationId: string): string =>
+        `/v1/verifications/${panelIdSegment(verificationId)}/certificate`,
     },
   },
 };

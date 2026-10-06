@@ -44,3 +44,111 @@ export type BatchLinha = {
   responsavel?: string;
   ext_id?: string;
 };
+
+// M6 cases (D-C1–D-C5 + C-M6-5/6): the closed sets the Fila branches on and
+// keys its copy by. Plain arrays, so client leaves can use them too.
+
+/** D-C1 `estado` filters (the two tabs) and D-C2's full set. */
+export const CASE_ESTADOS = ["aberto", "aguardando_doc", "decidido"] as const;
+export type CaseEstado = (typeof CASE_ESTADOS)[number];
+export const CASE_TAB_ESTADOS = ["aberto", "aguardando_doc"] as const;
+export type CaseTabEstado = (typeof CASE_TAB_ESTADOS)[number];
+
+export const CASE_ORIGENS = ["link", "lote", "monitoramento"] as const;
+export type CaseOrigem = (typeof CASE_ORIGENS)[number];
+
+export const VEREDITOS = ["aprovar", "revisar", "bloquear"] as const;
+export type Veredito = (typeof VEREDITOS)[number];
+
+/** The dot's status (D-C1) and each check's (D-C2). */
+export const CASE_STATUSES = ["ok", "warn", "bad"] as const;
+export type CaseStatus = (typeof CASE_STATUSES)[number];
+
+/** D-C3 decisions; `manter` only on monitoramento cases. */
+export const DECISAO_TIPOS = ["aprovar", "manter", "bloquear"] as const;
+export type DecisaoTipo = (typeof DECISAO_TIPOS)[number];
+
+/** D-C4 document types (the link's `documento.*` keys). */
+export const DOCUMENTO_TIPOS = [
+  "CONTRATO_SOCIAL_OU_CCMEI",
+  "PROCURACAO",
+  "COMPROVANTE_ENDERECO",
+  "CARTAO_CNPJ",
+  "RESPONSAVEL",
+] as const;
+export type DocumentoTipo = (typeof DOCUMENTO_TIPOS)[number];
+
+export function isDocumentoTipo(value: string): value is DocumentoTipo {
+  return (DOCUMENTO_TIPOS as readonly string[]).includes(value);
+}
+
+/** D-C3 block reasons (the link's `motivo.codigo` set). */
+export const MOTIVO_CODIGOS = [
+  "SITUACAO_IRREGULAR",
+  "RESPONSAVEL_NAO_SOCIO",
+  "EMPRESA_RECENTE",
+  "ATIVIDADE_FORA_DA_CATEGORIA",
+  "IE_NAO_ENCONTRADA",
+  "IE_SUSPENSA",
+  "MEI",
+  "GENERICO",
+] as const;
+export type MotivoCodigo = (typeof MOTIVO_CODIGOS)[number];
+
+export function isMotivoCodigo(value: string): value is MotivoCodigo {
+  return (MOTIVO_CODIGOS as readonly string[]).includes(value);
+}
+
+/** C-M6-5: the history's closed event types (rendered from the spec's copy). */
+export const CASE_EVENT_TIPOS = [
+  "caso_criado",
+  "documento_pedido",
+  "documento_recebido",
+  "decidido",
+  "reverificado",
+] as const;
+export type CaseEventTipo = (typeof CASE_EVENT_TIPOS)[number];
+
+/** C-M6-6: the six check keys (proposed names; `qsa` drives AC 30). */
+export const CHECK_CHAVES = [
+  "situacao",
+  "qsa",
+  "idade",
+  "cnae",
+  "ie",
+  "regime",
+] as const;
+export type CheckChave = (typeof CHECK_CHAVES)[number];
+
+// The seller's case link: /v/{slug}/c/{token}, with the link contract's slug
+// and token patterns (X3; the token is ≥ 128 bits).
+const LINK_VENDEDOR_PATH =
+  /^\/v\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/c\/[A-Za-z0-9_-]{22,64}$/;
+
+/**
+ * F8: a D-C2/D-C4 `link_vendedor` the panel may show (as an input value
+ * only, never an href): https on exactly `https://{linkHost}`, the seller
+ * case path, no query, fragment or userinfo, and already in canonical form.
+ * Anything else is null (the caller logs a shape-only marker).
+ */
+export function parseLinkVendedor(
+  value: string,
+  linkHost: string,
+): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  const ok =
+    url.protocol === "https:" &&
+    url.origin === `https://${linkHost}` &&
+    url.username === "" &&
+    url.password === "" &&
+    !value.includes("?") &&
+    !value.includes("#") &&
+    LINK_VENDEDOR_PATH.test(url.pathname) &&
+    url.href === value;
+  return ok ? value : null;
+}
