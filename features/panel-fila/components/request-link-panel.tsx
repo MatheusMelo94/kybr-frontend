@@ -14,6 +14,8 @@ type Props = {
   caseId: string;
   /** The case's link_vendedor (D-C2), already through parseLinkVendedor (F8). */
   link: string | undefined;
+  /** A decided case shows no link panel, whatever the API sends (AC 41, P6-009). */
+  decided: boolean;
 };
 
 /**
@@ -24,7 +26,11 @@ type Props = {
  * an href, a title, a label or a toast, and the clipboard is only written,
  * inside the click.
  */
-export function RequestLinkPanel({ caseId, link }: Props): JSX.Element | null {
+export function RequestLinkPanel({
+  caseId,
+  link,
+  decided,
+}: Props): JSX.Element | null {
   const { flash } = useFila();
   const { show } = useToast();
   const panel = useRef<HTMLElement>(null);
@@ -53,7 +59,7 @@ export function RequestLinkPanel({ caseId, link }: Props): JSX.Element | null {
     return () => cancelAnimationFrame(frame);
   }, [fresh, requested]);
 
-  if (shown === undefined) return null;
+  if (shown === undefined || decided) return null;
 
   async function copyLink(value: string): Promise<void> {
     try {

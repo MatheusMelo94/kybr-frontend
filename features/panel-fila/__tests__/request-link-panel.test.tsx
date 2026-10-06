@@ -43,15 +43,17 @@ function Requested({ link }: { link: string | undefined }): null {
 function Screen({
   link,
   requested,
+  decided = false,
 }: {
   link: string | undefined;
   requested?: { link: string | undefined };
+  decided?: boolean;
 }): JSX.Element {
   return (
     <ToastProvider closeLabel="Fechar">
       <FilaProvider renderedAt={1}>
         {requested && <Requested link={requested.link} />}
-        <RequestLinkPanel caseId="caso-a" link={link} />
+        <RequestLinkPanel caseId="caso-a" link={link} decided={decided} />
       </FilaProvider>
     </ToastProvider>
   );
@@ -79,6 +81,12 @@ describe("RequestLinkPanel (T109; AC 37 after half; D11; F9)", () => {
   it("no link: nothing renders", () => {
     render(<Screen link={undefined} />);
     expect(heading()).toBeNull();
+  });
+
+  it("a decided case with link_vendedor: nothing renders (AC 41, P6-009)", () => {
+    render(<Screen link={LINK} decided />);
+    expect(heading()).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copiar link" })).toBeNull();
   });
 
   it("a case with link_vendedor (a later visit): doc.link.h, the link in a read-only input, Copiar link; no focus moves", () => {

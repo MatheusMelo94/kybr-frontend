@@ -87,10 +87,11 @@ export default async function CasePage({
                     />
                   }
                 />
-                {/* D11: whenever the case has link_vendedor (no seller e-mail). */}
+                {/* D11: whenever an undecided case has link_vendedor (no seller e-mail). */}
                 <RequestLinkPanel
                   caseId={result.case.id}
                   link={result.case.link_vendedor}
+                  decided={result.case.estado === "decidido"}
                 />
                 {/* The only owner of decideAction and requestDocumentsAction (ADR-0008 Addendum 2, F7). */}
                 {result.case.estado !== "decidido" && (

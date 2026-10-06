@@ -123,7 +123,11 @@ function Screen({
                 Caso {caseId}
               </h2>
               <ConflictNotice caseId={caseId} decididoEm={undefined} />
-              <RequestLinkPanel caseId={caseId} link={undefined} />
+              <RequestLinkPanel
+                caseId={caseId}
+                link={undefined}
+                decided={false}
+              />
               <CaseActions
                 caseId={caseId}
                 origem="link"
