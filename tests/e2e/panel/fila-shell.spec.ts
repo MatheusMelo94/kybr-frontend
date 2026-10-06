@@ -48,15 +48,21 @@ test.describe("Fila routes and shell (T97) @feature-ops-panel @panel-fila", () =
     ).toBeVisible();
     const main = page.locator("main");
     await expect(main.getByText("30 abertos", { exact: true })).toBeVisible();
-    await expect(main.getByText("3 fora do prazo", { exact: true })).toBeVisible();
+    await expect(
+      main.getByText("3 fora do prazo", { exact: true }),
+    ).toBeVisible();
     const list = page.locator("[data-pane='list']");
     const detail = page.locator("[data-pane='detail']");
     await expect(list).toBeVisible();
     await expect(detail).toBeVisible();
-    const [listBox, detailBox] = [await list.boundingBox(), await detail.boundingBox()];
+    const [listBox, detailBox] = [
+      await list.boundingBox(),
+      await detail.boundingBox(),
+    ];
     // List ≈ 2/5, detail ≈ 3/5, side by side.
     expect(listBox && detailBox && listBox.x < detailBox.x).toBe(true);
-    const ratio = (listBox?.width ?? 0) / ((listBox?.width ?? 0) + (detailBox?.width ?? 1));
+    const ratio =
+      (listBox?.width ?? 0) / ((listBox?.width ?? 0) + (detailBox?.width ?? 1));
     expect(ratio).toBeGreaterThan(0.35);
     expect(ratio).toBeLessThan(0.45);
     await expectNoAxeViolations(page);
@@ -81,7 +87,9 @@ test.describe("Fila routes and shell (T97) @feature-ops-panel @panel-fila", () =
     await expect(page.getByTestId("fila-detail-skeleton")).toBeVisible();
     await expect(skeleton).toBeHidden({ timeout: 10_000 });
     expect(
-      await page.evaluate(() => (window as unknown as { __shift: number }).__shift),
+      await page.evaluate(
+        () => (window as unknown as { __shift: number }).__shift,
+      ),
     ).toBe(0);
   });
 
@@ -122,7 +130,9 @@ test.describe("Fila routes and shell (T97) @feature-ops-panel @panel-fila", () =
     const response = await page.goto("/fila/curto");
     expect(response?.status()).toBe(404);
     const calls = await callsFor(request, email);
-    expect(calls.some((call) => call.path.startsWith("/v1/cases/"))).toBe(false);
+    expect(calls.some((call) => call.path.startsWith("/v1/cases/"))).toBe(
+      false,
+    );
   });
 
   test("a case opens in the detail pane beside the list", async ({
@@ -140,7 +150,10 @@ test.describe("Fila routes and shell (T97) @feature-ops-panel @panel-fila", () =
     await expect(page.locator("[data-pane='list']")).toBeVisible();
   });
 
-  test("an unexpected render error → error.load.* with Tentar de novo", async ({
+  // T98: a list failure (here an invalid list) is ListError in the list
+  // pane, no longer error.tsx; the mock has no trigger left for the segment
+  // boundary (LoadError's own unit tests cover it).
+  test("an invalid list → error.load.* in the list pane, the header kept", async ({
     page,
     request,
   }, testInfo) => {
@@ -150,8 +163,14 @@ test.describe("Fila routes and shell (T97) @feature-ops-panel @panel-fila", () =
     await logIn(page, email);
     await caseFault(request, email, "list", "invalido", { times: 5 });
     await page.goto("/fila");
-    await expect(page.getByText("Não carregou")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
+    const banner = page.locator("[data-pane='list']").getByRole("alert");
+    await expect(banner).toContainText("Não carregou");
+    await expect(
+      banner.getByRole("button", { name: "Tentar de novo" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Fila de revisão" }),
+    ).toBeVisible();
   });
 });
 

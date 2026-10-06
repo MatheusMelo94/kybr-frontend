@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense, type JSX } from "react";
 
-import { CaseListSection } from "@/features/panel-fila/components/case-list-section";
+import { CaseList } from "@/features/panel-fila/components/case-list";
 import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
+import { FilaTabs } from "@/features/panel-fila/components/fila-tabs";
 import { ListSkeleton } from "@/features/panel-fila/components/list-skeleton";
 import { filaCopy } from "@/features/panel-fila/copy";
+import { parseFilaSearch } from "@/features/panel-fila/search-params";
 import { getCaseForPage } from "@/lib/api/panel/cases";
 import { AppError } from "@/lib/api/errors";
 import { requireSession } from "@/lib/api/panel/session";
@@ -14,7 +16,10 @@ import { contratarHref } from "@/lib/panel-config";
 
 export const metadata: Metadata = { title: filaCopy["fila.h1"] };
 
-type Props = { params: Promise<{ caseId: string }> };
+type Props = {
+  params: Promise<{ caseId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 // /fila/{id}: an id outside A-X3 is not found with no API call; an unknown or
 // foreign one (PC9) gets the same not found. The case is read before anything
@@ -22,9 +27,11 @@ type Props = { params: Promise<{ caseId: string }> };
 // streams its own skeleton.
 export default async function CasePage({
   params,
+  searchParams,
 }: Props): Promise<JSX.Element> {
   const { caseId } = await params;
   if (!isPanelId(caseId)) notFound();
+  const search = parseFilaSearch(await searchParams);
   const me = await requireSession();
   const result = await getCaseForPage(caseId).catch((error: unknown) => {
     if (error instanceof AppError && error.code === "CASO_NAO_ENCONTRADO")
@@ -39,9 +46,12 @@ export default async function CasePage({
       contratarHref={contratarHref()}
       caseOpen
       list={
-        <Suspense fallback={<ListSkeleton />}>
-          <CaseListSection />
-        </Suspense>
+        <>
+          <FilaTabs aba={search.aba} contagens={me.workspace.contagens} />
+          <Suspense fallback={<ListSkeleton />}>
+            <CaseList {...search} selectedId={caseId} />
+          </Suspense>
+        </>
       }
       detail={
         // T100/T101 build the detail; T97 names the case.

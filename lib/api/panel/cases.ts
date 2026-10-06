@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { z } from "zod";
 
 import type { ApiResult } from "@/lib/api/client";
@@ -192,6 +193,40 @@ export async function listCases(filter: {
     proximo_cursor: cursor,
   };
 }
+
+/**
+ * D-C1 for the Fila's pages, the CNPJs masked (F11), one read per request for (estado, limit) (React
+ * cache(): the list pane and the empty detail pane share it). A failed read
+ * is a result the list renders (ListError, AC 28) instead of error.tsx;
+ * SESSAO_EXPIRADA still throws.
+ */
+export const listCasesForPage = cache(
+  async (
+    estado: CaseTabEstado,
+    limit: number,
+  ): Promise<{ ok: true; page: CaseList } | { ok: false }> => {
+    try {
+      const page = await listCases({ estado, limit });
+      return {
+        ok: true,
+        page: {
+          ...page,
+          itens: page.itens.map((item) => ({
+            ...item,
+            cnpj: maskCnpj(item.cnpj),
+          })),
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        (error.code === "UNAVAILABLE" || error.code === "NETWORK")
+      )
+        return { ok: false };
+      throw error;
+    }
+  },
+);
 
 /** D-C2, with the documents' signed URLs: for the route handlers only (F1). */
 export async function getCase(id: string): Promise<Case> {

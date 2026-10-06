@@ -35,6 +35,7 @@ import {
   getCaseForPage,
   getDocumentUrl,
   listCases,
+  listCasesForPage,
   requestDocuments,
   streamCertificate,
   type CaseView,
@@ -501,5 +502,32 @@ describe("the seeded account still works for others", () => {
   it("PC1's fila@ list is unaffected", async () => {
     state.token = openSession(PANEL_EMAILS.fila).id;
     expect((await listCases({ estado: "aberto", limit: 200 })).total).toBe(30);
+  });
+});
+
+describe("listCasesForPage (T98: the list pane's read)", () => {
+  it("one read per (estado, limit), the CNPJs masked (F11)", async () => {
+    const result = await listCasesForPage("aberto", 25);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.page.itens.length).toBeGreaterThan(0);
+    for (const item of result.page.itens)
+      expect(item.cnpj).toMatch(/^.{2}\..{3}\..{3}\/.{4}-.{2}$/);
+    expect(result.page.total).toBeGreaterThan(0);
+    expect(result.page.gerado_em).toMatch(/Z$/);
+  });
+
+  it("a failed or invalid read is a result, not a throw (AC 28)", async () => {
+    setCaseFault(email, "list", { kind: "500", times: 1 });
+    expect(await listCasesForPage("aberto", 25)).toEqual({ ok: false });
+    setCaseFault(email, "list", { kind: "invalido", times: 1 });
+    expect(await listCasesForPage("aberto", 50)).toEqual({ ok: false });
+  });
+
+  it("SESSAO_EXPIRADA still throws", async () => {
+    state.token = undefined;
+    expect(await codeOf(listCasesForPage("aguardando_doc", 25))).toBe(
+      "SESSAO_EXPIRADA",
+    );
   });
 });

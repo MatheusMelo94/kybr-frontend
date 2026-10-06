@@ -5,19 +5,35 @@ import type { JSX, ReactNode } from "react";
 
 import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
 
-type Props = { href: string; className: string; children: ReactNode };
+type Props = {
+  href: string;
+  className: string;
+  children: ReactNode;
+  id?: string | undefined;
+  "aria-current"?: "page" | undefined;
+};
 
 /**
- * A pager link (T83): a real link (middle click, no JS), whose plain click
- * goes through useSoftNavigate (the soft navigation with its fallback).
+ * An in-page link (Lote's pager, T83; the Fila's tabs and "Carregar mais",
+ * T98): a real link (middle click, no JS), whose plain click goes through
+ * useSoftNavigate (the soft navigation with its fallback, P5-004). No
+ * prefetch: the target is per request.
  */
-export function PagerLink({ href, className, children }: Props): JSX.Element {
+export function SoftLink({
+  href,
+  className,
+  children,
+  id,
+  "aria-current": ariaCurrent,
+}: Props): JSX.Element {
   const navigate = useSoftNavigate();
   return (
     <Link
       href={href}
       prefetch={false}
       scroll={false}
+      id={id}
+      aria-current={ariaCurrent}
       className={className}
       onClick={(event) => {
         if (
