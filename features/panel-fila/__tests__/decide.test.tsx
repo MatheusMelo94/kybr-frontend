@@ -511,3 +511,32 @@ describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F
     }
   });
 });
+
+describe("E3 (plan-m6 § 18): a result after Renata moved on never moves her", () => {
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/fila/caso-a?ate=50");
+  });
+
+  it("ok after she left /fila/{id}: the toast still shows, no navigation and no focus move", async () => {
+    const call = deferred();
+    decideAction.mockReturnValueOnce(call.promise);
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    window.history.pushState(null, "", "/lote");
+    await act(async () => call.resolve({ ok: true }));
+    expect(toastText()).toContain("Empresa caso-a");
+    expect(router.push).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(fila?.focusIntent).toBeNull();
+  });
+
+  it("NETWORK after she left: no re-read (no refresh)", async () => {
+    const call = deferred();
+    decideAction.mockReturnValueOnce(call.promise);
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    window.history.pushState(null, "", "/lote");
+    await act(async () => call.resolve({ ok: false, code: "NETWORK" }));
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+});

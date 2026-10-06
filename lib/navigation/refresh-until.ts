@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
-import { currentUrl, fullNavigate } from "@/lib/navigation/soft-navigate";
+import { currentUrl } from "@/lib/navigation/navigation-guard";
+import { fullNavigate } from "@/lib/navigation/soft-navigate";
 
 const EVERY_MS = 2_000;
 const MAX_REFRESHES = 5;

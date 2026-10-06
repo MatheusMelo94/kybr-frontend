@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
+import {
+  currentUrl,
+  navigationGeneration,
+  nextNavigationGeneration,
+} from "@/lib/navigation/navigation-guard";
+
 /** How long a soft navigation may take before the full one replaces it. */
 export const STALL_MS = 4_000;
 
@@ -10,6 +16,17 @@ export const STALL_MS = 4_000;
 export function fullNavigate(url: string): void {
   window.location.replace(url);
 }
+
+// R1 (T105): every soft navigation, from any instance, takes the next
+// generation (navigation-guard.ts). A timer acts only for the latest one, so
+// a timer that outlived its navigation can never move Renata.
+
+export type SoftNavigateOptions = {
+  /** A new history entry (opening a case, T99) instead of a replace. */
+  push?: boolean;
+  /** Scroll to the top (one-pane layouts); default false. */
+  scroll?: boolean;
+};
 
 /**
  * A soft router.replace() (or push(): opening a Fila case) for in-page
@@ -24,23 +41,6 @@ export function fullNavigate(url: string): void {
  * (plan-m6 § 17 drift 2). Delete when a Next patch commits these
  * navigations reliably (looped E2E in T105).
  */
-/** The current path + query: what the fallbacks compare. */
-export function currentUrl(): string {
-  return window.location.pathname + window.location.search;
-}
-
-// R1 (T105): every soft navigation, from any instance, takes the next
-// generation. A timer acts only for the latest one, so a timer that outlived
-// its navigation (its component stayed mounted) can never move Renata.
-let generation = 0;
-
-export type SoftNavigateOptions = {
-  /** A new history entry (opening a case, T99) instead of a replace. */
-  push?: boolean;
-  /** Scroll to the top (one-pane layouts); default false. */
-  scroll?: boolean;
-};
-
 export function useSoftNavigate(
   onStall: (url: string) => void = fullNavigate,
 ): (url: string, options?: SoftNavigateOptions) => void {
@@ -62,7 +62,7 @@ export function useSoftNavigate(
       if (timer.current !== null) clearTimeout(timer.current);
       timer.current = null;
       const origin = currentUrl();
-      const mine = ++generation;
+      const mine = nextNavigationGeneration();
       if (push) router.push(url, { scroll });
       else router.replace(url, { scroll });
       // Already there: nothing can stall.
@@ -71,7 +71,8 @@ export function useSoftNavigate(
         timer.current = null;
         // A stall is "still on the origin" (never "not on the target": the
         // user may have moved on since), and only for the latest navigation.
-        if (mine === generation && currentUrl() === origin) onStall(url);
+        if (mine === navigationGeneration() && currentUrl() === origin)
+          onStall(url);
       }, STALL_MS);
     },
     [onStall, router],
