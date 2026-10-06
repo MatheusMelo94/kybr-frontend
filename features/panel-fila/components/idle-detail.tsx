@@ -34,5 +34,9 @@ export async function IdleDetail({
         />
       </>
     );
-  return aba === "aberto" ? <EmptyOpen /> : <EmptyWaiting />;
+  return aba === "aberto" ? (
+    <EmptyOpen detailHeading />
+  ) : (
+    <EmptyWaiting detailHeading />
+  );
 }

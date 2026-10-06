@@ -3,7 +3,10 @@
 import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import { DetailSkeleton } from "@/features/panel-fila/components/detail-skeleton";
-import { useFila } from "@/features/panel-fila/components/fila-provider";
+import {
+  FILA_NO_CASE,
+  useFila,
+} from "@/features/panel-fila/components/fila-provider";
 
 type Props = {
   /** The case this page rendered, or null on /fila. */
@@ -14,19 +17,25 @@ type Props = {
 /**
  * The detail pane: the skeleton while another case is being opened (the
  * list stays interactive), and the heading ([data-detail-heading]) takes
- * focus when an opened case lands. A deep link moves no focus (AC 41).
+ * focus when an opened case lands. A deep link moves no focus (AC 41). A
+ * case being decided shows the skeleton until the next one lands (D13).
  */
 export function DetailPane({ caseId, children }: Props): JSX.Element {
-  const { pendingCaseId, focusIntent, settle } = useFila();
+  const { pendingCaseId, focusIntent, settle, removal } = useFila();
   const pane = useRef<HTMLDivElement>(null);
-  const pending = pendingCaseId !== null && pendingCaseId !== caseId;
+  // /fila (no case) is FILA_NO_CASE: after the last case is decided, its
+  // empty state takes the focus.
+  const shown = caseId ?? FILA_NO_CASE;
+  const pending =
+    (pendingCaseId !== null && pendingCaseId !== shown) ||
+    (removal !== null && removal.id === caseId);
 
   useEffect(() => {
-    if (pendingCaseId !== null && pendingCaseId === caseId) settle("pending");
-  }, [pendingCaseId, caseId, settle]);
+    if (pendingCaseId !== null && pendingCaseId === shown) settle("pending");
+  }, [pendingCaseId, shown, settle]);
 
   useEffect(() => {
-    if (focusIntent === null || focusIntent !== caseId) return;
+    if (focusIntent === null || focusIntent !== shown) return;
     // D9: an h1 below lg and an h2 at lg; focus the one displayed.
     const headings = [
       ...(pane.current?.querySelectorAll<HTMLElement>(
@@ -38,7 +47,7 @@ export function DetailPane({ caseId, children }: Props): JSX.Element {
       headings[0]
     )?.focus();
     settle("focus");
-  }, [focusIntent, caseId, settle]);
+  }, [focusIntent, shown, settle]);
 
   return <div ref={pane}>{pending ? <DetailSkeleton /> : children}</div>;
 }

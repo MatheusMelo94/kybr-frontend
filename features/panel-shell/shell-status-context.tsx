@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type JSX,
   type ReactNode,
@@ -28,6 +29,10 @@ type Value = Status & {
   pollNow: () => void;
   /** How many times pollNow() was called (the poller's trigger). */
   pollRequests: number;
+  /** The Fila's decisions (plan-m6 § 3.3): no poll while one is in flight. Nests. */
+  pause: () => void;
+  resume: () => void;
+  isPaused: () => boolean;
 };
 
 const ShellStatusContext = createContext<Value | null>(null);
@@ -40,6 +45,7 @@ type Props = {
 export function ShellStatusProvider({ initial, children }: Props): JSX.Element {
   const [status, setStatus] = useState<Status>(initial);
   const [pollRequests, setPollRequests] = useState(0);
+  const pauses = useRef(0);
   // A server render (a router.refresh(), a revalidated action) brings a fresh
   // /me: take it, so the counts and the plan never wait for the next poll.
   const snapshot = JSON.stringify(initial);
@@ -62,6 +68,13 @@ export function ShellStatusProvider({ initial, children }: Props): JSX.Element {
         ),
       pollNow: () => setPollRequests((count) => count + 1),
       pollRequests,
+      pause: () => {
+        pauses.current += 1;
+      },
+      resume: () => {
+        pauses.current = Math.max(0, pauses.current - 1);
+      },
+      isPaused: () => pauses.current > 0,
     }),
     [status, pollRequests],
   );

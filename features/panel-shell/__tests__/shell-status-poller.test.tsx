@@ -150,25 +150,79 @@ describe("ShellStatusPoller (ADR-0011 rule 3, AC 11)", () => {
 
 describe("ShellStatusProvider: a fresh server render (T81)", () => {
   it("takes the new /me projection when the layout re-renders", async () => {
-    const { ShellStatusProvider: Provider, useShellStatus: useStatus } = await import(
-      "@/features/panel-shell/shell-status-context"
-    );
-    const { render: draw, screen: view } = await import("@testing-library/react");
+    const { ShellStatusProvider: Provider, useShellStatus: useStatus } =
+      await import("@/features/panel-shell/shell-status-context");
+    const { render: draw, screen: view } =
+      await import("@testing-library/react");
     function Show() {
       const { plano } = useStatus();
       return <p>{plano ? `${plano.usadas}` : "sem plano"}</p>;
     }
     const { rerender } = draw(
-      <Provider initial={{ contagens: undefined, plano: { tipo: "teste", usadas: 40, limite: 200 } }}>
+      <Provider
+        initial={{
+          contagens: undefined,
+          plano: { tipo: "teste", usadas: 40, limite: 200 },
+        }}
+      >
         <Show />
       </Provider>,
     );
     expect(view.getByText("40")).toBeInTheDocument();
     rerender(
-      <Provider initial={{ contagens: undefined, plano: { tipo: "teste", usadas: 43, limite: 200 } }}>
+      <Provider
+        initial={{
+          contagens: undefined,
+          plano: { tipo: "teste", usadas: 43, limite: 200 },
+        }}
+      >
         <Show />
       </Provider>,
     );
     expect(view.getByText("43")).toBeInTheDocument();
+  });
+});
+
+describe("ShellStatusProvider: pause() / resume() (plan-m6 § 3.3, T105)", () => {
+  let controls: ReturnType<typeof useShellStatus> | undefined;
+  function Controls() {
+    controls = useShellStatus();
+    return null;
+  }
+
+  it("no poll fires while a decision has paused the poller; it polls again after resume()", async () => {
+    render(
+      <ShellStatusProvider initial={{ contagens: COUNTS, plano: PLANO }}>
+        <ShellStatusPoller />
+        <Controls />
+      </ShellStatusProvider>,
+    );
+    act(() => controls?.pause());
+    await tick();
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(pollShellStatusAction).not.toHaveBeenCalled();
+    act(() => controls?.resume());
+    await tick();
+    expect(pollShellStatusAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("pauses nest: the poller resumes after the last resume()", async () => {
+    render(
+      <ShellStatusProvider initial={{ contagens: COUNTS, plano: PLANO }}>
+        <ShellStatusPoller />
+        <Controls />
+      </ShellStatusProvider>,
+    );
+    act(() => {
+      controls?.pause();
+      controls?.pause();
+      controls?.resume();
+    });
+    await tick();
+    expect(pollShellStatusAction).not.toHaveBeenCalled();
   });
 });

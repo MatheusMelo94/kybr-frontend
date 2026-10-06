@@ -15,16 +15,19 @@ import { useShellStatus } from "@/features/panel-shell/shell-status-context";
 /**
  * Refreshes the shell's counts and plan every 60 s while the tab is visible
  * and online, and once on becoming visible or online (ADR-0011 rule 3).
- * Never router.refresh(): only the polled projection changes. A failure
+ * Never router.refresh(): only the polled projection changes. Nothing
+ * fires while a Fila decision has paused it (plan-m6 § 3.3). A failure
  * hides the counts silently (AC 11); the next success restores them. A
  * missing session is never a result: requireSession() redirects from the
  * action and the client router leaves the shell (ADR-0011 Addendum 1).
  */
 export function ShellStatusPoller(): JSX.Element | null {
-  const { update, pollRequests } = useShellStatus();
+  const { update, pollRequests, isPaused } = useShellStatus();
   const inFlight = useRef(false);
   const updateRef = useRef(update);
   updateRef.current = update;
+  const pausedRef = useRef(isPaused);
+  pausedRef.current = isPaused;
   const pollRef = useRef<() => Promise<void>>(async () => undefined);
 
   // pollNow(): a poll right away (a Lote batch ended: the plan's usage moved).
@@ -34,7 +37,7 @@ export function ShellStatusPoller(): JSX.Element | null {
 
   useEffect(() => {
     async function poll(): Promise<void> {
-      if (inFlight.current || !canPoll()) return;
+      if (inFlight.current || pausedRef.current() || !canPoll()) return;
       inFlight.current = true;
       let result: ShellStatusResult;
       try {

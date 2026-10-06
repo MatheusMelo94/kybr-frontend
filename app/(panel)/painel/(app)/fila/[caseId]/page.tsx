@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense, type JSX } from "react";
 
 import { BackLink } from "@/features/panel-fila/components/back-link";
+import { CaseActions } from "@/features/panel-fila/components/case-actions";
 import { CaseDetail } from "@/features/panel-fila/components/case-detail";
 import { CaseDetailError } from "@/features/panel-fila/components/case-detail-error";
 import { CaseList } from "@/features/panel-fila/components/case-list";
@@ -66,11 +67,21 @@ export default async function CasePage({
               always={result.ok && result.case.estado === "decidido"}
             />
             {result.ok ? (
-              <CaseDetail
-                view={result.case}
-                now={new Date()}
-                documentsMode={documentsSettings().mode}
-              />
+              <>
+                <CaseDetail
+                  view={result.case}
+                  now={new Date()}
+                  documentsMode={documentsSettings().mode}
+                />
+                {/* The only owner of decideAction (ADR-0008 Addendum 2, F7). */}
+                {result.case.estado !== "decidido" && (
+                  <CaseActions
+                    caseId={result.case.id}
+                    origem={result.case.origem}
+                    razao={result.case.razao_social ?? result.case.cnpj}
+                  />
+                )}
+              </>
             ) : (
               <CaseDetailError />
             )}

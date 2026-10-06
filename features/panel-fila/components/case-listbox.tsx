@@ -29,7 +29,8 @@ function twoPanes(): boolean {
  * the stall fallback); the detail pane shows its skeleton meanwhile and the
  * heading takes focus when it lands. At lg the list scrolls inside itself
  * (plan § 6) and keeps its position; one pane starts the case at the top.
- * The position comes back once when the list remounts visible.
+ * The position comes back once when the list remounts visible. A case
+ * being decided leaves the list at once (T105).
  */
 export function CaseListbox({
   aba,
@@ -39,8 +40,15 @@ export function CaseListbox({
   children,
 }: Props): JSX.Element {
   const navigate = useSoftNavigate();
-  const { openCase, focusCase, saveScroll, takeScroll } = useFila();
+  const { openCase, focusCase, saveScroll, takeScroll, removal, reportList } =
+    useFila();
   const scroller = useRef<HTMLDivElement>(null);
+
+  // The next case after a decision comes from what is rendered here (D5).
+  const ids = options.map((option) => option.id).join("\n");
+  useLayoutEffect(() => {
+    reportList({ ids: ids === "" ? [] : ids.split("\n"), query });
+  }, [ids, query, reportList]);
 
   useLayoutEffect(() => {
     const wide = twoPanes();
@@ -78,8 +86,13 @@ export function CaseListbox({
       className="flex flex-col gap-4 lg:max-h-[calc(100dvh-16rem)] lg:overflow-y-auto lg:overscroll-contain"
     >
       <Listbox
-        options={options}
-        selectedId={selectedId}
+        options={
+          removal === null
+            ? options
+            : options.filter((option) => option.id !== removal.id)
+        }
+        // A decision in flight selects the next case before the URL moves (D13).
+        selectedId={removal === null ? selectedId : removal.next}
         labelledBy={FILA_TAB_ACTIVE_ID}
         onOpen={onOpen}
       />

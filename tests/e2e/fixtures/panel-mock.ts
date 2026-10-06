@@ -40,6 +40,8 @@ export type MockCall = {
   rows?: number;
   idempotencyKey?: string;
   poll?: boolean;
+  /** F7: the page a Server Action was posted from (x-kybr-panel-path). */
+  pagePath?: string;
 };
 
 /** The mock's request log for one e-mail. */
