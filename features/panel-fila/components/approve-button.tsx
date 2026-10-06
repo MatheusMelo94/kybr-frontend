@@ -13,6 +13,8 @@ type Props = {
   razao: string;
   /** Offline (T111): the trigger is disabled and described by offline.actions. */
   offline?: { disabled: true; describedBy: string } | undefined;
+  /** The action bar's placement (T112: full width below lg). */
+  className?: string;
 };
 
 /** fila.action.approve, or .keep on an alert: one click, no confirmation (AC 31). */
@@ -21,6 +23,7 @@ export function ApproveButton({
   decisao,
   razao,
   offline,
+  className,
 }: Props): JSX.Element {
   const { decide, busy } = useDecide();
   return (
@@ -30,6 +33,7 @@ export function ApproveButton({
       disabled={offline?.disabled}
       aria-describedby={offline?.describedBy}
       onClick={() => decide(caseId, decisao, razao)}
+      {...(className !== undefined && { className })}
     >
       {
         filaCopy[

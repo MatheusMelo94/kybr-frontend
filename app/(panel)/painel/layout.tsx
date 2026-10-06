@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { JSX, ReactNode } from "react";
 
 import { assertPanelHost } from "@/lib/api/panel/host";
@@ -26,6 +26,20 @@ export const metadata: Metadata = {
     ],
   },
   twitter: { card: "summary_large_image" },
+};
+
+// T112: the Fila's sticky action bar uses safe-area insets, which need
+// viewport-fit=cover; only the panel sets it, never the root or /v/* (plan-m6
+// § 6). A segment's viewport replaces the root's, so it repeats colorScheme
+// and themeColor (a test keeps them equal). Zoom is never limited (F14).
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+  // Justified raw hex (§ Styling): the root layout's literals, repeated.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#111111" },
+  ],
+  viewportFit: "cover",
 };
 
 type Props = {
