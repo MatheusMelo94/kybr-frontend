@@ -27,7 +27,10 @@
 #
 # PANEL_URL=https://app.kybr.com.br: also check the panel host's headers on
 # /entrar (ADR-0008 rule 9: private, no-store; noindex; a CSP whose
-# connect-src is 'self' only, and worker-src 'self' for Lote: ADR-0012).
+# connect-src is 'self' only, and worker-src 'self' for Lote: ADR-0012),
+# and that an anonymous GET of the Fila's route handlers (the proof PDF and a
+# seller document, T116) is a 307 to the panel's own /entrar: never a 200, a
+# 303 to a signed URL, or a redirect to any other host.
 # Unset while the panel is dark. The link page's CSP must have no
 # worker-src either way.
 set -eu
@@ -208,6 +211,22 @@ if [ -n "${PANEL_URL:-}" ]; then
   echo "Smoke: a 1.5 MB Server Action POST on ${panel}/fila gets 413"
   panel_big=$(action_status "${panel}/fila" "${action_tmp}/big")
   [ "$panel_big" = "413" ] || fail "panel: a 1.5 MB Server Action on /fila answered ${panel_big}, not 413 (C1)"
+  # T116: well-formed ids get past the id check, so the session check
+  # answers. %{redirect_url} is curl's absolute parse of Location (never
+  # followed); the format has no space because fetch_url word-splits $1.
+  probe=00000000-0000-4000-8000-000000000000
+  for path in "/fila/${probe}/comprovante" "/fila/${probe}/documentos/${probe}"; do
+    echo "Smoke: an anonymous GET of ${panel}${path} goes to /entrar"
+    answer=$(fetch_url "--output /dev/null --write-out %{http_code}|%{redirect_url}" "${panel}${path}")
+    answer_status=${answer%%|*}
+    answer_location=${answer#*|}
+    case "$answer_location" in
+      "${panel}/entrar" | "${panel}/entrar?"*) login=yes ;;
+      *) login=no ;;
+    esac
+    [ "$answer_status" = "307" ] && [ "$login" = "yes" ] ||
+      fail "panel: an anonymous GET of ${path} answered ${answer_status}, not a 307 to ${panel}/entrar"
+  done
 fi
 
 finish

@@ -33,6 +33,19 @@ const PANEL_PAGE = {
     "default-src 'self'; script-src 'self' 'nonce-abc' 'strict-dynamic' https://challenges.cloudflare.com; connect-src 'self'; worker-src 'self'; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests",
 };
 
+// T116: the Fila's two route handlers, probed anonymously on the panel host.
+const PROBE = "00000000-0000-4000-8000-000000000000";
+const PROOF_PATH = `/fila/${PROBE}/comprovante`;
+const DOCUMENT_PATH = `/fila/${PROBE}/documentos/${PROBE}`;
+const TO_LOGIN: Route = {
+  status: 307,
+  headers: { location: `/entrar?volta=%2Ffila%2F${PROBE}` },
+};
+const FILA_ROUTES: Record<string, Route> = {
+  [PROOF_PATH]: TO_LOGIN,
+  [DOCUMENT_PATH]: TO_LOGIN,
+};
+
 let server: Server | undefined;
 
 type Route = {
@@ -145,6 +158,7 @@ describe("check-deploy-headers.sh: hosts (T62)", () => {
       "/api/health": { status: 200 },
       "/v/loja-exemplo": { status: 200, headers: LINK_PAGE, body: PAGE_BODY },
       "/entrar": { status: 200, headers: PANEL_PAGE },
+      ...FILA_ROUTES,
     });
     const { status, output } = await run(link, { PANEL_URL: link });
 
@@ -212,11 +226,76 @@ describe("check-deploy-headers.sh: hosts (T62)", () => {
   });
 });
 
+describe("check-deploy-headers.sh: the Fila's route handlers (T116)", () => {
+  const routes = (fila: Record<string, Route>): Record<string, Route> => ({
+    "/api/health": { status: 200 },
+    "/v/loja-exemplo": { status: 200, headers: LINK_PAGE, body: PAGE_BODY },
+    "/entrar": { status: 200, headers: PANEL_PAGE },
+    ...fila,
+  });
+
+  it("passes when an anonymous GET of the proof and a document is a 307 to /entrar", async () => {
+    const base = await serve(routes(FILA_ROUTES));
+    const { status, output } = await run(base, { PANEL_URL: base });
+    expect(output).toContain("/comprovante");
+    expect(output).toContain("/documentos/");
+    expect(status).toBe(0);
+  });
+
+  it("accepts an absolute Location on the panel host", async () => {
+    // The server's port is known only once it listens: fill the Location in then.
+    const absolute: Route = { status: 307 };
+    const base = await serve(
+      routes({ [PROOF_PATH]: absolute, [DOCUMENT_PATH]: absolute }),
+    );
+    absolute.headers = { location: `${base}/entrar?volta=%2Ffila` };
+    const { status } = await run(base, { PANEL_URL: base });
+    expect(status).toBe(0);
+  });
+
+  it.each([
+    ["a 200 (the document served without a session)", { status: 200 }],
+    [
+      "a 303 (the signed URL handed out)",
+      {
+        status: 303,
+        headers: { location: "https://docs.example.invalid/x?sig=abc" },
+      },
+    ],
+    [
+      "a 307 to another host",
+      { status: 307, headers: { location: "https://evil.example/entrar" } },
+    ],
+    [
+      "a 307 to a path other than /entrar",
+      { status: 307, headers: { location: "/entrarx" } },
+    ],
+    ["a 404 (the route missing)", { status: 404 }],
+  ] as [string, Route][])("fails on %s", async (_name, route) => {
+    const base = await serve(
+      routes({ [PROOF_PATH]: TO_LOGIN, [DOCUMENT_PATH]: route }),
+    );
+    const { status, output } = await run(base, { PANEL_URL: base });
+    expect(output).toMatch(/FAIL: panel: .*\/documentos\//);
+    expect(status).toBe(1);
+  });
+
+  it("checks the proof route the same way", async () => {
+    const base = await serve(
+      routes({ [PROOF_PATH]: { status: 200 }, [DOCUMENT_PATH]: TO_LOGIN }),
+    );
+    const { status, output } = await run(base, { PANEL_URL: base });
+    expect(output).toMatch(/FAIL: panel: .*\/comprovante/);
+    expect(status).toBe(1);
+  });
+});
+
 describe("check-deploy-headers.sh: Server Action body caps and the static CSP (M5C-01)", () => {
   const routes = (): Record<string, Route> => ({
     "/api/health": { status: 200 },
     "/v/loja-exemplo": { status: 200, headers: LINK_PAGE, body: PAGE_BODY },
     "/entrar": { status: 200, headers: PANEL_PAGE },
+    ...FILA_ROUTES,
   });
 
   it("passes when a small action gets through, 1.5 MB gets 413 (link and panel /fila), and a chunk has the no-egress CSP", async () => {
@@ -248,4 +327,3 @@ describe("check-deploy-headers.sh: Server Action body caps and the static CSP (M
     expect(status).toBe(1);
   });
 });
-
