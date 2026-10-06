@@ -6,6 +6,7 @@ import { BackLink } from "@/features/panel-fila/components/back-link";
 import { CaseActions } from "@/features/panel-fila/components/case-actions";
 import { CaseDetail } from "@/features/panel-fila/components/case-detail";
 import { CaseDetailError } from "@/features/panel-fila/components/case-detail-error";
+import { ConflictNotice } from "@/features/panel-fila/components/conflict-notice";
 import { CaseList } from "@/features/panel-fila/components/case-list";
 import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
@@ -72,6 +73,12 @@ export default async function CasePage({
                   view={result.case}
                   now={new Date()}
                   documentsMode={documentsSettings().mode}
+                  decidedNotice={
+                    <ConflictNotice
+                      caseId={result.case.id}
+                      decididoEm={result.case.decisao?.em}
+                    />
+                  }
                 />
                 {/* The only owner of decideAction (ADR-0008 Addendum 2, F7). */}
                 {result.case.estado !== "decidido" && (

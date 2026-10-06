@@ -70,3 +70,17 @@ export async function caseSeed(
   if (response.status() !== 204)
     throw new Error(`caseSeed: ${response.status()}`);
 }
+
+/** PC13 / AC 35: another session decides the case (aprovar by default). */
+export async function decideElsewhere(
+  request: APIRequestContext,
+  id: string,
+  decisao?: "aprovar" | "manter" | "bloquear",
+): Promise<void> {
+  const response = await request.post(
+    `${CONTROLS}/cases/${encodeURIComponent(id)}/decide-elsewhere`,
+    { data: decisao === undefined ? {} : { decisao } },
+  );
+  if (response.status() !== 204)
+    throw new Error(`decideElsewhere: ${response.status()}`);
+}

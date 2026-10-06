@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 
 import { ChangeBlock } from "@/features/panel-fila/components/change-block";
 import { CheckList } from "@/features/panel-fila/components/check-list";
@@ -19,6 +19,8 @@ type Props = {
   now: Date;
   /** PANEL_DOCUMENTS_MODE, read by the page (Q1, Q19). */
   documentsMode?: "redirect" | "attachment" | undefined;
+  /** Under the decided banner: the page's ConflictNotice (T106). */
+  decidedNotice?: ReactNode;
 };
 
 /**
@@ -27,13 +29,21 @@ type Props = {
  * (eventos / documentos, D-C2) is left out with fila.detail.partial. T104+
  * add the actions.
  */
-export function CaseDetail({ view, now, documentsMode }: Props): JSX.Element {
+export function CaseDetail({
+  view,
+  now,
+  documentsMode,
+  decidedNotice,
+}: Props): JSX.Element {
   const partial = view.eventos === undefined || view.documentos === undefined;
   return (
     <article className="@container/detail flex flex-col gap-6">
       <VerdictHeader view={view} />
       {view.estado === "decidido" && view.decisao && (
-        <DecidedBanner decisao={view.decisao} />
+        <>
+          <DecidedBanner decisao={view.decisao} />
+          {decidedNotice}
+        </>
       )}
       {view.origem === "monitoramento" && view.mudanca && (
         <ChangeBlock mudanca={view.mudanca} />

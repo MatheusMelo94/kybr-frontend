@@ -290,6 +290,30 @@ describe("CaseDetail II: sections, partial, decided", () => {
     ).toBeVisible();
   });
 
+  it("the decided notice slot (T106's ConflictNotice) sits under the decided banner, only on a decided case", () => {
+    const notice = <p>conflito</p>;
+    const { unmount } = render(
+      <CaseDetail view={view()} now={NOW} decidedNotice={notice} />,
+    );
+    expect(screen.queryByText("conflito")).toBeNull();
+    unmount();
+    render(
+      <CaseDetail
+        view={view({
+          estado: "decidido",
+          decisao: { tipo: "aprovar", em: "2026-10-05T13:37:00Z" },
+        })}
+        now={NOW}
+        decidedNotice={notice}
+      />,
+    );
+    const banner = screen.getByText(/^Decidido: Aprovado/);
+    expect(
+      banner.compareDocumentPosition(screen.getByText("conflito")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("DADOS_NAO_ENCONTRADOS has no proof, so no button (D7)", () => {
     render(
       <CaseDetail

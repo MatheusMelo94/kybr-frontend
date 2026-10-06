@@ -35,7 +35,8 @@ export function DetailPane({ caseId, children }: Props): JSX.Element {
   }, [pendingCaseId, shown, settle]);
 
   useEffect(() => {
-    if (focusIntent === null || focusIntent !== shown) return;
+    // A failed decision restores the case once its skeleton goes (T106, Q6).
+    if (pending || focusIntent === null || focusIntent !== shown) return;
     // D9: an h1 below lg and an h2 at lg; focus the one displayed.
     const headings = [
       ...(pane.current?.querySelectorAll<HTMLElement>(
@@ -47,7 +48,7 @@ export function DetailPane({ caseId, children }: Props): JSX.Element {
       headings[0]
     )?.focus();
     settle("focus");
-  }, [focusIntent, shown, settle]);
+  }, [pending, focusIntent, shown, settle]);
 
   return <div ref={pane}>{pending ? <DetailSkeleton /> : children}</div>;
 }

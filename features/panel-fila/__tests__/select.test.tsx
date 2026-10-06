@@ -63,7 +63,7 @@ function Screen({
   list?: boolean;
 }): JSX.Element {
   return (
-    <FilaProvider>
+    <FilaProvider renderedAt={1}>
       <span id={FILA_TAB_ACTIVE_ID}>Para decidir (3)</span>
       {list && (
         <CaseListbox
@@ -169,7 +169,7 @@ describe("opening a case (AC 27, AC 45)", () => {
 describe("AutoSelectOldest (D4)", () => {
   it("at lg: replaces /fila with /fila/{oldest}, keeping the query", () => {
     render(
-      <FilaProvider>
+      <FilaProvider renderedAt={1}>
         <AutoSelectOldest oldestId="caso-a" query="?aba=aguardando" />
       </FilaProvider>,
     );
@@ -181,7 +181,7 @@ describe("AutoSelectOldest (D4)", () => {
   it("below lg: no navigation", () => {
     wide = false;
     render(
-      <FilaProvider>
+      <FilaProvider renderedAt={1}>
         <AutoSelectOldest oldestId="caso-a" query="" />
       </FilaProvider>,
     );
@@ -191,13 +191,13 @@ describe("AutoSelectOldest (D4)", () => {
 
   it("navigates once, even if it renders again", () => {
     const { rerender } = render(
-      <FilaProvider>
+      <FilaProvider renderedAt={1}>
         <AutoSelectOldest oldestId="caso-a" query="" />
       </FilaProvider>,
     );
     act(() =>
       rerender(
-        <FilaProvider>
+        <FilaProvider renderedAt={1}>
           <AutoSelectOldest oldestId="caso-a" query="" />
         </FilaProvider>,
       ),

@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useOptimistic,
   useRef,
@@ -13,19 +14,29 @@ import {
 } from "react";
 
 import type { FilaAba } from "@/features/panel-fila/search-params";
+import { useRefreshUntil } from "@/lib/navigation/refresh-until";
 
 // The Fila's layout-scoped client state (plan-m6 § 5), kept across the page
 // remount of a case switch: the case being opened (the detail skeleton), the
 // focus intent (the detail heading after an open) and the list's scroll per
 // tab (T99), the optimistic removal of a case being decided and the intent
-// Idempotency-Keys (F5, T105). The new-case poll, online state and flashes
-// arrive with T106, T110 and T111.
+// Idempotency-Keys (F5, T105), the decide flashes, the offline hint and the
+// re-read after a failed decision (T106). The new-case poll and the online
+// state arrive with T110 and T111.
 
 /** /fila's key for the pane (DetailPane's caseId null): case ids are never empty. */
 export const FILA_NO_CASE = "";
 
 /** A decision in flight (useOptimistic: it ends with the transition). */
 type Removal = { id: string; next: string | null } | null;
+
+/**
+ * A decision's outcome shown on its case (plan-m6 § 3.3): decide-error
+ * (a failure or an unknown outcome) or conflict (a 409, decided elsewhere).
+ */
+export type Flash =
+  | { kind: "decide-error" }
+  | { kind: "conflict"; decididoEm: string | undefined };
 
 /** The list as rendered: its ids in order and its ?aba=&ate= (the next case, D5). */
 type ListSnapshot = { ids: readonly string[]; query: string };
@@ -61,15 +72,25 @@ type FilaValue = {
   /** R1: the cases decided in this session, never a "next" case (a lagging list may still show them). */
   markDecided: (id: string) => void;
   wasDecided: (id: string) => boolean;
+  /** The flash per case: until the case is opened again or decided. */
+  flash: Readonly<Record<string, Flash>>;
+  setFlash: (id: string, flash: Flash | null) => void;
+  /** A decision's call didn't get through (NETWORK); T111 reads it. */
+  offlineHint: boolean;
+  hintOffline: () => void;
+  /** Re-read the current page until the server re-renders it (renderedAt). */
+  reread: () => void;
 };
 
 const FilaContext = createContext<FilaValue | null>(null);
 
-export function FilaProvider({
-  children,
-}: {
+type Props = {
+  /** The layout's render time: it changes when the server re-renders (a refresh). */
+  renderedAt: number;
   children: ReactNode;
-}): JSX.Element {
+};
+
+export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
   const [pendingCaseId, setPendingCaseId] = useState<string | null>(null);
   const [focusIntent, setFocusIntent] = useState<string | null>(null);
   const scroll = useRef(new Map<FilaAba, number>());
@@ -80,11 +101,41 @@ export function FilaProvider({
   const listRef = useRef<ListSnapshot>({ ids: [], query: "" });
   const keys = useRef(new Map<string, string>());
   const decided = useRef(new Set<string>());
+  const [flash, setFlashes] = useState<Readonly<Record<string, Flash>>>({});
+  const [offlineHint, setOfflineHint] = useState(false);
+  const rendered = useRef(renderedAt);
+  const rereadFrom = useRef(renderedAt);
 
-  const openCase = useCallback((id: string) => {
-    setPendingCaseId(id);
-    setFocusIntent(id);
+  useEffect(() => {
+    rendered.current = renderedAt;
+  }, [renderedAt]);
+
+  const setFlash = useCallback((id: string, next: Flash | null) => {
+    setFlashes((current) => {
+      if (next !== null) return { ...current, [id]: next };
+      if (!(id in current)) return current;
+      const rest = { ...current };
+      delete rest[id];
+      return rest;
+    });
   }, []);
+  const hintOffline = useCallback(() => setOfflineHint(true), []);
+  const refreshUntilRendered = useRefreshUntil(
+    useCallback(() => rendered.current !== rereadFrom.current, []),
+  );
+  const reread = useCallback(() => {
+    rereadFrom.current = rendered.current;
+    refreshUntilRendered();
+  }, [refreshUntilRendered]);
+
+  const openCase = useCallback(
+    (id: string) => {
+      setPendingCaseId(id);
+      setFocusIntent(id);
+      setFlash(id, null);
+    },
+    [setFlash],
+  );
   const settle = useCallback((what: "pending" | "focus") => {
     if (what === "pending") setPendingCaseId(null);
     else setFocusIntent(null);
@@ -136,6 +187,11 @@ export function FilaProvider({
       releaseKey,
       markDecided,
       wasDecided,
+      flash,
+      setFlash,
+      offlineHint,
+      hintOffline,
+      reread,
     }),
     [
       pendingCaseId,
@@ -152,6 +208,11 @@ export function FilaProvider({
       releaseKey,
       markDecided,
       wasDecided,
+      flash,
+      setFlash,
+      offlineHint,
+      hintOffline,
+      reread,
     ],
   );
   return <FilaContext.Provider value={value}>{children}</FilaContext.Provider>;

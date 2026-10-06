@@ -6,10 +6,14 @@ import { ToastProvider } from "@/components/panel/toast";
 import type { DecideResult } from "@/features/panel-fila/actions";
 import { CaseActions } from "@/features/panel-fila/components/case-actions";
 import { CaseListbox } from "@/features/panel-fila/components/case-listbox";
+import { ConflictNotice } from "@/features/panel-fila/components/conflict-notice";
 import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { EmptyOpen } from "@/features/panel-fila/components/empty-open";
 import { EmptyWaiting } from "@/features/panel-fila/components/empty-waiting";
-import { FilaProvider } from "@/features/panel-fila/components/fila-provider";
+import {
+  FilaProvider,
+  useFila,
+} from "@/features/panel-fila/components/fila-provider";
 import { FILA_TAB_ACTIVE_ID } from "@/features/panel-fila/components/fila-tabs";
 import { DECIDE_TIMEOUT_MS } from "@/features/panel-fila/limits";
 import {
@@ -36,9 +40,16 @@ function ShellProbe(): null {
   return null;
 }
 
+let fila: ReturnType<typeof useFila> | undefined;
+function FilaProbe(): null {
+  fila = useFila();
+  return null;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   shell = undefined;
+  fila = undefined;
   Element.prototype.scrollIntoView = vi.fn();
   window.matchMedia = vi.fn((query: string) => ({
     matches: true,
@@ -73,6 +84,7 @@ function Page({
         <h2 data-detail-heading tabIndex={-1}>
           Caso {caseId}
         </h2>
+        <ConflictNotice caseId={caseId} decididoEm={undefined} />
         <CaseActions
           caseId={caseId}
           origem={origem}
@@ -85,13 +97,18 @@ function Page({
 
 function Screen({
   idle,
+  renderedAt = 1,
   ...props
-}: Parameters<typeof Page>[0] & { idle?: JSX.Element }): JSX.Element {
+}: Parameters<typeof Page>[0] & {
+  idle?: JSX.Element;
+  renderedAt?: number;
+}): JSX.Element {
   return (
     <ShellStatusProvider initial={{ contagens: undefined, plano: undefined }}>
       <ShellProbe />
       <ToastProvider closeLabel="Fechar">
-        <FilaProvider>
+        <FilaProvider renderedAt={renderedAt}>
+          <FilaProbe />
           <span id={FILA_TAB_ACTIVE_ID}>Para decidir (3)</span>
           {idle ? (
             <DetailPane caseId={null}>{idle}</DetailPane>
@@ -340,6 +357,157 @@ describe("Aprovar / Manter aprovado (AC 31, AC 33; D13; F5, F6, F7)", () => {
       expect(second).not.toBe(first);
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F6)", () => {
+  const ERROR =
+    "Não conseguimos registrar a decisão. O caso voltou para a fila. Tente de novo.";
+  const alertText = () => screen.queryByRole("alert")?.textContent ?? null;
+
+  it("a definitive failure: fila.decide.error in an alert above the actions, focus back on the case's heading; no re-read", async () => {
+    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    await flush();
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(ERROR);
+    expect(
+      alert.compareDocumentPosition(approve()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByText("Caso caso-a")).toHaveFocus();
+    expect(toastText()).toBe("");
+    expect(router.refresh).not.toHaveBeenCalled();
+    expect(fila?.offlineHint).toBe(false);
+  });
+
+  it("a second press clears the alert, and its ok shows the toast and moves on", async () => {
+    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    await flush();
+    expect(alertText()).toBe(ERROR);
+    const call = deferred();
+    decideAction.mockReturnValueOnce(call.promise);
+    await act(async () => fireEvent.click(approve()));
+    expect(alertText()).toBeNull();
+    await act(async () => call.resolve({ ok: true }));
+    expect(toastText()).toContain("Empresa caso-a");
+    expect(router.push).toHaveBeenCalledWith("/fila/caso-b?ate=50", {
+      scroll: false,
+    });
+  });
+
+  it("F6: a rejected call shows the alert on the case it was for, never a throw", async () => {
+    decideAction.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    await flush();
+    expect(alertText()).toBe(ERROR);
+    expect(screen.getByText("Caso caso-a")).toBeInTheDocument();
+  });
+
+  it("F5/F6: an unknown outcome (NETWORK) shows the alert, re-reads the case and sets the offline hint", async () => {
+    decideAction.mockResolvedValueOnce({ ok: false, code: "NETWORK" });
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    await flush();
+    expect(alertText()).toBe(ERROR);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(fila?.offlineHint).toBe(true);
+  });
+
+  it("F6: no result within DECIDE_TIMEOUT_MS → the alert and the re-read, until the server re-renders; nothing reports done", async () => {
+    vi.useFakeTimers();
+    try {
+      const call = deferred();
+      decideAction.mockReturnValueOnce(call.promise);
+      const { rerender } = render(<Screen caseId="caso-a" ids={IDS} />);
+      await act(async () => fireEvent.click(approve()));
+      expect(alertText()).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(DECIDE_TIMEOUT_MS);
+      });
+      expect(alertText()).toBe(ERROR);
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+      expect(router.refresh).toHaveBeenCalledTimes(2);
+      // The re-read landed (the layout's renderedAt moved): no more refreshes.
+      rerender(<Screen caseId="caso-a" ids={IDS} renderedAt={2} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6_000);
+      });
+      expect(router.refresh).toHaveBeenCalledTimes(2);
+      expect(toastText()).toBe("");
+      expect(alertText()).toBe(ERROR);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("409: fila.decide.conflict with decidido_em, the re-read, no alert, no toast, no navigation; focus on the heading", async () => {
+    decideAction.mockResolvedValueOnce({
+      ok: false,
+      code: "CASO_JA_DECIDIDO",
+      decididoEm: "2026-10-06T13:05:00.000Z",
+      decisao: { tipo: "aprovar" },
+    });
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    await flush();
+    expect(
+      screen.getByText("Este caso já tinha sido decidido em 06/10, 10:05."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(toastText()).toBe("");
+    expect(router.push).not.toHaveBeenCalled();
+    expect(screen.getByText("Caso caso-a")).toHaveFocus();
+  });
+
+  it("the flash clears when the case is opened again later", async () => {
+    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    const { rerender } = render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    await flush();
+    expect(alertText()).toBe(ERROR);
+    await act(async () =>
+      fireEvent.click(screen.getByRole("option", { name: "caso-b" })),
+    );
+    rerender(<Screen caseId="caso-b" ids={IDS} />);
+    await act(async () =>
+      fireEvent.click(screen.getByRole("option", { name: "caso-a" })),
+    );
+    rerender(<Screen caseId="caso-a" ids={IDS} />);
+    expect(alertText()).toBeNull();
+  });
+
+  it("SESSAO_EXPIRADA: the session-expiry path (ADR-0009 rule 7), no alert", async () => {
+    const assign = vi.fn();
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      ...window.location,
+      pathname: "/fila/caso-a",
+      search: "",
+      assign,
+    });
+    try {
+      decideAction.mockResolvedValueOnce({
+        ok: false,
+        code: "SESSAO_EXPIRADA",
+      });
+      render(<Screen caseId="caso-a" ids={IDS} />);
+      await act(async () => fireEvent.click(approve()));
+      await flush();
+      expect(assign).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/entrar\?motivo=sessao/),
+      );
+      expect(screen.queryByRole("alert")).toBeNull();
+    } finally {
+      vi.restoreAllMocks();
     }
   });
 });
