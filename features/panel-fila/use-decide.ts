@@ -4,7 +4,10 @@ import { startTransition, useCallback, useState } from "react";
 
 import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { filaCopy } from "@/features/panel-fila/copy";
-import { useDecisionFlow } from "@/features/panel-fila/use-decision-flow";
+import {
+  isUnknownOutcome,
+  useDecisionFlow,
+} from "@/features/panel-fila/use-decision-flow";
 import { fill } from "@/features/panel-shell/format";
 import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
 import { useNavigationGuard } from "@/lib/navigation/navigation-guard";
@@ -74,7 +77,7 @@ export function useDecide(): {
           conflict(caseId, result.decididoEm, here);
         else {
           setFlash(caseId, { kind: "decide-error" });
-          if (result.code === "NETWORK") unknown(here);
+          if (isUnknownOutcome(result)) unknown(result.code, here);
         }
         if (here) focusCase(caseId);
       });

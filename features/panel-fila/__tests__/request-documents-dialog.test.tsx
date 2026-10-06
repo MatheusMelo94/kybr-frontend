@@ -352,7 +352,7 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     );
   });
 
-  it.each(["UNAVAILABLE", "DOCUMENTO_NAO_HABILITADO", "VALOR_INVALIDO"])(
+  it.each(["DOCUMENTO_NAO_HABILITADO", "VALOR_INVALIDO"])(
     "%s: error.network in the dialog (role=alert), the values kept, no toast; the key is spent",
     async (code) => {
       requestDocumentsAction.mockResolvedValueOnce({ ok: false, code });
@@ -372,26 +372,26 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     },
   );
 
-  it("F5/F6: NETWORK → error.network, the case is re-read, and the retry carries the same key, even after a remount and a reopen", async () => {
-    requestDocumentsAction.mockResolvedValueOnce({
-      ok: false,
-      code: "NETWORK",
-    });
-    const { rerender } = render(<Screen caseId="caso-a" />);
-    await openWith(["Cartão CNPJ atualizado"], "x");
-    await act(async () => fireEvent.click(submit()));
-    await flush();
-    expect(screen.getByRole("alert")).toHaveTextContent(NETWORK_ERROR);
-    expect(router.refresh).toHaveBeenCalledTimes(1);
-    // A server render: it also ends T111's offline hint.
-    rerender(<Screen caseId="caso-b" renderedAt={2} />);
-    rerender(<Screen caseId="caso-a" renderedAt={2} />);
-    requestDocumentsAction.mockResolvedValueOnce({ ok: true });
-    await openWith(["Cartão CNPJ atualizado"], "x");
-    await act(async () => fireEvent.click(submit()));
-    expect(keys()).toHaveLength(2);
-    expect(keys()[1]).toBe(keys()[0]);
-  });
+  it.each(["NETWORK", "UNAVAILABLE"] as const)(
+    "F5/F6 (M6C-01): %s is unknown → error.network, the case is re-read, and the retry carries the same key, even after a remount and a reopen",
+    async (code) => {
+      requestDocumentsAction.mockResolvedValueOnce({ ok: false, code });
+      const { rerender } = render(<Screen caseId="caso-a" />);
+      await openWith(["Cartão CNPJ atualizado"], "x");
+      await act(async () => fireEvent.click(submit()));
+      await flush();
+      expect(screen.getByRole("alert")).toHaveTextContent(NETWORK_ERROR);
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+      // A server render: it also ends T111's offline hint.
+      rerender(<Screen caseId="caso-b" renderedAt={2} />);
+      rerender(<Screen caseId="caso-a" renderedAt={2} />);
+      requestDocumentsAction.mockResolvedValueOnce({ ok: true });
+      await openWith(["Cartão CNPJ atualizado"], "x");
+      await act(async () => fireEvent.click(submit()));
+      expect(keys()).toHaveLength(2);
+      expect(keys()[1]).toBe(keys()[0]);
+    },
+  );
 
   it("F5: changed types or a changed note is a new intent, with a new key", async () => {
     requestDocumentsAction.mockResolvedValue({ ok: false, code: "NETWORK" });

@@ -108,8 +108,10 @@ export function RequestDocumentsDialog({
         conflict(caseId, result.decididoEm, here);
         return;
       case "NETWORK":
+      case "UNAVAILABLE":
+        // Unknown outcomes (M6C-01): the key is kept, the case re-read.
         setFailed(true);
-        unknown(here);
+        unknown(result.code, here);
         return;
       default:
         setFailed(true);

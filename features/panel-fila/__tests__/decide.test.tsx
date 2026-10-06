@@ -285,7 +285,7 @@ describe("Aprovar / Manter aprovado (AC 31, AC 33; D13; F5, F6, F7)", () => {
   });
 
   it("a definitive failure: the item comes back in place and selected; no toast, no navigation; the next press gets a fresh key", async () => {
-    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    decideAction.mockResolvedValueOnce({ ok: false, code: "VALOR_INVALIDO" });
     render(<Screen caseId="caso-a" ids={IDS} />);
     await act(async () => fireEvent.click(approve()));
     await flush();
@@ -373,7 +373,7 @@ describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F
   const alertText = () => screen.queryByRole("alert")?.textContent ?? null;
 
   it("a definitive failure: fila.decide.error in an alert above the actions, focus back on the case's heading; no re-read", async () => {
-    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    decideAction.mockResolvedValueOnce({ ok: false, code: "VALOR_INVALIDO" });
     render(<Screen caseId="caso-a" ids={IDS} />);
     await act(async () => fireEvent.click(approve()));
     await flush();
@@ -390,7 +390,7 @@ describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F
   });
 
   it("a second press clears the alert, and its ok shows the toast and moves on", async () => {
-    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    decideAction.mockResolvedValueOnce({ ok: false, code: "VALOR_INVALIDO" });
     render(<Screen caseId="caso-a" ids={IDS} />);
     await act(async () => fireEvent.click(approve()));
     await flush();
@@ -413,6 +413,23 @@ describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F
     await flush();
     expect(alertText()).toBe(ERROR);
     expect(screen.getByText("Caso caso-a")).toBeInTheDocument();
+  });
+
+  it("M6C-01: UNAVAILABLE (a server timeout, a 5xx, a 2xx failing the schema) is unknown: the alert, the case re-read, the same key on retry; no offline hint (the server answered)", async () => {
+    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    const { rerender } = render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+    await flush();
+    expect(alertText()).toBe(ERROR);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(fila?.offlineHint).toBe(false);
+    rerender(<Screen caseId="caso-a" ids={IDS} renderedAt={2} />);
+    decideAction.mockResolvedValueOnce({ ok: true });
+    await act(async () => fireEvent.click(approve()));
+    const [first, second] = decideAction.mock.calls.map(
+      ([input]) => (input as { idempotencyKey: string }).idempotencyKey,
+    );
+    expect(second).toBe(first);
   });
 
   it("F5/F6: an unknown outcome (NETWORK) shows the alert, re-reads the case and sets the offline hint", async () => {
@@ -480,7 +497,7 @@ describe("Decision failure, unknown outcome and conflict (T106; AC 34, 35; F5, F
   });
 
   it("the flash clears when the case is opened again later", async () => {
-    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+    decideAction.mockResolvedValueOnce({ ok: false, code: "VALOR_INVALIDO" });
     const { rerender } = render(<Screen caseId="caso-a" ids={IDS} />);
     await act(async () => fireEvent.click(approve()));
     await flush();

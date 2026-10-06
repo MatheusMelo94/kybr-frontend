@@ -224,7 +224,7 @@ test.describe("Fila decisions: the last case (T105, F7) @feature-ops-panel @pane
 // T106: failure, unknown outcome and conflict (AC 34, 35; plan-m6 § 3.3;
 // Security F5, F6). Every failure shows in place on /fila/{id} (D13).
 test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @feature-ops-panel @panel-fila", () => {
-  test("a definitive failure (503): back in place and selected, the alert above the actions, focus on the heading; no toast, same counts; a second click succeeds", async ({
+  test("an unknown outcome (503, M6C-01): back in place and selected, the alert above the actions, focus on the heading; no toast, same counts; the case re-read, and the second click succeeds with the same key", async ({
     page,
     request,
   }, testInfo) => {
@@ -266,7 +266,7 @@ test.describe("Fila decisions: failure, unknown outcome and conflict (T106) @fea
       (call) => call.idempotencyKey,
     );
     expect(keys).toHaveLength(2);
-    expect(keys[1]).not.toBe(keys[0]);
+    expect(keys[1]).toBe(keys[0]);
   });
 
   test("F6: a rejected action call shows the alert on its case, never fila/error.tsx", async ({

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { HttpResponse, http } from "msw";
+import { HttpResponse, delay, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FOREIGN_CASE_ID } from "@/tests/fixtures/factories/panel";
@@ -34,6 +34,7 @@ vi.mock("@/lib/api/panel/cookies", () => ({
 vi.mock("@/lib/monitoring", () => ({ reportMarker }));
 
 import { decideAction } from "@/features/panel-fila/actions";
+import { DEFAULT_TIMEOUT_MS } from "@/lib/api/client";
 import { panelPath } from "@/lib/panel-paths";
 
 const KEY = "0b7f3c1e-2a4d-4e5f-8a6b-9c0d1e2f3a4b";
@@ -329,5 +330,65 @@ describe("decideAction (D-C3; ADR-0011 order; ADR-0008 Addendum 2)", () => {
     expect(new Set(decidePosts().map((call) => call.idempotencyKey))).toEqual(
       new Set([KEY]),
     );
+  });
+  describe("M6C-01: the server's unknown outcomes are UNAVAILABLE or NETWORK (the client keeps the key for both)", () => {
+    it.each([502, 503, 504])("a %d with no envelope", async (status) => {
+      server.use(
+        http.post(
+          "*/v1/cases/:id/decide",
+          () => new HttpResponse(null, { status }),
+        ),
+      );
+      expect(
+        await decideAction({
+          caseId: idOf("link"),
+          idempotencyKey: KEY,
+          decisao: "aprovar",
+        }),
+      ).toEqual({ ok: false, code: "UNAVAILABLE" });
+    });
+
+    it("the API past the server's own bound (TIMEOUT at DEFAULT_TIMEOUT_MS, shortened here) is NETWORK, like a dropped call", async () => {
+      const timeout = AbortSignal.timeout.bind(AbortSignal);
+      const bound = vi
+        .spyOn(AbortSignal, "timeout")
+        .mockImplementation(() => timeout(20));
+      server.use(
+        http.post("*/v1/cases/:id/decide", async () => {
+          await delay("infinite");
+          return HttpResponse.json({});
+        }),
+      );
+      try {
+        expect(
+          await decideAction({
+            caseId: idOf("link"),
+            idempotencyKey: KEY,
+            decisao: "aprovar",
+          }),
+        ).toEqual({
+          ok: false,
+          code: "NETWORK",
+        });
+        expect(bound).toHaveBeenCalledWith(DEFAULT_TIMEOUT_MS);
+      } finally {
+        bound.mockRestore();
+      }
+    });
+
+    it("a 2xx whose body fails the schema (the decision may have applied)", async () => {
+      server.use(
+        http.post("*/v1/cases/:id/decide", () =>
+          HttpResponse.json({ inesperado: true }),
+        ),
+      );
+      expect(
+        await decideAction({
+          caseId: idOf("link"),
+          idempotencyKey: KEY,
+          decisao: "aprovar",
+        }),
+      ).toEqual({ ok: false, code: "UNAVAILABLE" });
+    });
   });
 });

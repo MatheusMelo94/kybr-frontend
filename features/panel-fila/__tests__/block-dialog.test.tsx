@@ -252,8 +252,8 @@ describe("Bloquear dialog (T107; AC 38; D10; F5, F6, F7)", () => {
     expect(input).not.toHaveProperty("notaVendedor");
   });
 
-  it("a failure: error.network in the dialog (role=alert), the values kept, no toast; the key is spent", async () => {
-    decideAction.mockResolvedValueOnce({ ok: false, code: "UNAVAILABLE" });
+  it("a definitive failure (an explicit 4xx code): error.network in the dialog (role=alert), the values kept, no toast; the key is spent", async () => {
+    decideAction.mockResolvedValueOnce({ ok: false, code: "VALOR_INVALIDO" });
     render(<Screen caseId="caso-a" />);
     await openWith("MEI acima do limite", "Nota.");
     await act(async () => fireEvent.click(submit()));
@@ -269,24 +269,27 @@ describe("Bloquear dialog (T107; AC 38; D10; F5, F6, F7)", () => {
     expect(keys()[1]).not.toBe(keys()[0]);
   });
 
-  it("F5/F6: NETWORK → error.network, the case is re-read, and the retry carries the same key, even after a remount and a reopen", async () => {
-    decideAction.mockResolvedValueOnce({ ok: false, code: "NETWORK" });
-    const { rerender } = render(<Screen caseId="caso-a" />);
-    await openWith("Outro motivo", "x");
-    await act(async () => fireEvent.click(submit()));
-    await flush();
-    expect(screen.getByRole("alert")).toHaveTextContent(NETWORK_ERROR);
-    expect(router.refresh).toHaveBeenCalledTimes(1);
-    // The re-read remounts the page; the dialog reopens with the same body.
-    // A server render: it also ends T111's offline hint.
-    rerender(<Screen caseId="caso-b" renderedAt={2} />);
-    rerender(<Screen caseId="caso-a" renderedAt={2} />);
-    decideAction.mockResolvedValueOnce({ ok: true });
-    await openWith("Outro motivo", "x");
-    await act(async () => fireEvent.click(submit()));
-    expect(keys()).toHaveLength(2);
-    expect(keys()[1]).toBe(keys()[0]);
-  });
+  it.each(["NETWORK", "UNAVAILABLE"] as const)(
+    "F5/F6 (M6C-01): %s is unknown → error.network, the case is re-read, and the retry carries the same key, even after a remount and a reopen",
+    async (code) => {
+      decideAction.mockResolvedValueOnce({ ok: false, code });
+      const { rerender } = render(<Screen caseId="caso-a" />);
+      await openWith("Outro motivo", "x");
+      await act(async () => fireEvent.click(submit()));
+      await flush();
+      expect(screen.getByRole("alert")).toHaveTextContent(NETWORK_ERROR);
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+      // The re-read remounts the page; the dialog reopens with the same body.
+      // A server render: it also ends T111's offline hint.
+      rerender(<Screen caseId="caso-b" renderedAt={2} />);
+      rerender(<Screen caseId="caso-a" renderedAt={2} />);
+      decideAction.mockResolvedValueOnce({ ok: true });
+      await openWith("Outro motivo", "x");
+      await act(async () => fireEvent.click(submit()));
+      expect(keys()).toHaveLength(2);
+      expect(keys()[1]).toBe(keys()[0]);
+    },
+  );
 
   it("F5: a changed reason or note is a new intent, with a new key", async () => {
     decideAction.mockResolvedValue({ ok: false, code: "NETWORK" });

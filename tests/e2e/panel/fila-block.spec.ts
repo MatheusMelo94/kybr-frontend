@@ -132,7 +132,7 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     expect(post?.pagePath).toBe(`/fila/${first?.id}`);
   });
 
-  test("a failure (503): error.network in the dialog, the values kept, the case in place; the retry succeeds", async ({
+  test("an unknown outcome (503, M6C-01): error.network in the dialog, the values kept, the case in place; the retry succeeds with the same key", async ({
     page,
     request,
   }, testInfo) => {
@@ -159,6 +159,11 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(2);
     await dialog.getByRole("button", { name: "Bloquear vendedor" }).click();
     await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
+    const keys = (await decidePosts(request, email)).map(
+      (call) => call.idempotencyKey,
+    );
+    expect(keys).toHaveLength(2);
+    expect(new Set(keys).size).toBe(1);
   });
 
   test("409 (decided elsewhere): the dialog closes on the decided state with fila.decide.conflict; no toast, no navigation", async ({

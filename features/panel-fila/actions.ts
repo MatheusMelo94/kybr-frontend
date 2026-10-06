@@ -52,8 +52,9 @@ async function pagePath(): Promise<string | undefined> {
 /**
  * D-C3 from /fila/[caseId]: Aprovar, Manter aprovado or Bloquear, with the
  * client's Idempotency-Key unchanged (F5: the key lives in FilaProvider).
- * `NETWORK` tells the client the outcome is unknown (keep the key); the
- * rest are definitive (T106: a 5xx is UNAVAILABLE, a definitive failure).
+ * `NETWORK` (a dropped call, the server's TIMEOUT) and `UNAVAILABLE` (a
+ * 5xx, a 2xx failing the schema) tell the client the outcome is unknown:
+ * keep the key, re-read (M6C-01). The rest are definitive.
  * A refused input is VALOR_INVALIDO and logs nothing from the parse (F11).
  */
 export async function decideAction(input: unknown): Promise<DecideResult> {

@@ -265,7 +265,7 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     ).toEqual([0, value.length]);
   });
 
-  test("a failure (503): error.network in the dialog, the values kept, the case in place; the retry succeeds", async ({
+  test("an unknown outcome (503, M6C-01): error.network in the dialog, the values kept, the case in place; the retry succeeds with the same key", async ({
     page,
     request,
   }, testInfo) => {
@@ -297,8 +297,9 @@ test.describe("Fila decisions: Pedir documento (T108) @feature-ops-panel @panel-
     const keys = (await requestPosts(request, email)).map(
       (call) => call.idempotencyKey,
     );
-    // UNAVAILABLE is definitive: the retry is a new intent.
-    expect(new Set(keys).size).toBe(2);
+    // UNAVAILABLE is unknown (M6C-01): the retry is the same intent.
+    expect(keys).toHaveLength(2);
+    expect(new Set(keys).size).toBe(1);
   });
 
   test("F5: a dropped answer (decide-rede) → error.network; the retry carries the same key and gets the first result: one request, one link", async ({

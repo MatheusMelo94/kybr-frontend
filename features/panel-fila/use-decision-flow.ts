@@ -28,11 +28,23 @@ import { useShellStatus } from "@/features/panel-shell/shell-status-context";
 import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
 
 /**
- * ok, a 409, a 4xx or the API's 5xx (UNAVAILABLE, T106: a definitive
- * failure): the key is spent. NETWORK (a dropped call, a timeout): unknown.
+ * An outcome the client can't know (plan § 3.2, M6C-01): NETWORK (a dropped
+ * call, the client's bound) and UNAVAILABLE (the server's own TIMEOUT, a
+ * 500/502/503/504, a 2xx failing the schema). The decision may have applied:
+ * the key is kept and the case re-read before a retry (F5, F6).
  */
+export function isUnknownOutcome(result: {
+  ok: boolean;
+  code?: string;
+}): boolean {
+  return (
+    !result.ok && (result.code === "NETWORK" || result.code === "UNAVAILABLE")
+  );
+}
+
+/** ok, a 409 or an explicit 4xx code: the key is spent. */
 function definitive(result: { ok: boolean; code?: string }): boolean {
-  return result.ok || result.code !== "NETWORK";
+  return !isUnknownOutcome(result);
 }
 
 /** Where a decided case's screen goes (D5): the next case, or /fila. */
@@ -67,8 +79,8 @@ export function useDecisionFlow(): {
     decididoEm: string | undefined,
     here: boolean,
   ) => void;
-  /** NETWORK: the offline hint, and the case re-read before any retry (F5). */
-  unknown: (here: boolean) => void;
+  /** An unknown outcome: the case re-read before any retry (F5); NETWORK also hints offline. */
+  unknown: (code: string, here: boolean) => void;
 } {
   const {
     list,
@@ -168,8 +180,9 @@ export function useDecisionFlow(): {
   );
 
   const unknown = useCallback(
-    (here: boolean) => {
-      hintOffline();
+    (code: string, here: boolean) => {
+      // UNAVAILABLE: the server answered, so the browser isn't offline.
+      if (code === "NETWORK") hintOffline();
       if (here) reread();
     },
     [hintOffline, reread],
