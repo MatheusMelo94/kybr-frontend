@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef } from "react";
 /** How long a soft navigation may take before the full one replaces it. */
 export const STALL_MS = 4_000;
 
-function fullNavigate(url: string): void {
+/** The full load both fallbacks use (soft navigations, BatchProgress P5-004). */
+export function fullNavigate(url: string): void {
   window.location.replace(url);
 }
 

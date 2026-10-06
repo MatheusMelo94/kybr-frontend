@@ -5,6 +5,8 @@ const poll = vi.hoisted(() => vi.fn());
 vi.mock("@/features/panel-lote/actions", () => ({ pollBatchAction: poll }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+const fullNavigate = vi.hoisted(() => vi.fn());
+vi.mock("@/features/panel-lote/soft-navigate", () => ({ fullNavigate }));
 const expire = vi.hoisted(() => vi.fn());
 vi.mock("@/features/panel-shell/use-session-expiry", () => ({
   useSessionExpiry: () => expire,
@@ -239,6 +241,25 @@ describe("BatchProgress (AC 19)", () => {
     for (let i = 0; i < 8; i++) await tick();
     expect(router.refresh).toHaveBeenCalledTimes(5);
     expect(poll).toHaveBeenCalledTimes(1);
+  });
+
+  it("P5-004: the refreshes spent and still here → one full load of the same /lote/{id}, once", async () => {
+    renderProgress();
+    answer(200, 200, "concluido");
+    for (let i = 0; i < 5; i++) await tick();
+    expect(router.refresh).toHaveBeenCalledTimes(5);
+    expect(fullNavigate).not.toHaveBeenCalled();
+    for (let i = 0; i < 5; i++) await tick();
+    expect(fullNavigate).toHaveBeenCalledTimes(1);
+    expect(fullNavigate).toHaveBeenCalledWith(`/lote/${ID}`);
+  });
+
+  it("P5-004: an ended session never falls back to the full load (it leaves for /entrar)", async () => {
+    renderProgress();
+    poll.mockResolvedValueOnce({ ok: false, code: "SESSAO_EXPIRADA" });
+    for (let i = 0; i < 8; i++) await tick();
+    expect(expire).toHaveBeenCalledTimes(1);
+    expect(fullNavigate).not.toHaveBeenCalled();
   });
 
   it("focus outside the region at the end is recorded too", async () => {

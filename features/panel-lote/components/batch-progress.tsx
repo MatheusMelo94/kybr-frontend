@@ -10,6 +10,8 @@ import {
 } from "@/features/panel-lote/actions";
 import { useBatchFocus } from "@/features/panel-lote/components/batch-focus-keeper";
 import { loteCopy } from "@/features/panel-lote/copy";
+import { fullNavigate } from "@/features/panel-lote/soft-navigate";
+import { isBatchId } from "@/features/panel-lote/validation";
 import { fill, formatNumber } from "@/features/panel-shell/format";
 import {
   BATCH_PROGRESS_INTERVAL_MS,
@@ -29,6 +31,10 @@ const TERMINAL = new Set(["concluido", "concluido_com_erros", "falhou"]);
  * A router.refresh() issued as the poll's Server Action settles can be
  * dropped by the router's queue; while this progress is still on screen
  * after the end, it asks again at the next tick, up to this many times.
+ * Then one full load of the same /lote/{id} (P5-004).
+ * Pre-Convention: a workaround for Next 15.5's dropped refreshes, pending
+ * the Architect's investigation (with soft-navigate.ts and
+ * useRefreshUntilReplaced).
  */
 const MAX_REFRESHES = 5;
 
@@ -60,6 +66,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
   const { setLoteRunning } = useShellStatus();
   const done = useRef(false);
   const refreshes = useRef(0);
+  const reloaded = useRef(false);
 
   // QA Q6: after the start, focus lands on this heading, once per view.
   useEffect(() => {
@@ -77,6 +84,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
           // Once: the page is leaving for /entrar.
           done.current = true;
           refreshes.current = MAX_REFRESHES;
+          reloaded.current = true;
           expire();
         } else if (result.code === "NOT_FOUND") {
           done.current = true;
@@ -109,9 +117,15 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
     }
 
     function refresh(): void {
-      if (refreshes.current >= MAX_REFRESHES) return;
-      refreshes.current += 1;
-      router.refresh();
+      if (refreshes.current < MAX_REFRESHES) {
+        refreshes.current += 1;
+        router.refresh();
+        return;
+      }
+      // P5-004: every refresh dropped; load the same page fully, once.
+      if (reloaded.current) return;
+      reloaded.current = true;
+      if (isBatchId(batchId)) fullNavigate(`/lote/${batchId}`);
     }
 
     async function poll(): Promise<void> {
