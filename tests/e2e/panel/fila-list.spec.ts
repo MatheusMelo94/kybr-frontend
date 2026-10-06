@@ -29,6 +29,8 @@ test.describe("Fila list (T98) @feature-ops-panel @panel-fila", () => {
     expect(seeded.length).toBeGreaterThan(30);
     await logIn(page, email);
     await page.goto("/fila");
+    // At lg /fila opens the oldest case (D4, T99); the list stays.
+    await expect(page).toHaveURL(new RegExp(`/fila/${open[0]?.id}$`));
 
     const tabOpen = page.getByRole("link", { name: /^Para decidir/ });
     await expect(tabOpen).toHaveAttribute("aria-current", "page");
@@ -47,17 +49,20 @@ test.describe("Fila list (T98) @feature-ops-panel @panel-fila", () => {
     await expect(listbox.getByText(/^Atrasado há /).first()).toBeVisible();
     await expect(listbox.getByText(/^Vence em /).first()).toBeVisible();
 
+    // At lg the list scrolls inside itself (plan § 6): its position is kept.
+    const scroller = page.locator("[data-fila-list-scroller]");
     const more = page.getByRole("link", { name: "Carregar mais 5" });
     await more.scrollIntoViewIfNeeded();
-    const before = await page.evaluate(() => window.scrollY);
+    const before = await scroller.evaluate((el) => el.scrollTop);
     expect(before).toBeGreaterThan(0);
     await more.click();
-    await expect(page).toHaveURL(/\/fila\?ate=50$/);
+    // The open case stays open.
+    await expect(page).toHaveURL(new RegExp(`/fila/${open[0]?.id}\\?ate=50$`));
     await expect(options).toHaveCount(30);
     await expect(
       page.getByRole("link", { name: /^Carregar mais/ }),
     ).toHaveCount(0);
-    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
 
     await expectNoAxeViolations(page);
   });
@@ -74,8 +79,12 @@ test.describe("Fila list (T98) @feature-ops-panel @panel-fila", () => {
     );
     await logIn(page, email);
     await page.goto("/fila");
+    // At lg each tab opens its oldest case (D4, T99).
+    await expect(page).toHaveURL(/\/fila\/[^/?]+$/);
     await page.getByRole("link", { name: /^Aguardando vendedor/ }).click();
-    await expect(page).toHaveURL(/\/fila\?aba=aguardando$/);
+    await expect(page).toHaveURL(
+      new RegExp(`/fila/${waiting[0]?.id}\\?aba=aguardando$`),
+    );
     await expect(
       page.getByRole("link", { name: /^Aguardando vendedor/ }),
     ).toHaveAttribute("aria-current", "page");

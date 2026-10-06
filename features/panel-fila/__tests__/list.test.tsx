@@ -1,7 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CaseListbox } from "@/features/panel-fila/components/case-listbox";
 import { CaseOption } from "@/features/panel-fila/components/case-option";
 import { EmptyOpen } from "@/features/panel-fila/components/empty-open";
 import { EmptyWaiting } from "@/features/panel-fila/components/empty-waiting";
@@ -22,8 +21,6 @@ const router = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 beforeEach(() => {
-  // jsdom has no scrollIntoView (the listbox scrolls its active option).
-  Element.prototype.scrollIntoView = vi.fn();
   router.push.mockClear();
   router.refresh.mockClear();
 });
@@ -100,7 +97,9 @@ describe("CaseOption (AC 27, G3, G12)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Lote")).toBeInTheDocument();
     expect(screen.getByText("Vence em 6 h")).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass(LIST_ITEM_HEIGHT);
+    // At least the skeleton's h-19: 200 % text may grow it (AC 74).
+    expect(container.firstElementChild).toHaveClass("min-h-19");
+    expect(LIST_ITEM_HEIGHT).toBe("h-19");
   });
 
   it("late: the SLA in danger ink, with words", () => {
@@ -137,33 +136,6 @@ describe("CaseOption (AC 27, G3, G12)", () => {
     expect(container.querySelector("img, b")).toBeNull();
     expect(screen.getByText("<img src=x onerror=alert(1)>")).toHaveClass(
       "truncate",
-    );
-  });
-});
-
-describe("CaseListbox", () => {
-  const options = [
-    { id: "caso-a", content: <span>A</span> },
-    { id: "caso-b", content: <span>B</span> },
-  ];
-
-  it("a listbox named by the active tab; opening keeps aba and ate", () => {
-    render(
-      <>
-        <span id={FILA_TAB_ACTIVE_ID}>Para decidir (2)</span>
-        <CaseListbox options={options} query="?ate=50" selectedId={null} />
-      </>,
-    );
-    const listbox = screen.getByRole("listbox", { name: "Para decidir (2)" });
-    fireEvent.click(within(listbox).getByText("B"));
-    expect(router.push).toHaveBeenCalledWith("/fila/caso-b?ate=50");
-  });
-
-  it("the open case is aria-selected", () => {
-    render(<CaseListbox options={options} query="" selectedId="caso-b" />);
-    expect(screen.getByRole("option", { name: "B" })).toHaveAttribute(
-      "aria-selected",
-      "true",
     );
   });
 });

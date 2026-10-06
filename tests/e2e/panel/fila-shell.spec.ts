@@ -42,6 +42,8 @@ test.describe("Fila routes and shell (T97) @feature-ops-panel @panel-fila", () =
     await seedCases(request, email, "tres-tardios-de-trinta");
     await logIn(page, email);
     await page.goto("/fila");
+    // At lg /fila opens the oldest case (D4, T99): measure after it lands.
+    await expect(page).toHaveURL(/\/fila\/[^/?]+$/);
 
     await expect(
       page.getByRole("heading", { level: 1, name: "Fila de revisão" }),

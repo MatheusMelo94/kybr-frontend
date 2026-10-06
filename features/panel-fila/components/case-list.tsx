@@ -45,28 +45,28 @@ export async function CaseList({
   const query = filaHref("", { aba, ate });
   const remaining = total - itens.length;
   return (
-    <div className="flex flex-col gap-4">
-      <CaseListbox
-        selectedId={selectedId}
-        query={query}
-        options={itens.map((item) => ({
-          id: item.id,
-          content: (
-            <CaseOption
-              status={item.status}
-              razao={item.razao_social ?? item.cnpj}
-              motivos={item.motivos}
-              origem={item.origem}
-              slaAte={item.sla_ate}
-              vencido={item.vencido}
-              now={gerado_em}
-            />
-          ),
-        }))}
-      />
+    <CaseListbox
+      aba={aba}
+      selectedId={selectedId}
+      query={query}
+      options={itens.map((item) => ({
+        id: item.id,
+        content: (
+          <CaseOption
+            status={item.status}
+            razao={item.razao_social ?? item.cnpj}
+            motivos={item.motivos}
+            origem={item.origem}
+            slaAte={item.sla_ate}
+            vencido={item.vencido}
+            now={gerado_em}
+          />
+        ),
+      }))}
+    >
       {remaining > 0 && ate < FILA_ATE_MAX && (
         <LoadMoreLink base={base} aba={aba} ate={ate} remaining={remaining} />
       )}
-    </div>
+    </CaseListbox>
   );
 }

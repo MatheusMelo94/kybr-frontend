@@ -12,8 +12,9 @@ export function fullNavigate(url: string): void {
 }
 
 /**
- * A soft router.replace() for Lote's in-page navigations (the result table's
- * filter and pager), with a fallback. On Next 15.5 such a navigation that
+ * A soft router.replace() (or push(): opening a Fila case) for in-page
+ * navigations (Lote's result table's filter and pager, the Fila's tabs and
+ * cases), with a fallback. On Next 15.5 such a navigation that
  * changes only the query on /lote/[batchId] fetched its payload (200) but now
  * and then never committed (E2E, T83). If the URL hasn't become the target
  * after 4 s, the same URL loads fully, so Renata is never stuck.
@@ -21,9 +22,16 @@ export function fullNavigate(url: string): void {
  * (plan-m6 § 17 drift 2). Delete when a Next patch commits these
  * navigations reliably (looped E2E in T105).
  */
+export type SoftNavigateOptions = {
+  /** A new history entry (opening a case, T99) instead of a replace. */
+  push?: boolean;
+  /** Scroll to the top (one-pane layouts); default false. */
+  scroll?: boolean;
+};
+
 export function useSoftNavigate(
   onStall: (url: string) => void = fullNavigate,
-): (url: string) => void {
+): (url: string, options?: SoftNavigateOptions) => void {
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -35,9 +43,13 @@ export function useSoftNavigate(
   );
 
   return useCallback(
-    (url: string) => {
+    (
+      url: string,
+      { push = false, scroll = false }: SoftNavigateOptions = {},
+    ) => {
       if (timer.current !== null) clearTimeout(timer.current);
-      router.replace(url, { scroll: false });
+      if (push) router.push(url, { scroll });
+      else router.replace(url, { scroll });
       timer.current = setTimeout(() => {
         timer.current = null;
         const here = window.location.pathname + window.location.search;

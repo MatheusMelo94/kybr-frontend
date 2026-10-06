@@ -1,6 +1,5 @@
 import type { JSX } from "react";
 
-import { LIST_ITEM_HEIGHT } from "@/features/panel-fila/components/list-skeleton";
 import { OriginChip } from "@/features/panel-fila/components/origin-chip";
 import { SlaText } from "@/features/panel-fila/components/sla-text";
 import { StatusWord } from "@/features/panel-lote/components/status-word";
@@ -21,7 +20,7 @@ type Props = {
 
 /**
  * One case in the list (spec S6, AC 27): the status word (G12), the name,
- * the reasons, the origin chip and the SLA, at the skeleton's height (no
+ * the reasons, the origin chip and the SLA, at least the skeleton's height (no
  * shift). Backend text is rendered as text only.
  */
 export function CaseOption({
@@ -36,12 +35,15 @@ export function CaseOption({
   return (
     <div
       className={cn(
-        LIST_ITEM_HEIGHT,
+        // The skeleton's h-19 as a minimum: no shift, and 200 % text grows it.
+        "min-h-19",
         "flex min-w-0 flex-col justify-center gap-1 border-b border-line px-3",
-        "group-aria-disabled:opacity-60 hover:bg-surface-raised in-aria-selected:bg-field",
+        // The open case: an ink bar, not a fill (danger ink keeps its
+        // contrast in both themes, AC 69).
+        "border-l-4 border-l-transparent hover:border-l-line in-aria-selected:border-l-ink",
       )}
     >
-      <div className="flex min-w-0 items-center gap-2 text-secondary">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-secondary">
         <StatusWord status={status} />
         <OriginChip origem={origem} />
         <span className="ml-auto shrink-0">

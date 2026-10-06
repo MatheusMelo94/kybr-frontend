@@ -52,4 +52,13 @@ describe("useSoftNavigate (the Next 15.5 soft-navigation stall, T83)", () => {
     expect(stalled).toHaveBeenCalledTimes(1);
     expect(stalled).toHaveBeenCalledWith("/lote/abc?status=bad");
   });
+
+  it("can push instead (opening a case, T99), scrolling when asked", () => {
+    const { result } = renderHook(() => useSoftNavigate(vi.fn()));
+    act(() => result.current("/fila/x?ate=50", { push: true, scroll: true }));
+    expect(router.push).toHaveBeenCalledWith("/fila/x?ate=50", {
+      scroll: true,
+    });
+    expect(router.replace).not.toHaveBeenCalled();
+  });
 });

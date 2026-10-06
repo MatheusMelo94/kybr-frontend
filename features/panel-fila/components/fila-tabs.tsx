@@ -35,7 +35,7 @@ export function FilaTabs({ aba, contagens }: Props): JSX.Element {
     },
   ] as const;
   return (
-    <div data-fila-tabs className="flex gap-6 border-b border-line">
+    <div data-fila-tabs className="flex flex-wrap gap-x-6 border-b border-line">
       {tabs.map((tab) => {
         const active = tab.aba === aba;
         return (

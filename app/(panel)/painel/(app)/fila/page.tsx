@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense, type JSX } from "react";
 
 import { CaseList } from "@/features/panel-fila/components/case-list";
+import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { DetailSkeleton } from "@/features/panel-fila/components/detail-skeleton";
 import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
 import { FilaTabs } from "@/features/panel-fila/components/fila-tabs";
@@ -19,7 +20,7 @@ type Props = {
 };
 
 // /fila: the tabs and the list (?aba=, ?ate=, plan D2); at lg the detail pane
-// waits for a case (T99) or holds the empty message. /me is the layout's
+// opens the oldest case (D4) or holds the empty message. /me is the layout's
 // read (React cache(), one request).
 export default async function FilaPage({
   searchParams,
@@ -41,9 +42,11 @@ export default async function FilaPage({
         </>
       }
       detail={
-        <Suspense fallback={<DetailSkeleton />}>
-          <IdleDetail {...search} />
-        </Suspense>
+        <DetailPane caseId={null}>
+          <Suspense fallback={<DetailSkeleton />}>
+            <IdleDetail {...search} />
+          </Suspense>
+        </DetailPane>
       }
     />
   );
