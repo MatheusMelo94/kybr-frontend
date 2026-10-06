@@ -21,10 +21,16 @@ import { useShellStatus } from "@/features/panel-shell/shell-status-context";
  * action and the client router leaves the shell (ADR-0011 Addendum 1).
  */
 export function ShellStatusPoller(): JSX.Element | null {
-  const { update } = useShellStatus();
+  const { update, pollRequests } = useShellStatus();
   const inFlight = useRef(false);
   const updateRef = useRef(update);
   updateRef.current = update;
+  const pollRef = useRef<() => Promise<void>>(async () => undefined);
+
+  // pollNow(): a poll right away (a Lote batch ended: the plan's usage moved).
+  useEffect(() => {
+    if (pollRequests > 0) void pollRef.current();
+  }, [pollRequests]);
 
   useEffect(() => {
     async function poll(): Promise<void> {
@@ -44,6 +50,7 @@ export function ShellStatusPoller(): JSX.Element | null {
       );
     }
 
+    pollRef.current = poll;
     const timer = setInterval(() => void poll(), SHELL_STATUS_INTERVAL_MS);
     const onVisible = (): void => {
       if (document.visibilityState === "visible") void poll();

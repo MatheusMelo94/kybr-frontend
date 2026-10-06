@@ -302,3 +302,56 @@ describe("check-bundle-budget: layouts count (T55)", () => {
     expect(status).toBe(1);
   });
 });
+
+// T71 / ADR-0012 item 6: the parser worker's sentinel. It must sit in a
+// worker chunk, never in any route's First Load JS.
+describe("check-bundle-budget: the parser worker sentinel", () => {
+  const SENTINEL = "kybr-lote-parser/1";
+
+  function buildWith(pageSource: string, chunks: Record<string, string>): string {
+    const cwd = build(chunks);
+    writeFileSync(
+      join(cwd, "bundle-budget.json"),
+      JSON.stringify({
+        default: 180,
+        routes: {},
+        firstLoadForbidden: [SENTINEL, "SheetJS"],
+        workerRequired: SENTINEL,
+      }),
+    );
+    writeFileSync(join(cwd, ".next/static/chunks/app/page.js"), pageSource);
+    return cwd;
+  }
+
+  it("passes when only a lazy worker chunk carries it", () => {
+    const { status, output } = run(
+      buildWith("page();", { "4181.abc.js": `postMessage("${SENTINEL}")` }),
+    );
+    expect(status).toBe(0);
+    expect(output).toContain("Parser worker: sentinel in 4181.abc.js only");
+  });
+
+  it("fails when a route's First Load JS carries the sentinel", () => {
+    const { status, output } = run(
+      buildWith(`x("${SENTINEL}")`, { "4181.abc.js": `postMessage("${SENTINEL}")` }),
+    );
+    expect(status).toBe(1);
+    expect(output).toContain(`/v/[slug] First Load JS has "${SENTINEL}"`);
+  });
+
+  it("fails when SheetJS code reaches First Load JS", () => {
+    const { status, output } = run(
+      buildWith('throw new Error("SheetJS")', {
+        "4181.abc.js": `postMessage("${SENTINEL}")`,
+      }),
+    );
+    expect(status).toBe(1);
+    expect(output).toContain('First Load JS has "SheetJS"');
+  });
+
+  it("fails when no chunk in .next/static carries it (the worker didn't build)", () => {
+    const { status, output } = run(buildWith("page();", { "lazy.js": "leaf();" }));
+    expect(status).toBe(1);
+    expect(output).toContain(`no client chunk carries "${SENTINEL}"`);
+  });
+});

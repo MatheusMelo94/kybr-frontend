@@ -144,6 +144,7 @@ for (const [entry, files] of Object.entries(manifest.pages)) {
   const rsc = referenceManifest(entry);
   const css = cssFilesOf(rsc);
   routes.set(route, {
+    jsFiles: js,
     js: js.reduce((sum, f) => sum + gzipBytes(f), 0),
     css:
       rsc === undefined
@@ -299,6 +300,39 @@ if (sentryFiles.length > 0) {
   console.log(
     `Sentry bytes in client chunks: 0 (${clientFiles.size} files checked).`,
   );
+}
+
+// ADR-0012 item 6 (T71): Lote's parser runs in a worker. Its sentinel (and
+// SheetJS) must never reach a route's First Load JS, and some client chunk
+// must carry the sentinel (the worker was built).
+const forbidden = config.firstLoadForbidden ?? [];
+const sentinelProblems = [];
+for (const [route, { jsFiles }] of routes) {
+  for (const file of jsFiles) {
+    const source = readFileSync(join(distDir, file), "utf8");
+    for (const marker of forbidden)
+      if (source.includes(marker))
+        sentinelProblems.push(`${route} First Load JS has "${marker}" (${file})`);
+  }
+}
+if (config.workerRequired !== undefined) {
+  const carriers = [...clientFiles].filter((f) =>
+    readFileSync(join(distDir, f), "utf8").includes(config.workerRequired),
+  );
+  if (carriers.length === 0)
+    sentinelProblems.push(
+      `no client chunk carries "${config.workerRequired}" (the parser worker wasn't built)`,
+    );
+  else if (sentinelProblems.length === 0)
+    console.log(
+      `Parser worker: sentinel in ${carriers.map((f) => f.split("/").pop()).join(", ")} only (no First Load JS).`,
+    );
+}
+if (sentinelProblems.length > 0) {
+  console.error(
+    `Bundle guard FAILED: the parser worker (ADR-0012):\n  ${[...new Set(sentinelProblems)].join("\n  ")}`,
+  );
+  process.exitCode = 1;
 }
 
 if (cssFailed) {

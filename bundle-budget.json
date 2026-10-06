@@ -15,5 +15,8 @@
       "/painel/*": 30
     },
     "panelSentinel": "isolate"
-  }
+  },
+  "$comment_worker": "ADR-0012 item 6: Lote's parser worker. No route's First Load JS may contain these markers, and some client chunk must carry workerRequired (the worker was built).",
+  "firstLoadForbidden": ["kybr-lote-parser/1", "SheetJS"],
+  "workerRequired": "kybr-lote-parser/1"
 }

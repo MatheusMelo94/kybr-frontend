@@ -2,6 +2,8 @@ import { delay, http, type RequestHandler } from "msw";
 
 import { CATEGORIES, type ContatoVendedor } from "../../factories/panel.ts";
 import {
+  hasRunningBatch,
+  takeFault,
   scenarioApplies,
   sessionAccount,
   type Account,
@@ -15,9 +17,14 @@ const PLAIN_EMAIL = /^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/;
 function workspaceView(account: Account): Record<string, unknown> {
   const { plano, ...workspace } = account.workspace;
   // QA G3: the counts fail alone (the shell hides them), until unseeded.
-  const contagens = scenarioApplies("contagens-falham", account.email)
+  const stored = scenarioApplies("contagens-falham", account.email)
     ? undefined
     : account.workspace.contagens;
+  // PB17: true while a batch of this workspace is processando.
+  const contagens = stored && {
+    ...stored,
+    lote_em_andamento: hasRunningBatch(account.email),
+  };
   delete (workspace as { contagens?: unknown }).contagens;
   return {
     ...workspace,
@@ -54,6 +61,11 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
       request.headers.get("x-kybr-poll") !== "1",
     );
     if (!account) return apiError(401, "SESSAO_EXPIRADA");
+    // QA G4: a slow or failing /me for one account.
+    const fault = takeFault(account.email, "me");
+    if (fault?.kind === "delay") await delay(fault.ms ?? 1_000);
+    if (fault?.kind === "500") return apiError(500, "ERRO_INTERNO");
+    if (fault?.kind === "drop") return networkDrop();
     // An unexpected failure, for the panel's fatal-error screen (S16).
     if (scenarioApplies("me-falha", account.email))
       return apiError(500, "ERRO_INTERNO");

@@ -1,6 +1,8 @@
 allowBuilds:
   msw: false
   unrs-resolver: false
+  # ADR-0012: the vendored SheetJS tarball has no install hooks; never run any.
+  xlsx: false
 
 # Threat model F18 (frontend-security-conventions.md § Supply Chain).
 # next 15.5 pins postcss 8.4.31, which has GHSA-6g55-p6wh-862q and

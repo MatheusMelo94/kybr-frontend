@@ -50,8 +50,13 @@ describe("PanelFatalError (S16)", () => {
 });
 
 describe("FilaStub (M4)", () => {
-  it("shows fila.h1 and fila.lead only", () => {
-    const { container } = render(<FilaStub />);
+  it("shows fila.h1 and fila.lead only while checks are left", () => {
+    const { container } = render(
+      <FilaStub
+        plano={{ tipo: "teste", usadas: 40, limite: 200 }}
+        contratarHref="mailto:vendas@exemplo.test"
+      />,
+    );
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Fila de revisão" }),
@@ -62,5 +67,22 @@ describe("FilaStub (M4)", () => {
       ),
     ).toBeInTheDocument();
     expect(container.querySelectorAll("a, button")).toHaveLength(0);
+  });
+
+  it("puts the plan banner under the heading when checks are used up (T66)", () => {
+    render(
+      <FilaStub
+        plano={{ tipo: "teste", usadas: 200, limite: 200 }}
+        contratarHref={undefined}
+      />,
+    );
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    const banner = screen.getByText(
+      "As verificações do plano acabaram. Contrate para continuar verificando.",
+    );
+    expect(
+      heading.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

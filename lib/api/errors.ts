@@ -30,6 +30,12 @@ export const API_ERROR_CODES = [
   "CODIGO_EXPIRADO",
   "TOKEN_INVALIDO",
   "RECURSO_NAO_ENCONTRADO",
+  // Batches (A-X2, M5)
+  "LOTE_NAO_ENCONTRADO",
+  "SEM_SALDO",
+  "MUITAS_LINHAS",
+  "SEM_CNPJ_VALIDO",
+  "LOTE_EM_ANDAMENTO",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
@@ -58,6 +64,7 @@ type AppErrorInit = {
   field?: string | undefined;
   signupTicket?: string | undefined;
   reenviarEm?: string | undefined;
+  disponiveis?: number | undefined;
 };
 
 /**
@@ -75,6 +82,8 @@ export class AppError extends Error {
   readonly signupTicket: string | undefined;
   /** D-A4 EMAIL_NAO_CONFIRMADO: when the next resend unlocks (ISO 8601). */
   readonly reenviarEm: string | undefined;
+  /** D-B1 / D-B7 402 SEM_SALDO: the checks still available (the over-allowance state). */
+  readonly disponiveis: number | undefined;
 
   constructor({
     code,
@@ -84,6 +93,7 @@ export class AppError extends Error {
     field,
     signupTicket,
     reenviarEm,
+    disponiveis,
   }: AppErrorInit) {
     super(`Kybr API error: ${code}`);
     this.code = code;
@@ -93,6 +103,7 @@ export class AppError extends Error {
     this.field = field;
     this.signupTicket = signupTicket;
     this.reenviarEm = reenviarEm;
+    this.disponiveis = disponiveis;
   }
 }
 
@@ -107,6 +118,8 @@ const errorEnvelopeSchema = z.object({
     .optional()
     .catch(undefined),
   reenviar_em: z.string().max(64).optional().catch(undefined),
+  // D-B1 / D-B7: 402 SEM_SALDO carries the remaining checks.
+  disponiveis: z.number().int().nonnegative().optional().catch(undefined),
 });
 
 function isApiErrorCode(code: string | undefined): code is ApiErrorCode {
@@ -137,5 +150,6 @@ export async function appErrorFromResponse(
     field: envelope.success ? envelope.data.field : undefined,
     signupTicket: envelope.success ? envelope.data.signup_ticket : undefined,
     reenviarEm: envelope.success ? envelope.data.reenviar_em : undefined,
+    disponiveis: envelope.success ? envelope.data.disponiveis : undefined,
   });
 }

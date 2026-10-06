@@ -29,6 +29,10 @@ updates:
       # Node 22 LTS is the CI and runtime target; types follow it.
       - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
+      # SheetJS is vendored (file:vendor/sheetjs, ADR-0012); the registry's
+      # xlsx is a stale 0.18.5. Never proposed; watched by hand (Security
+      # C12, docs/devops/vercel-setup.md § 11.6).
+      - dependency-name: xlsx
 
   # The deploy workflows' CLIs (Vercel CLI, Lighthouse CI). Separate lockfile;
   # nothing here ships in the app.

@@ -122,3 +122,26 @@ describe("buildContentSecurityPolicy: the panel (ADR-0008 rule 9, P03.4)", () =>
     expect(directive(policy, "form-action")).toBe("form-action 'self'");
   });
 });
+
+describe("buildContentSecurityPolicy: Lote's worker (ADR-0012 item 7, Security C5)", () => {
+  const base = { nonce: "abc", isDev: false, upgradeInsecureRequests: true };
+
+  it("worker: true adds worker-src 'self' (strict-dynamic ignores 'self' in script-src)", () => {
+    expect(buildContentSecurityPolicy({ ...base, worker: true })).toContain(
+      "worker-src 'self';",
+    );
+  });
+
+  it("no worker option, no worker-src (the link host)", () => {
+    expect(buildContentSecurityPolicy(base)).not.toContain("worker-src");
+  });
+
+  it("production never allows blob: workers; development does (Turbopack's bootstrap)", () => {
+    expect(
+      buildContentSecurityPolicy({ ...base, worker: true }),
+    ).not.toMatch(/worker-src[^;]*blob:/);
+    expect(
+      buildContentSecurityPolicy({ ...base, worker: true, isDev: true }),
+    ).toContain("worker-src 'self' blob:;");
+  });
+});

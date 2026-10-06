@@ -145,3 +145,49 @@ describe("apiPaths.panel (A-X1, A-X3)", () => {
     expect(() => panelIdSegment(id)).toThrow(/Refused/);
   });
 });
+
+describe("apiPaths.panel.batches (D-B1–D-B7)", () => {
+  const ID = "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b";
+
+  it("builds every batch path under /v1/", () => {
+    const b = apiPaths.panel.batches;
+    expect(b.start()).toBe("/v1/batches");
+    expect(b.history()).toBe("/v1/batches?limit=10");
+    expect(b.get(ID)).toBe(`/v1/batches/${ID}`);
+    expect(b.toQueue(ID)).toBe(`/v1/batches/${ID}/to-queue`);
+    expect(b.monitor(ID)).toBe(`/v1/batches/${ID}/monitor`);
+    expect(b.resume(ID)).toBe(`/v1/batches/${ID}/resume`);
+    expect(b.csv(ID, "result")).toBe(`/v1/batches/${ID}/result.csv`);
+    expect(b.csv(ID, "errors")).toBe(`/v1/batches/${ID}/errors.csv`);
+  });
+
+  it("rows: limit 25, then status and cursor when given", () => {
+    const b = apiPaths.panel.batches;
+    expect(b.rows(ID)).toBe(`/v1/batches/${ID}/rows?limit=25`);
+    expect(b.rows(ID, { status: "warn", cursor: "eyJvIjoyNX0" })).toBe(
+      `/v1/batches/${ID}/rows?limit=25&status=warn&cursor=eyJvIjoyNX0`,
+    );
+  });
+
+  it.each([
+    "../x",
+    "short",
+    // A-X3 allows 16–21 characters for other panel ids; batches need 22 (C10).
+    "lote_ABCDEFGHIJKLMNOP",
+    "a b c d e f g h i j",
+    "%2e%2e%2fxxxxxxxxxxx",
+    "",
+  ])("throws before a request for batch id %j", (id) => {
+    const b = apiPaths.panel.batches;
+    expect(() => b.get(id)).toThrow(/Refused API path segment/);
+    expect(() => b.rows(id)).toThrow(/Refused API path segment/);
+    expect(() => b.csv(id, "result")).toThrow(/Refused API path segment/);
+    expect(() => b.toQueue(id)).toThrow(/Refused API path segment/);
+  });
+
+  it("throws for a status or cursor outside their patterns", () => {
+    const b = apiPaths.panel.batches;
+    expect(() => b.rows(ID, { status: "todos" as never })).toThrow();
+    expect(() => b.rows(ID, { cursor: "x&status=ok" })).toThrow();
+  });
+});

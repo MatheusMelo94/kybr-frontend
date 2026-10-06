@@ -147,3 +147,28 @@ describe("ShellStatusPoller (ADR-0011 rule 3, AC 11)", () => {
     expect(screen.getByTestId("probe")).toHaveTextContent("lote=true");
   });
 });
+
+describe("ShellStatusProvider: a fresh server render (T81)", () => {
+  it("takes the new /me projection when the layout re-renders", async () => {
+    const { ShellStatusProvider: Provider, useShellStatus: useStatus } = await import(
+      "@/features/panel-shell/shell-status-context"
+    );
+    const { render: draw, screen: view } = await import("@testing-library/react");
+    function Show() {
+      const { plano } = useStatus();
+      return <p>{plano ? `${plano.usadas}` : "sem plano"}</p>;
+    }
+    const { rerender } = draw(
+      <Provider initial={{ contagens: undefined, plano: { tipo: "teste", usadas: 40, limite: 200 } }}>
+        <Show />
+      </Provider>,
+    );
+    expect(view.getByText("40")).toBeInTheDocument();
+    rerender(
+      <Provider initial={{ contagens: undefined, plano: { tipo: "teste", usadas: 43, limite: 200 } }}>
+        <Show />
+      </Provider>,
+    );
+    expect(view.getByText("43")).toBeInTheDocument();
+  });
+});

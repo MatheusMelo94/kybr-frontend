@@ -51,4 +51,23 @@ describe("safeReturnPath", () => {
   it.each([null, undefined])("is null for %s", (volta) => {
     expect(safeReturnPath(volta)).toBeNull();
   });
+
+  // Security M5C-03: a login never router.pushes to a download Route Handler
+  // (two audited exports and a stranded user); it lands on the batch page.
+  it.each([
+    [
+      "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b/resultado.csv",
+      "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+    ],
+    [
+      "%2Flote%2F3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b%2Ferros.csv",
+      "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+    ],
+    [
+      "/lote/abcdefghijklmnopqrstuv/resultado.csv?x=1",
+      "/lote/abcdefghijklmnopqrstuv",
+    ],
+  ])("maps the download %j to its batch page", (volta, expected) => {
+    expect(safeReturnPath(volta)).toBe(expected);
+  });
 });

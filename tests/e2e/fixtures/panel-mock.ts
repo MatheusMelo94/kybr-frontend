@@ -37,6 +37,9 @@ export type MockCall = {
   email?: string;
   turnstile?: string;
   authorized: boolean;
+  rows?: number;
+  idempotencyKey?: string;
+  poll?: boolean;
 };
 
 /** The mock's request log for one e-mail. */
@@ -71,10 +74,93 @@ export async function outbox(
 
 export async function seed(
   request: APIRequestContext,
-  scenario: "categorias-falham" | "teste-pausado" | "me-falha",
+  scenario:
+    | "categorias-falham"
+    | "teste-pausado"
+    | "me-falha"
+    | "historico-falha"
+    | "csv-sem-escape"
+    | "queda-de-rede-lote"
+    | "lote-poll-falha",
+  email: string,
+  extra: { n?: number } = {},
+): Promise<void> {
+  await request.post(`${CONTROLS}/seed`, {
+    data: { scenario, email, ...extra },
+  });
+}
+
+/** Turns an account's seed off again. */
+export async function unseed(
+  request: APIRequestContext,
+  scenario: string,
   email: string,
 ): Promise<void> {
-  await request.post(`${CONTROLS}/seed`, { data: { scenario, email } });
+  await request.post(`${CONTROLS}/unseed`, { data: { scenario, email } });
+}
+
+/** QA G10: sets an account's plan usage or limit. */
+export async function setPlan(
+  request: APIRequestContext,
+  email: string,
+  plan: { usadas?: number; limite?: number },
+): Promise<void> {
+  await request.post(`${CONTROLS}/plan`, { data: { email, ...plan } });
+}
+
+/** An account's batches, newest first (ids from the mock). */
+export async function batchesFor(
+  request: APIRequestContext,
+  email: string,
+): Promise<{ id: string; estado: string; processados: number; total: number }[]> {
+  return (await (
+    await request.get(`${CONTROLS}/batches?email=${encodeURIComponent(email)}`)
+  ).json()) as { id: string; estado: string; processados: number; total: number }[];
+}
+
+/**
+ * M5: a batch made directly for an account (the mock's control; its rows are
+ * charged like a start). `set`: ac16 / tudo-ok / tudo-erro / falha.
+ */
+export async function createBatch(
+  request: APIRequestContext,
+  email: string,
+  set:
+    | "ac16"
+    | "tudo-ok"
+    | "tudo-erro"
+    | "falha"
+    | "misto-sem-erro"
+    | "um-atencao"
+    | "hostil",
+  options: { finish?: boolean; hold?: boolean } = {},
+): Promise<string> {
+  const response = await request.post(`${CONTROLS}/batches`, {
+    data: { email, set, ...options },
+  });
+  if (response.status() !== 201)
+    throw new Error(`createBatch: ${response.status()}`);
+  return ((await response.json()) as { id: string }).id;
+}
+
+/** PB1: hold a batch (no progress on reads), or let it go. */
+export async function holdBatch(
+  request: APIRequestContext,
+  id: string,
+  hold = true,
+): Promise<void> {
+  await request.post(`${CONTROLS}/batches/${id}/hold`, { data: { hold } });
+}
+
+/** PB1: move a batch to `processados`, or one step. */
+export async function advanceBatch(
+  request: APIRequestContext,
+  id: string,
+  processados?: number,
+): Promise<void> {
+  await request.post(`${CONTROLS}/batches/${id}/advance`, {
+    data: processados === undefined ? {} : { processados },
+  });
 }
 
 /** PA12: ends every session of an account. */

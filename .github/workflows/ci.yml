@@ -91,6 +91,8 @@ jobs:
 
       # Reads pnpm-lock.yaml. Reviewed exceptions live in pnpm-workspace.yaml
       # (auditConfig.ignoreGhsas), each with a reason and a revisit date.
+      # Blind to the vendored SheetJS (file:vendor/sheetjs, ADR-0012): no
+      # registry advisory maps to it. Its watch is manual (Security C12).
       - run: pnpm audit --audit-level=high
 
       # The deploy workflows' CLIs (.github/deploy-tools), outside the app's

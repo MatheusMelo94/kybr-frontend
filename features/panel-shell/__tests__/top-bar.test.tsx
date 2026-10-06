@@ -74,7 +74,11 @@ describe("TopBar (AC 10)", () => {
   // The 44 px button and the menu opening below it: primitives.spec.
   it("shows the workspace name and the Conta menu", () => {
     reducedMotion(false);
-    render(<TopBar workspaceNome="Loja Exemplo" />);
+    render(
+      <ShellStatusProvider initial={{ contagens: undefined, plano: undefined }}>
+        <TopBar workspaceNome="Loja Exemplo" contratarHref={undefined} />
+      </ShellStatusProvider>,
+    );
 
     expect(screen.getByText("Loja Exemplo")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: "Conta" });

@@ -6,13 +6,17 @@ import {
   panelAuthHandlers,
   panelControlHandlers,
 } from "./handlers/panel-auth.ts";
+import {
+  panelBatchControlHandlers,
+  panelBatchHandlers,
+} from "./handlers/panel-batches.ts";
 import { panelWorkspaceHandlers } from "./handlers/panel-workspace.ts";
 import {
   mockControlHandlers,
   sellerLinkHandlers,
 } from "./handlers/seller-link.ts";
 
-// The seller-link (Pre-Contract D1–D6) and panel (D-A1–D-A5, D-W1–D-W3) MSW
+// The seller-link (Pre-Contract D1–D6) and panel (D-A1–D-A5, D-W1–D-W3, D-B1–D-B7) MSW
 // handlers over HTTP, for `pnpm dev` and Playwright: Server Components and Actions reach it through API_BASE_URL,
 // and the browser uploads to it through API_PUBLIC_BASE_URL (D6, with CORS).
 // Runs with Node's built-in TypeScript type stripping (Node >= 22.18).
@@ -26,9 +30,11 @@ const host = process.env.MOCK_API_HOST ?? "127.0.0.1";
 const app = createServer(
   ...mockControlHandlers,
   ...panelControlHandlers,
+  ...panelBatchControlHandlers,
   ...sellerLinkHandlers,
   ...panelAuthHandlers,
   ...panelWorkspaceHandlers,
+  ...panelBatchHandlers,
 );
 
 createHttpServer((request, response) => {
@@ -46,6 +52,6 @@ createHttpServer((request, response) => {
   app(request, response);
 }).listen(port, host, () => {
   console.log(
-    `Kybr mock API (Pre-Contract: link D1–D6, panel D-A1–D-A5, D-W1–D-W3) on http://${host}:${port}`,
+    `Kybr mock API (Pre-Contract: link D1–D6, panel D-A1–D-A5, D-W1–D-W3, D-B1–D-B7) on http://${host}:${port}`,
   );
 });

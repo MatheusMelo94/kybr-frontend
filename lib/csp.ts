@@ -11,6 +11,12 @@ type CspOptions = {
   apiOrigin?: string;
   /** The panel's auth pages: Cloudflare Turnstile's script and frame (ADR-0009 rule 13). */
   turnstile?: boolean;
+  /**
+   * The panel host: worker-src 'self' for Lote's parser worker (ADR-0012
+   * item 7, Security C5: on every panel document, since a soft navigation
+   * keeps the first document's policy). Never on the link host.
+   */
+  worker?: boolean;
   /** Development only: React Refresh needs eval. */
   isDev: boolean;
   /** Off for loopback hosts, so a local production build over http still loads. */
@@ -30,6 +36,7 @@ export function buildContentSecurityPolicy({
   nonce,
   apiOrigin,
   turnstile = false,
+  worker = false,
   isDev,
   upgradeInsecureRequests,
 }: CspOptions): string {
@@ -50,6 +57,13 @@ export function buildContentSecurityPolicy({
     ["img-src", "'self'", "data:", "blob:"],
     ["font-src", "'self'"],
     ["connect-src", "'self'", ...(apiOrigin !== undefined ? [apiOrigin] : [])],
+    // Under 'strict-dynamic', 'self' in script-src is ignored, so a
+    // same-origin worker needs its own directive. blob: only in development:
+    // Turbopack's dev server bootstraps workers from a blob: URL (T71 spike);
+    // production never allows it (C5).
+    ...(worker
+      ? [["worker-src", "'self'", ...(isDev ? ["blob:"] : [])]]
+      : []),
     ...(turnstile ? [["frame-src", TURNSTILE_ORIGIN]] : []),
     ["frame-ancestors", "'none'"],
     ["base-uri", "'self'"],

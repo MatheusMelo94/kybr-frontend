@@ -23,6 +23,7 @@ coverage/
 playwright-report/
 blob-report/
 test-results/
+e2e-logs/
 playwright/.cache/
 
 # lighthouse ci

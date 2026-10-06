@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type JSX,
@@ -18,9 +19,15 @@ import type { Contagens, Plano } from "@/lib/api/schemas/panel/me";
 type Status = { contagens: Contagens | undefined; plano: Plano | undefined };
 
 type Value = Status & {
-  /** contagens.lote_em_andamento: the Lote item's nav.lote.running (rendered once M5 adds it). */
+  /** contagens.lote_em_andamento: the Lote item's nav.lote.running (S5). */
   loteRunning: boolean;
   update: (next: Status) => void;
+  /** Lote (T80/T81): sets lote_em_andamento without waiting for the poll. */
+  setLoteRunning: (running: boolean) => void;
+  /** Asks ShellStatusPoller for a poll now (a batch ended: the plan moved). */
+  pollNow: () => void;
+  /** How many times pollNow() was called (the poller's trigger). */
+  pollRequests: number;
 };
 
 const ShellStatusContext = createContext<Value | null>(null);
@@ -32,13 +39,31 @@ type Props = {
 
 export function ShellStatusProvider({ initial, children }: Props): JSX.Element {
   const [status, setStatus] = useState<Status>(initial);
+  const [pollRequests, setPollRequests] = useState(0);
+  // A server render (a router.refresh(), a revalidated action) brings a fresh
+  // /me: take it, so the counts and the plan never wait for the next poll.
+  const snapshot = JSON.stringify(initial);
+  useEffect(() => {
+    setStatus(JSON.parse(snapshot) as Status);
+  }, [snapshot]);
   const value = useMemo<Value>(
     () => ({
       ...status,
       loteRunning: status.contagens?.lote_em_andamento ?? false,
       update: setStatus,
+      setLoteRunning: (running) =>
+        setStatus((current) =>
+          current.contagens === undefined
+            ? current
+            : {
+                ...current,
+                contagens: { ...current.contagens, lote_em_andamento: running },
+              },
+        ),
+      pollNow: () => setPollRequests((count) => count + 1),
+      pollRequests,
     }),
-    [status],
+    [status, pollRequests],
   );
   return (
     <ShellStatusContext.Provider value={value}>

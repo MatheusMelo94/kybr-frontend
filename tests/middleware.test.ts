@@ -135,6 +135,7 @@ describe("middleware: Server Actions on the link host (action-forwarding loop)",
       headers: {
         host: "kybr.test",
         "next-action": "40c0cdc082a5712b05ef1d53a1fa2ee96d4ccc7b9f",
+        "content-length": "2",
         accept,
       },
     });
@@ -167,7 +168,8 @@ describe("middleware: Next's action forwarding never chains (HIGH, branch-introd
   ) =>
     new NextRequest(`http://localhost:3000${path}`, {
       method: "POST",
-      headers: { host, accept: "text/html", ...headers },
+      // Browsers always send an action's Content-Length (C1 answers 411 without).
+      headers: { host, accept: "text/html", "content-length": "2", ...headers },
     });
 
   for (const host of ["app.kybr.test", "kybr.test", "evil.example"])
@@ -205,5 +207,92 @@ describe("middleware: Next's action forwarding never chains (HIGH, branch-introd
     expect(response.headers.get("x-middleware-rewrite")).toMatch(
       /\/painel\/entrar$/,
     );
+  });
+});
+
+describe("middleware: Lote's worker in the CSP (ADR-0012 item 7, Security C5)", () => {
+  it.each(["/fila", "/lote", "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", "/entrar", "/comecar"])(
+    "every panel-host page allows same-origin workers: %s",
+    (path) => {
+      const response = middleware(
+        request(path, { headers: { cookie: "__Host-kybr_session=v" } }),
+      );
+      expect(response.headers.get("content-security-policy")).toContain(
+        "worker-src 'self';",
+      );
+    },
+  );
+
+  it("the link host never does", () => {
+    const response = middleware(request("/v/loja-exemplo", { host: "kybr.test" }));
+    expect(response.headers.get("content-security-policy")).not.toContain(
+      "worker-src",
+    );
+  });
+});
+
+describe("middleware: the third-party notice (Security C12)", () => {
+  for (const host of ["app.kybr.test", "kybr.test"])
+    it(`passes /third-party-notices.txt through untouched on ${host}`, () => {
+      const response = middleware(request("/third-party-notices.txt", { host }));
+      expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    });
+});
+
+describe("middleware: Server Action body size (Security C1)", () => {
+  const MiB = 1024 * 1024;
+  function action(path: string, host: string, length: number | undefined) {
+    return new NextRequest(`http://localhost:3000${path}`, {
+      method: "POST",
+      headers: {
+        host,
+        "next-action": "40c0cdc082a5712b05ef1d53a1fa2ee96d4ccc7b9f",
+        accept: "text/x-component",
+        cookie: "__Host-kybr_session=v",
+        ...(length !== undefined && { "content-length": String(length) }),
+      },
+    });
+  }
+
+  it.each([
+    ["/fila", "app.kybr.test"],
+    ["/entrar", "app.kybr.test"],
+    ["/lote/", "app.kybr.test"],
+    ["/LOTE", "app.kybr.test"],
+    ["/painel/lote", "app.kybr.test"],
+    ["/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", "app.kybr.test"],
+    ["/v/loja-exemplo", "kybr.test"],
+    ["/lote", "kybr.test"],
+  ])("over 1 MiB to %s on %s → 413", (path, host) => {
+    expect(middleware(action(path, host, MiB + 1)).status).toBe(413);
+  });
+
+  it("1 MiB exactly passes to /fila", () => {
+    expect(middleware(action("/fila", "app.kybr.test", MiB)).status).not.toBe(413);
+  });
+
+  it("the panel host's /lote, exactly, may carry more (startBatchAction; Next's 2.5 MB limit is its backstop)", () => {
+    const response = middleware(
+      action("/lote", "app.kybr.test", Math.floor(2.4 * MiB)),
+    );
+    expect(response.status).not.toBe(413);
+    expect(response.headers.get("x-middleware-rewrite")).toMatch(/\/painel\/lote$/);
+  });
+
+  it.each([
+    ["/fila", "app.kybr.test"],
+    ["/lote", "app.kybr.test"],
+    ["/v/loja-exemplo", "kybr.test"],
+  ])("a Server Action without Content-Length to %s → 411", (path, host) => {
+    expect(middleware(action(path, host, undefined)).status).toBe(411);
+  });
+
+  it("a plain POST (no next-action) isn't capped here", () => {
+    const request = new NextRequest("http://localhost:3000/api/csp-report", {
+      method: "POST",
+      headers: { host: "app.kybr.test", "content-length": String(2 * MiB) },
+    });
+    expect(middleware(request).status).not.toBe(413);
   });
 });

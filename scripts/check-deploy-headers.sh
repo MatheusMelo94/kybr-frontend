@@ -27,7 +27,9 @@
 #
 # PANEL_URL=https://app.kybr.com.br: also check the panel host's headers on
 # /entrar (ADR-0008 rule 9: private, no-store; noindex; a CSP whose
-# connect-src is 'self' only). Unset while the panel is dark.
+# connect-src is 'self' only, and worker-src 'self' for Lote: ADR-0012).
+# Unset while the panel is dark. The link page's CSP must have no
+# worker-src either way.
 set -eu
 
 base="${1:?Usage: check-deploy-headers.sh <base-url>}"
@@ -130,10 +132,55 @@ for directive in "frame-ancestors 'none'" "'nonce-" "'strict-dynamic'" "object-s
   printf '%s' "$csp" | grep -qF -- "$directive" || fail "CSP lacks ${directive}"
 done
 printf '%s' "$csp" | grep -qF -- "'unsafe-eval'" && fail "CSP allows 'unsafe-eval'"
+# ADR-0012 item 7 / Security C5: the parser worker's worker-src is the
+# panel host's alone; the link never runs a worker.
+printf '%s' "$csp" | grep -qF -- "worker-src" && fail "CSP on the link host has a worker-src"
 
 printf '%s\n' "$headers" | grep -q '^x-powered-by:' && fail "x-powered-by is present"
 printf '%s\n' "$headers" | grep '^cache-control:' | grep -qF "no-store" ||
   fail "cache-control on ${page_path} lacks no-store (F06c)"
+
+# Security M5C-01 (C1, C3), on the platform itself, not only `next start`:
+# - C1: middleware answers 411 to a Server Action POST without
+#   Content-Length and 413 over 1 MiB (off the panel's /lote). A small
+#   action must get past it: if the edge ever dropped Content-Length,
+#   every action on both hosts would be a 411. The action id is a dummy:
+#   middleware decides before Next resolves it, so anything but 411/413
+#   (the unknown action's own answer) proves the header arrived.
+# - C3: /_next/static carries the no-egress policy the parser worker runs
+#   under (next.config.ts), also when the CDN serves it.
+action_tmp=$(mktemp -d)
+trap 'rm -rf "$action_tmp"' EXIT
+printf '[]' > "${action_tmp}/small"
+head -c 1572864 /dev/zero | tr '\0' 'a' > "${action_tmp}/big"
+ACTION_ID=0000000000000000000000000000000000000000
+
+action_status() {
+  # $1: absolute URL, $2: body file
+  fetch_url "--output /dev/null --write-out %{http_code} -X POST -H next-action:${ACTION_ID} -H content-type:text/plain;charset=UTF-8 --data-binary @$2" "$1"
+}
+
+echo "Smoke: a small Server Action POST on ${base}${page_path} gets past the body cap"
+small_status=$(action_status "${base}${page_path}" "${action_tmp}/small")
+case "$small_status" in
+  411) fail "a small Server Action got 411: Content-Length doesn't reach middleware, so every action fails (C1)" ;;
+  413) fail "a small Server Action got 413 (C1 cap misfires)" ;;
+esac
+
+echo "Smoke: a 1.5 MB Server Action POST on ${base}${page_path} gets 413"
+big_status=$(action_status "${base}${page_path}" "${action_tmp}/big")
+[ "$big_status" = "413" ] || fail "a 1.5 MB Server Action on ${page_path} answered ${big_status}, not 413 (C1)"
+
+chunk=$(fetch "" "$page_path" | grep -o '/_next/static/chunks/[A-Za-z0-9._/-]*\.js' | head -n 1 || true)
+if [ -z "$chunk" ]; then
+  fail "no /_next/static chunk found on ${page_path} to check its CSP (C3)"
+else
+  echo "Smoke: the worker CSP on ${base}${chunk}"
+  static_csp=$(fetch "--head --dump-header - --output /dev/null" "$chunk" | tr -d '\r' | tr '[:upper:]' '[:lower:]' | grep '^content-security-policy:' || true)
+  for directive in "default-src 'none'" "script-src 'self'"; do
+    printf '%s' "$static_csp" | grep -qF -- "$directive" || fail "/_next/static lacks the no-egress CSP (${directive}) (C3)"
+  done
+fi
 
 if [ -n "${PANEL_URL:-}" ]; then
   panel="${PANEL_URL%/}"
@@ -151,6 +198,16 @@ if [ -n "${PANEL_URL:-}" ]; then
   for directive in "frame-ancestors 'none'" "'nonce-" "'strict-dynamic'" "connect-src 'self';"; do
     printf '%s' "$panel_csp" | grep -qF -- "$directive" || fail "panel: CSP lacks ${directive} (the panel browser never calls the API)"
   done
+  # Lote's parser worker (ADR-0012 item 7, Security C5): with
+  # 'strict-dynamic', a same-origin worker needs worker-src 'self', and it
+  # is on every panel document (a soft navigation to /lote keeps the first
+  # document's policy). Never blob:. /lote itself needs a session (a 307
+  # with no policy), so /entrar stands for it.
+  printf '%s' "$panel_csp" | grep -qF -- "worker-src 'self'" || fail "panel: CSP lacks worker-src 'self' (Lote's parser worker)"
+  printf '%s' "$panel_csp" | grep -qE -- "worker-src[^;]*blob:" && fail "panel: worker-src allows blob:"
+  echo "Smoke: a 1.5 MB Server Action POST on ${panel}/fila gets 413"
+  panel_big=$(action_status "${panel}/fila" "${action_tmp}/big")
+  [ "$panel_big" = "413" ] || fail "panel: a 1.5 MB Server Action on /fila answered ${panel_big}, not 413 (C1)"
 fi
 
 finish
