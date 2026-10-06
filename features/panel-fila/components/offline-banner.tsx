@@ -16,7 +16,7 @@ import { fill } from "@/features/panel-shell/format";
  * F10 (accepted residual): that re-read is a full render without the poll
  * header, so it slides the idle session; it's bounded to one per return.
  */
-export function OfflineBanner(): JSX.Element | null {
+export function OfflineBanner(): JSX.Element {
   const { online, renderedAt, reread } = useFila();
   const { show } = useToast();
   const wasOffline = useRef(false);
@@ -32,10 +32,16 @@ export function OfflineBanner(): JSX.Element | null {
     show(globalCopy["offline.back"]);
   }, [online, reread, show]);
 
-  if (online) return null;
+  // The status region is present at first paint and only its content
+  // switches: a region inserted with its text is often not announced
+  // (P6-004; plan § 8).
   return (
-    <Notice tone="warning" className="tabular-nums">
-      {fill(globalCopy["offline.panel"], { hora: formatHora(renderedAt) })}
-    </Notice>
+    <div data-fila-offline role="status">
+      {!online && (
+        <Notice role="none" tone="warning" className="tabular-nums">
+          {fill(globalCopy["offline.panel"], { hora: formatHora(renderedAt) })}
+        </Notice>
+      )}
+    </div>
   );
 }

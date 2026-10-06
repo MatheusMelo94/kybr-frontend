@@ -123,9 +123,17 @@ const decisions = () =>
   );
 
 describe("offline (T111; AC 44; D8; ADR-0011 rule 8; F14)", () => {
-  it("online: no banner, everything enabled", () => {
-    render(<Screen />);
+  it("online: no banner, everything enabled; the banner's status region is mounted, empty (P6-004)", () => {
+    const { container } = render(<Screen />);
     expect(banner()).toBeNull();
+    const region = container.querySelector("[data-fila-offline]");
+    expect(region).toHaveAttribute("role", "status");
+    expect(region).toHaveTextContent("");
+    setOnline(false);
+    // The same node: only its content switches, so going offline is announced.
+    expect(container.querySelector("[data-fila-offline]")).toBe(region);
+    expect(region).toHaveTextContent(/^Sem conexão\./);
+    setOnline(true);
     for (const button of decisions()) expect(button).toBeEnabled();
     expect(screen.getByRole("listbox")).not.toHaveAttribute("aria-disabled");
   });
