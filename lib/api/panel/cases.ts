@@ -248,7 +248,10 @@ export type CaseDocumentView = {
   enviadoEm: string;
 };
 
-/** The page's projection of D-C2: no document URL (F1), the CNPJs masked (F11). */
+/**
+ * The page's projection of D-C2: no document URL (F1), the CNPJs masked
+ * (F11), no link_vendedor once decided (M6C-08).
+ */
 export type CaseView = Omit<Case, "documentos" | "cnpj" | "seller"> & {
   cnpj: string;
   seller: Omit<Case["seller"], "cnpj"> & { cnpj: string };
@@ -256,11 +259,15 @@ export type CaseView = Omit<Case, "documentos" | "cnpj" | "seller"> & {
 };
 
 function project(record: Case): CaseView {
-  const { documentos, cnpj, seller, ...rest } = record;
+  const { documentos, cnpj, seller, link_vendedor, ...rest } = record;
   return {
     ...rest,
     cnpj: maskCnpj(cnpj),
     seller: { ...seller, cnpj: maskCnpj(seller.cnpj) },
+    // M6C-08: a decided case's link is dead (CR-P9) and never shown, so it
+    // isn't sent to the client at all.
+    ...(link_vendedor !== undefined &&
+      record.estado !== "decidido" && { link_vendedor }),
     ...(documentos && {
       documentos: documentos.map((doc) => ({
         id: doc.id,

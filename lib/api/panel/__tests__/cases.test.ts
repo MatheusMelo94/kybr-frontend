@@ -264,6 +264,29 @@ describe("getCaseForPage (F1, F11)", () => {
     expect(JSON.stringify(view)).not.toContain("documentos.exemplo.test");
   });
 
+  it("M6C-08: a decided case's projection drops link_vendedor, so it never reaches the RSC payload", async () => {
+    const waiting = await getCase(idOf("aguardando-sem-email"));
+    expect(waiting.link_vendedor).toBeDefined();
+    const decided = await getCase(idOf("decidido-com-documentos"));
+    server.use(
+      http.get(`${API}/v1/cases/:id`, () =>
+        HttpResponse.json({ ...decided, link_vendedor: waiting.link_vendedor }),
+      ),
+    );
+    const result = await getCaseForPage(decided.id);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.case.estado).toBe("decidido");
+    expect(result.case.link_vendedor).toBeUndefined();
+    expect(JSON.stringify(result.case)).not.toContain(
+      String(waiting.link_vendedor),
+    );
+  });
+
+  it("an undecided case keeps link_vendedor (D11)", async () => {
+    const result = await getCaseForPage(idOf("aguardando-sem-email"));
+    expect(result.ok && result.case.link_vendedor).toMatch(/\/v\//);
+  });
+
   it("UNAVAILABLE and NETWORK come back as results", async () => {
     const id = idOf("link");
     setCaseFault(email, "case", { kind: "500", times: 1 });
