@@ -102,7 +102,7 @@ function Screen({
   /** The layout's server render: a re-read moves it (T106, T111). */
   renderedAt?: number;
   email?: boolean;
-  /** null: /me sent no documentos_habilitados. */
+  /** null: no `request` prop (the page always passes one: P6-008). */
   tipos?: readonly (typeof TIPOS)[number][] | null;
 }): JSX.Element {
   return (
@@ -231,7 +231,7 @@ describe("Pedir documento dialog (T108; AC 36, AC 37; D10, D11; F5, F6, F7)", ()
     expect(box("Cartão CNPJ atualizado")).toBeInTheDocument();
   });
 
-  it("no documentos_habilitados from /me: no Pedir documento at all", () => {
+  it("CaseActions without `request`: no Pedir documento (the page always passes one since P6-008)", () => {
     render(<Screen caseId="caso-a" tipos={null} />);
     expect(
       screen.queryByRole("button", { name: "Pedir documento" }),

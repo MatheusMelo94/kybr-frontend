@@ -16,6 +16,7 @@ import { NewCasesNotice } from "@/features/panel-fila/components/new-cases-notic
 import { RequestLinkPanel } from "@/features/panel-fila/components/request-link-panel";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { documentsSettings } from "@/features/panel-fila/document-route";
+import { documentosHabilitados } from "@/features/panel-fila/limits";
 import { parseFilaSearch } from "@/features/panel-fila/search-params";
 import { getCaseForPage } from "@/lib/api/panel/cases";
 import { AppError } from "@/lib/api/errors";
@@ -101,12 +102,12 @@ export default async function CasePage({
                     razao={result.case.razao_social ?? result.case.cnpj}
                     webhook={me.workspace.webhook_configurado}
                     proof={result.case.variante !== "DADOS_NAO_ENCONTRADOS"}
-                    request={
-                      me.workspace.documentos_habilitados && {
-                        tipos: me.workspace.documentos_habilitados,
-                        vendedorTemEmail: result.case.vendedor_tem_email,
-                      }
-                    }
+                    request={{
+                      tipos: documentosHabilitados(
+                        me.workspace.documentos_habilitados,
+                      ),
+                      vendedorTemEmail: result.case.vendedor_tem_email,
+                    }}
                   />
                 )}
               </>

@@ -1,3 +1,5 @@
+import { DOCUMENTO_TIPOS, type DocumentoTipo } from "@/lib/panel-api-values";
+
 // The Fila's bounds (plan-m6 § 3.2, Security F6).
 
 /** A decide / request-documents call with no result by then is an unknown outcome: re-read, never report done. */
@@ -11,3 +13,15 @@ export const NOTA_VENDEDOR_MAX = 280;
 
 /** C-M6-1: the oldest `desde` the new-case poll may send (the API refuses older). */
 export const DESDE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * The types Pedir documento offers: /me's documentos_habilitados (C-M6-4),
+ * or, until the backend sends it, G10's default four: every type but
+ * PROCURACAO (spec J4 "the default four until Regras ships"; P6-008). The
+ * action still refuses a disabled type (DOCUMENTO_NAO_HABILITADO).
+ */
+export function documentosHabilitados(
+  fromMe: readonly DocumentoTipo[] | undefined,
+): readonly DocumentoTipo[] {
+  return fromMe ?? DOCUMENTO_TIPOS.filter((tipo) => tipo !== "PROCURACAO");
+}
