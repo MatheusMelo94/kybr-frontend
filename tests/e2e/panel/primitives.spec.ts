@@ -8,6 +8,11 @@ import {
   TOAST_ITEM,
   TOAST_REGION,
 } from "../../../components/panel/toast-styles.ts";
+import {
+  DIALOG,
+  DIALOG_BODY,
+  DIALOG_CLOSE,
+} from "../../../components/panel/dialog-styles.ts";
 import { navCountClassName } from "../../../features/panel-shell/nav-count-styles.ts";
 import { createAccount, logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
 
@@ -454,5 +459,141 @@ test.describe("panel toasts @feature-ops-panel @panel-lote", () => {
     expect(reduced.property).toBe("opacity");
     const reducedOut = await probe(true);
     expect(reducedOut.translate).toBe("0px");
+  });
+});
+
+// T94: the Dialog primitive's classes under the panel's real stylesheet, on a
+// real showModal(). The behaviour (focus, Esc, busy, the draft) is in
+// components/panel/__tests__/dialog.test.tsx.
+type DialogProbe = {
+  modal: boolean;
+  focusInside: boolean;
+  closed: { opacity: string; translate: string; display: string };
+  open: {
+    opacity: string;
+    translate: string;
+    width: number;
+    height: number;
+    bottom: number;
+    property: string;
+    duration: string;
+    behavior: string;
+    paddingBottom: string;
+    closeHeight: number;
+  };
+};
+
+async function probeDialog(page: Page): Promise<DialogProbe> {
+  return page.evaluate(
+    ([dialogClass, bodyClass, closeClass]) => {
+      const dialog = document.createElement("dialog");
+      dialog.className = dialogClass;
+      const body = document.createElement("div");
+      body.className = bodyClass;
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = closeClass;
+      close.setAttribute("aria-label", "Fechar");
+      const field = document.createElement("input");
+      body.append(close, field);
+      dialog.append(body);
+      document.body.append(dialog);
+      const read = () => getComputedStyle(dialog);
+      const before = read();
+      const closed = {
+        opacity: before.opacity,
+        translate: before.translate,
+        display: before.display,
+      };
+      dialog.showModal();
+      // Jump the entry transition to its end state.
+      dialog.getAnimations({ subtree: true }).forEach((a) => a.finish());
+      const s = read();
+      const box = dialog.getBoundingClientRect();
+      const result = {
+        modal: dialog.matches(":modal"),
+        focusInside: dialog.contains(document.activeElement),
+        closed,
+        open: {
+          opacity: s.opacity,
+          translate: s.translate,
+          width: box.width,
+          height: box.height,
+          bottom: box.bottom,
+          property: s.transitionProperty,
+          duration: s.transitionDuration,
+          behavior: s.transitionBehavior,
+          paddingBottom: getComputedStyle(body).paddingBottom,
+          closeHeight: close.getBoundingClientRect().height,
+        },
+      };
+      dialog.close();
+      dialog.remove();
+      return result;
+    },
+    [DIALOG, DIALOG_BODY, DIALOG_CLOSE] as const,
+  );
+}
+
+test.describe("panel Dialog / bottom sheet (T94) @feature-ops-panel @panel-fila @panel-phone", () => {
+  test("at 1280: modal, centred, at most 520 px wide, fades at --duration-base with allow-discrete; reduced motion: opacity only", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/entrar");
+    await page.waitForLoadState("networkidle");
+
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    const dialog = await probeDialog(page);
+    expect(dialog.modal).toBe(true);
+    expect(dialog.focusInside).toBe(true);
+    expect(dialog.closed.opacity).toBe("0");
+    expect(dialog.open.opacity).toBe("1");
+    expect(dialog.open.translate).toBe("none");
+    expect(dialog.open.width).toBeLessThanOrEqual(520);
+    expect(dialog.open.width).toBeGreaterThan(400);
+    expect(dialog.open.bottom).toBeLessThan(800);
+    expect(dialog.open.property).toBe("opacity, translate, display, overlay");
+    expect(dialog.open.duration).toMatch(/^0\.25s(, 0\.25s)*$/);
+    expect(dialog.open.behavior).toMatch(/^allow-discrete/);
+    expect(dialog.open.paddingBottom).toBe("24px");
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const reduced = await probeDialog(page);
+    expect(reduced.open.property).toBe("opacity, display, overlay");
+    expect(reduced.closed.opacity).toBe("0");
+    expect(reduced.open.translate).toBe("none");
+  });
+
+  test("below lg: a full-height bottom sheet that slides up from 100 %, clears the safe area, 44 px close on coarse pointers; reduced motion: opacity only", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto("/entrar");
+    await page.waitForLoadState("networkidle");
+
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    const sheet = await probeDialog(page);
+    expect(sheet.modal).toBe(true);
+    expect(sheet.open.width).toBe(360);
+    expect(sheet.open.height).toBe(780);
+    expect(sheet.open.bottom).toBe(780);
+    expect(sheet.open.opacity).toBe("1");
+    expect(sheet.closed.opacity).toBe("1");
+    expect(sheet.closed.translate).toMatch(/^0px (100%|780px)$/);
+    expect(sheet.open.translate).toMatch(/^(none|0px( 0px)?)$/);
+    expect(sheet.open.property).toBe("opacity, translate, display, overlay");
+    // 16 px + env(safe-area-inset-bottom), which is 0 here.
+    expect(sheet.open.paddingBottom).toBe("16px");
+    if (await coarsePointer(page)) {
+      expect(sheet.open.closeHeight).toBeGreaterThanOrEqual(44);
+    }
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const reduced = await probeDialog(page);
+    expect(reduced.open.property).toBe("opacity, display, overlay");
+    expect(reduced.closed.opacity).toBe("0");
+    expect(reduced.closed.translate).toBe("none");
+    expect(reduced.open.opacity).toBe("1");
   });
 });
