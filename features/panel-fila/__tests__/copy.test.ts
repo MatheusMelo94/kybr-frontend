@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { filaCopy } from "@/features/panel-fila/copy";
+import { pendingCopy } from "@/features/seller-link/copy/pending";
 import { globalCopy } from "@/features/panel-shell/copy/global";
 import { fill } from "@/features/panel-shell/format";
 import { plural } from "@/features/panel-shell/plural";
@@ -94,7 +95,7 @@ const SPEC_S6: Record<string, string> = {
   "fila.decision.manter": "Mantido como aprovado",
   "fila.decision.bloquear": "Bloqueado",
   "fila.decided.reason": "Motivo: {motivo}",
-  "fila.decided.note": "Mensagem ao vendedor: \"{nota}\"",
+  "fila.decided.note": 'Mensagem ao vendedor: "{nota}"',
   "fila.notfound.h": "Caso não encontrado",
   "fila.notfound.body": "Ele não existe ou não pertence a esta conta.",
   "fila.proof.error": "Não conseguimos baixar o comprovante. Tente de novo.",
@@ -112,7 +113,7 @@ const SPEC_S6: Record<string, string> = {
   "documento.PROCURACAO": "Procuração do responsável",
   "documento.COMPROVANTE_ENDERECO": "Comprovante de endereço da empresa",
   "documento.CARTAO_CNPJ": "Cartão CNPJ atualizado",
-  "documento.RESPONSAVEL": "Documento do responsável",
+  "documento.RESPONSAVEL": "Contrato social ou procuração",
   "doc.note.label": "Mensagem para o vendedor (opcional)",
   "doc.note.hint": "O vendedor vê esta mensagem no link. Até 280 caracteres.",
   "doc.submit.one": "Pedir documento",
@@ -176,12 +177,20 @@ describe("filaCopy (T91, spec § Content & Copy › S6)", () => {
   });
 
   it("fills and pluralizes as the spec reads", () => {
-    expect(
-      fill(plural(filaCopy, "doc.submit", 2), { n: 2 }),
-    ).toBe("Pedir 2 documentos");
+    expect(fill(plural(filaCopy, "doc.submit", 2), { n: 2 })).toBe(
+      "Pedir 2 documentos",
+    );
     expect(plural(filaCopy, "fila.new", 1)).toBe("1 caso novo");
     expect(fill(filaCopy["fila.sla.late"], { duracao: "2 dias" })).toBe(
       "Atrasado há 2 dias",
+    );
+  });
+});
+
+describe("document names shared with the seller link (spec 2026-10-06)", () => {
+  it("documento.RESPONSAVEL matches the seller link's own name", () => {
+    expect(filaCopy["documento.RESPONSAVEL"]).toBe(
+      pendingCopy["documento.RESPONSAVEL"],
     );
   });
 });

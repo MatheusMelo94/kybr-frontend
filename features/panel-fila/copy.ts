@@ -101,7 +101,7 @@ export const filaCopy = {
   "documento.PROCURACAO": "Procuração do responsável",
   "documento.COMPROVANTE_ENDERECO": "Comprovante de endereço da empresa",
   "documento.CARTAO_CNPJ": "Cartão CNPJ atualizado",
-  "documento.RESPONSAVEL": "Documento do responsável",
+  "documento.RESPONSAVEL": "Contrato social ou procuração",
   "doc.note.label": "Mensagem para o vendedor (opcional)",
   "doc.note.hint": "O vendedor vê esta mensagem no link. Até 280 caracteres.",
   "doc.submit.one": "Pedir documento",
