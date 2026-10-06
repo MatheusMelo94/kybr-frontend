@@ -77,12 +77,11 @@ describe("StatusFilter (AC 21 filter)", () => {
       "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b?status=bad",
       { scroll: false },
     );
-    // The page re-renders through its loading boundary: a new select gets focus.
-    const { unmount } = render(<StatusFilter status="bad" />);
-    expect(
-      screen.getAllByRole("combobox", { name: "Mostrar" })[1],
-    ).toHaveFocus();
-    unmount();
+    // A Suspense boundary can hide the page while the server renders, which
+    // drops focus: when the new status arrives, the select takes it back.
+    select.blur();
+    rerender(<StatusFilter status="bad" />);
+    expect(screen.getByRole("combobox", { name: "Mostrar" })).toHaveFocus();
     fireEvent.change(select, { target: { value: "" } });
     expect(router.replace).toHaveBeenLastCalledWith(
       "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",

@@ -11,6 +11,7 @@ import { POLL_TIMEOUT_MS } from "@/features/panel-shell/polling";
 import {
   getBatch,
   monitorBatch,
+  resumeBatch,
   sendToQueue,
   startBatch,
 } from "@/lib/api/panel/batches";
@@ -145,4 +146,33 @@ export async function monitorBatchAction(
   input: unknown,
 ): Promise<BatchWriteResult> {
   return batchWrite(input, monitorBatch, false);
+}
+
+export type ResumeResult =
+  | { ok: true }
+  | { ok: false; code: "SEM_SALDO" | "SESSAO_EXPIRADA" | "FAILED" };
+
+/**
+ * D-B7, from /lote/[batchId] (AC 22): checks the rows a stopped batch didn't
+ * reach. Idempotent (C6). Revalidates the batch page (back to progress) and
+ * the layout (the shell's running flag). 402 → SEM_SALDO.
+ */
+export async function resumeBatchAction(input: unknown): Promise<ResumeResult> {
+  await assertPanelHost();
+  const parsed = batchRefSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "FAILED" };
+  await requireSession();
+
+  const { batchId } = parsed.data;
+  const result = await resumeBatch(batchId);
+  if (result.ok) {
+    revalidatePath(panelPath(`/lote/${batchId}`));
+    revalidatePath(panelPath("/"), "layout");
+    return { ok: true };
+  }
+  if (result.error.code === "SEM_SALDO")
+    return { ok: false, code: "SEM_SALDO" };
+  if (result.error.code === "SESSAO_EXPIRADA")
+    return { ok: false, code: "SESSAO_EXPIRADA" };
+  return { ok: false, code: "FAILED" };
 }

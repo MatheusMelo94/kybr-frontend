@@ -14,6 +14,7 @@ import {
   type RowsQuery,
 } from "@/features/panel-lote/data";
 import { requireSession } from "@/lib/api/panel/session";
+import { contratarHref } from "@/lib/panel-config";
 
 export const metadata: Metadata = { title: loteCopy["lote.h1"] };
 
@@ -58,7 +59,7 @@ async function BatchBody({
       <h1 className="text-title font-title text-ink">{loteCopy["lote.h1"]}</h1>
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
         <div className="flex min-w-0 flex-col gap-6">
-          <BatchState batch={batch} />
+          <BatchState batch={batch} contratarHref={contratarHref()} />
           {finished && (
             <Suspense fallback={<Skeleton className="h-96 w-full" />}>
               <ResultTableSection batchId={batchId} query={query} />

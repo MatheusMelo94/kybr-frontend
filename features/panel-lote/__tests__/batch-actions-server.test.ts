@@ -140,3 +140,46 @@ describe("monitorBatchAction (D-B5, AC 24 panel half)", () => {
     expect(revalidatePath).toHaveBeenCalledWith(panelPath(`/lote/${id}`));
   });
 });
+
+describe("resumeBatchAction (D-B7 + C6, AC 22)", () => {
+  it("resumes a stopped batch and revalidates the page and the layout", async () => {
+    const { resumeBatchAction } = await import("@/features/panel-lote/actions");
+    const { BATCH_SETS: SETS } =
+      await import("@/tests/fixtures/factories/panel");
+    const stopped = newBatch(
+      PANEL_EMAILS.pago,
+      [...SETS.tudoOk, SETS.falha, ...SETS.tudoErro].map((cnpj) => ({ cnpj })),
+    );
+    for (let i = 0; i < 3; i++) advanceBatch(stopped);
+    expect(stopped.estado).toBe("falhou");
+    expect(await resumeBatchAction({ batchId: stopped.id })).toEqual({
+      ok: true,
+    });
+    expect(stopped.estado).toBe("processando");
+    expect(revalidatePath).toHaveBeenCalledWith(
+      panelPath(`/lote/${stopped.id}`),
+    );
+    expect(revalidatePath).toHaveBeenCalledWith(panelPath("/"), "layout");
+  });
+
+  it("402 → SEM_SALDO; a bad id → FAILED with no API call", async () => {
+    const { resumeBatchAction } = await import("@/features/panel-lote/actions");
+    const { BATCH_SETS: SETS } =
+      await import("@/tests/fixtures/factories/panel");
+    const stopped = newBatch(
+      PANEL_EMAILS.pago,
+      [...SETS.tudoOk, SETS.falha, ...SETS.tudoErro].map((cnpj) => ({ cnpj })),
+    );
+    for (let i = 0; i < 3; i++) advanceBatch(stopped);
+    const plano = panelStore().accounts.get(PANEL_EMAILS.pago)?.workspace.plano;
+    if (plano) plano.usadas = plano.limite;
+    expect(await resumeBatchAction({ batchId: stopped.id })).toEqual({
+      ok: false,
+      code: "SEM_SALDO",
+    });
+    expect(await resumeBatchAction({ batchId: "../x" })).toEqual({
+      ok: false,
+      code: "FAILED",
+    });
+  });
+});
