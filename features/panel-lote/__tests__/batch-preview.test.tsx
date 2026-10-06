@@ -48,6 +48,7 @@ describe("BatchPreview (AC 16–18, AC 12 Lote half)", () => {
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(PREVIEW.headers);
     expect(screen.getByRole("combobox", { name: "Coluna do CNPJ" })).toHaveValue("0");
     expect(cta()).toHaveAccessibleName("Verificar 184 CNPJs");
+    expect(cta()).toHaveClass("tabular-nums");
     expect(cta()).not.toHaveAttribute("aria-disabled");
     fireEvent.click(cta());
     expect(onStart).toHaveBeenCalledTimes(1);

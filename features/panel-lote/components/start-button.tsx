@@ -40,7 +40,8 @@ export function StartButton({
         else onClick();
       }}
       className={cn(
-        "inline-flex h-(--size-control-panel) items-center justify-center rounded-full bg-accent px-6 text-body font-strong text-accent-ink",
+        // tabular-nums: the label carries the count (AC 76).
+        "inline-flex h-(--size-control-panel) items-center justify-center rounded-full bg-accent px-6 text-body font-strong text-accent-ink tabular-nums",
         "transition-colors duration-(--duration-fast) ease-out-quart motion-reduce:transition-none",
         "hover:bg-accent/90 active:bg-accent/80",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",

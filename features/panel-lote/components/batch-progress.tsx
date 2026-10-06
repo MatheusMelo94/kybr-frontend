@@ -168,7 +168,7 @@ export function BatchProgress({ batchId, initial }: Props): JSX.Element {
         id="lote-progress-h"
         ref={headingRef}
         tabIndex={-1}
-        className="text-h2 font-title text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="text-h2 font-title text-ink tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         {heading}
       </h2>

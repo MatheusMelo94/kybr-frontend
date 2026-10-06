@@ -86,6 +86,7 @@ describe("BatchProgress (AC 19)", () => {
       name: "Verificando 200 CNPJs",
     });
     expect(heading).toHaveFocus();
+    expect(heading).toHaveClass("tabular-nums");
     expect(screen.getByText("50 de 200", { selector: "p" })).toHaveClass(
       "tabular-nums",
     );

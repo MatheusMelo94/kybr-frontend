@@ -2,7 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { expectNoAxeViolations } from "../fixtures/axe.ts";
 import {
+  forEachLoteBatchState,
+  forEachLoteUploadState,
+  visit,
+} from "../fixtures/lote-states.ts";
+import {
   createAccount,
+  createBatch,
   logIn,
   pendingSignup,
   seed,
@@ -154,3 +160,91 @@ test.describe("M4 cross-cutting: AC 67, 69, 72, 74 @feature-ops-panel @panel-acc
     await crossCutting(page, "fatal error");
   });
 });
+
+/**
+ * Lote's extra cross-cutting checks (T89): AC 68 (the only CNPJ input is the
+ * Lote file: no text field in main), AC 71 (every status dot, bar or donut
+ * is aria-hidden beside a word), AC 76 (every CNPJ and count in main is
+ * tabular).
+ */
+async function loteCrossCutting(page: Page, label: string): Promise<void> {
+  await crossCutting(page, label);
+  const fields = await page
+    .locator("main")
+    .locator(
+      "input:not([type=file]):not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea",
+    )
+    .count();
+  expect(fields, `${label}: AC 68`).toBe(0);
+  const unlabeled = await page.locator("main").evaluate((main) =>
+    [...main.querySelectorAll<SVGElement | HTMLElement>("svg, [data-status-dot]")]
+      .filter((mark) => mark.closest("[aria-hidden=true]") === null)
+      .map((mark) => mark.outerHTML.slice(0, 60)),
+  );
+  expect(unlabeled, `${label}: AC 71 (marks are aria-hidden)`).toEqual([]);
+  const notTabular = await page.locator("main").evaluate((main) =>
+    [...main.querySelectorAll<HTMLElement>("*")]
+      // Seen text only: a screen-reader-only live region has no figures to align.
+      .filter(
+        (element) =>
+          element.getClientRects().length > 0 &&
+          element.closest(".sr-only") === null,
+      )
+      .filter((element) =>
+        [...element.childNodes].some(
+          (node) =>
+            node.nodeType === Node.TEXT_NODE &&
+            /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\b\d+ CNPJs?\b/.test(
+              node.textContent ?? "",
+            ),
+        ),
+      )
+      .filter(
+        (element) =>
+          !getComputedStyle(element).fontVariantNumeric.includes(
+            "tabular-nums",
+          ),
+      )
+      .map((element) => element.textContent?.trim().slice(0, 50)),
+  );
+  expect(notTabular, `${label}: AC 76`).toEqual([]);
+}
+
+test.describe("M5 cross-cutting on Lote: AC 67, 68, 69, 71, 72, 73, 74, 76 @feature-ops-panel @panel-lote @panel-phone", () => {
+  test.setTimeout(240_000);
+
+  test("every /lote state", async ({ page, request }, testInfo) => {
+    await forEachLoteUploadState(page, request, testInfo, (label) =>
+      loteCrossCutting(page, label),
+    );
+  });
+
+  test("every /lote/{id} state", async ({ page, request }, testInfo) => {
+    await forEachLoteBatchState(page, request, testInfo, (label) =>
+      loteCrossCutting(page, label),
+    );
+  });
+
+  test("AC 73: another workspace's batch renders the not-found state, identical to an unknown id", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const owner = uniqueEmail("a11y-lote-dono", testInfo);
+    const other = uniqueEmail("a11y-lote-outro", testInfo);
+    await createAccount(request, owner, "pago");
+    await createAccount(request, other, "pago");
+    const foreign = await createBatch(request, owner, "ac16", { finish: true });
+    await logIn(page, other);
+
+    await visit(page, `/lote/${foreign}`);
+    const foreignText = await page.locator("main").innerText();
+    await visit(page, "/lote/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b");
+    const unknownText = await page.locator("main").innerText();
+    expect(foreignText).toBe(unknownText);
+    for (const file of ["resultado.csv", "erros.csv"])
+      expect(
+        (await page.request.get(`/lote/${foreign}/${file}`)).status(),
+      ).toBe(404);
+  });
+});
+
