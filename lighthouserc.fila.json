@@ -1,0 +1,76 @@
+{
+  "$comment": "Lighthouse CI for the Fila, signed in (ADR-0010 § 1, T116), on the mobile preset: the e-mail deep link /fila/{id} opens on a phone. scripts/lighthouse-local.sh runs it with the seeded case's URL. scripts/lighthouse-panel-login.cjs logs in through the local mock API before each run; Lighthouse's storage reset clears the HTTP cache before every run but keeps cookies (Lighthouse 12's default clearStorageTypes), so every run is a cold load, signed in. puppeteerLaunchOptions.args replaces chromeFlags, which LHCI ignores with a puppeteerScript. Median of 3. LCP per ADR-0007: warn above 2500 ms, fail above 3000 ms (one assertion per audit key, hence the two assertMatrix entries, as in lighthouserc.json); CLS <= 0.1; category scores from frontend-qa-conventions.md § Accessibility & Performance Gates. Thresholds are the Frontend Architect's: change them only through the plan or an ADR.",
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "puppeteerScript": "scripts/lighthouse-panel-login.cjs",
+      "puppeteerLaunchOptions": {
+        "args": ["--no-sandbox", "--disable-dev-shm-usage"]
+      }
+    },
+    "assert": {
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": ".*",
+          "assertions": {
+            "largest-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 2500,
+                "aggregationMethod": "median-run"
+              }
+            ]
+          }
+        },
+        {
+          "matchingUrlPattern": ".*",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.85
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 0.95
+              }
+            ],
+            "categories:best-practices": [
+              "error",
+              {
+                "minScore": 0.9
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 3000,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.1,
+                "aggregationMethod": "median-run"
+              }
+            ],
+            "total-blocking-time": [
+              "warn",
+              {
+                "maxNumericValue": 200,
+                "aggregationMethod": "median-run"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci/reports-fila-mobile"
+    }
+  }
+}

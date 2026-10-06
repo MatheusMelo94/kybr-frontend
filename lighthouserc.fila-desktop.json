@@ -1,0 +1,62 @@
+{
+  "$comment": "Lighthouse CI for the Fila, signed in (ADR-0010 § 1, T116), on the desktop preset: /fila, the desk-side queue (at lg it opens the oldest case). scripts/lighthouse-local.sh runs it. scripts/lighthouse-panel-login.cjs logs in through the local mock API before each run; Lighthouse's storage reset clears the HTTP cache before every run but keeps cookies (Lighthouse 12's default clearStorageTypes), so every run is a cold load, signed in. puppeteerLaunchOptions.args replaces chromeFlags, which LHCI ignores with a puppeteerScript. Median of 3. LCP <= 2.5 s blocking (ADR-0010); CLS <= 0.1; category scores from frontend-qa-conventions.md § Accessibility & Performance Gates. Thresholds are the Frontend Architect's: change them only through the plan or an ADR.",
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "puppeteerScript": "scripts/lighthouse-panel-login.cjs",
+      "puppeteerLaunchOptions": {
+        "args": ["--no-sandbox", "--disable-dev-shm-usage"]
+      },
+      "settings": {
+        "preset": "desktop"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": [
+          "error",
+          {
+            "minScore": 0.85
+          }
+        ],
+        "categories:accessibility": [
+          "error",
+          {
+            "minScore": 0.95
+          }
+        ],
+        "categories:best-practices": [
+          "error",
+          {
+            "minScore": 0.9
+          }
+        ],
+        "largest-contentful-paint": [
+          "error",
+          {
+            "maxNumericValue": 2500,
+            "aggregationMethod": "median-run"
+          }
+        ],
+        "cumulative-layout-shift": [
+          "error",
+          {
+            "maxNumericValue": 0.1,
+            "aggregationMethod": "median-run"
+          }
+        ],
+        "total-blocking-time": [
+          "warn",
+          {
+            "maxNumericValue": 200,
+            "aggregationMethod": "median-run"
+          }
+        ]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci/reports-fila-desktop"
+    }
+  }
+}
