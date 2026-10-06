@@ -37,7 +37,7 @@ export function useDecide(): {
   decide: (caseId: string, decisao: QuickDecisao, razao: string) => void;
   busy: boolean;
 } {
-  const { setRemoval, focusCase, setFlash } = useFila();
+  const { setRemoval, focusCase, setFlash, captureCollapse } = useFila();
   const flow = useDecisionFlow();
   const arm = useNavigationGuard();
   const expire = useSessionExpiry();
@@ -50,6 +50,8 @@ export function useDecide(): {
       const to = target(caseId);
       setFlash(caseId, null);
       setBusy(true);
+      // T114: the list's positions before the case leaves it.
+      captureCollapse(caseId);
       startTransition(async () => {
         setRemoval({ id: caseId, next: to.next });
         const result = await call({ caseId, decisao });
@@ -88,6 +90,7 @@ export function useDecide(): {
       setFlash,
       setRemoval,
       focusCase,
+      captureCollapse,
     ],
   );
 

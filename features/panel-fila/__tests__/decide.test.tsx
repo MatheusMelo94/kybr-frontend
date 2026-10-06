@@ -546,3 +546,63 @@ describe("E3 (plan-m6 § 18): a result after Renata moved on never moves her", (
     expect(router.refresh).not.toHaveBeenCalled();
   });
 });
+
+describe("the collapse on Aprovar (T114; AC 70)", () => {
+  it("captures before the item leaves and plays after: the options below move up, the leaving one fades as a snapshot", async () => {
+    const reduceQuery = "(prefers-reduced-motion: reduce)";
+    const media = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      ...media(query),
+      matches: query !== reduceQuery,
+    })) as typeof window.matchMedia;
+    const animated: { text: string; keys: string[] }[] = [];
+    Element.prototype.animate = vi.fn(function (
+      this: Element,
+      keyframes: Keyframe[],
+    ) {
+      animated.push({
+        text: this.textContent ?? "",
+        keys: keyframes.flatMap((frame) => Object.keys(frame)),
+      });
+      return { cancel: vi.fn(), onfinish: null } as unknown as Animation;
+    }) as unknown as Element["animate"];
+    // Each option sits 50 px below the previous one in the list's order.
+    const rect = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: Element) {
+        const all = Array.from(document.querySelectorAll('[role="option"]'));
+        const top = Math.max(0, all.indexOf(this)) * 50;
+        return { top, left: 0, width: 300, height: 50 } as DOMRect;
+      });
+
+    decideAction.mockReturnValue(deferred().promise);
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    await act(async () => fireEvent.click(approve()));
+
+    expect(options()).toEqual(["caso-b", "caso-c"]);
+    expect(animated.map((a) => a.text)).toEqual(["caso-b", "caso-c", "caso-a"]);
+    expect(
+      animated
+        .slice(0, 2)
+        .every((a) => a.keys.join() === "transform,transform"),
+    ).toBe(true);
+    expect(animated[2]?.keys).toEqual(["opacity", "opacity"]);
+    rect.mockRestore();
+    delete (Element.prototype as Partial<Element>).animate;
+  });
+
+  it("the latest list to mount owns the collapse: an older list's late cleanup doesn't unregister it", () => {
+    render(<Screen caseId="caso-a" ids={IDS} />);
+    const older = { capture: vi.fn(), play: vi.fn() };
+    const newer = { capture: vi.fn(), play: vi.fn() };
+    const offOlder = fila?.setCollapse(older);
+    const offNewer = fila?.setCollapse(newer);
+    offOlder?.();
+    fila?.captureCollapse("caso-b");
+    expect(newer.capture).toHaveBeenCalledWith("caso-b");
+    expect(older.capture).not.toHaveBeenCalled();
+    offNewer?.();
+    fila?.captureCollapse("caso-c");
+    expect(newer.capture).toHaveBeenCalledTimes(1);
+  });
+});

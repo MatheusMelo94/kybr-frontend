@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import type { FilaAba } from "@/features/panel-fila/search-params";
+import type { Collapse } from "@/features/panel-fila/use-collapse";
 import { useOnline } from "@/features/panel-fila/use-online";
 import { useRefreshUntil } from "@/lib/navigation/refresh-until";
 
@@ -100,6 +101,10 @@ type FilaValue = {
   /** R1: the cases decided in this session, never a "next" case (a lagging list may still show them). */
   markDecided: (id: string) => void;
   wasDecided: (id: string) => boolean;
+  /** T114: the list registers its collapse; a quick decision captures it before the removal. */
+  /** Returns the unregister (a no-op once another list registered). */
+  setCollapse: (collapse: Collapse) => () => void;
+  captureCollapse: (leavingId: string) => void;
   /** The flash per case: until the case is opened again or decided. */
   flash: Readonly<Record<string, Flash>>;
   setFlash: (id: string, flash: Flash | null) => void;
@@ -278,6 +283,19 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
   }, []);
   const wasDecided = useCallback((id: string) => decided.current.has(id), []);
 
+  const collapse = useRef<Collapse | null>(null);
+  // The latest list to mount wins; an older one's cleanup (which can run
+  // after the new page's list mounted) doesn't unregister it.
+  const setCollapse = useCallback((next: Collapse) => {
+    collapse.current = next;
+    return () => {
+      if (collapse.current === next) collapse.current = null;
+    };
+  }, []);
+  const captureCollapse = useCallback((leavingId: string) => {
+    collapse.current?.capture(leavingId);
+  }, []);
+
   const value = useMemo<FilaValue>(
     () => ({
       pendingCaseId,
@@ -295,6 +313,8 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       releaseKey,
       markDecided,
       wasDecided,
+      setCollapse,
+      captureCollapse,
       flash,
       setFlash,
       offlineHint,
@@ -325,6 +345,8 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       releaseKey,
       markDecided,
       wasDecided,
+      setCollapse,
+      captureCollapse,
       flash,
       setFlash,
       offlineHint,

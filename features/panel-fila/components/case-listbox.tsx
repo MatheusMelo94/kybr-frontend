@@ -7,6 +7,7 @@ import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { FILA_TAB_ACTIVE_ID } from "@/features/panel-fila/components/fila-tabs";
 import { LG_MEDIA } from "@/features/panel-fila/limits";
 import type { FilaAba } from "@/features/panel-fila/search-params";
+import { useCollapse } from "@/features/panel-fila/use-collapse";
 import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
 
 type Props = {
@@ -33,7 +34,8 @@ function twoPanes(): boolean {
  * (plan § 6) and keeps its position; one pane starts the case at the top.
  * The position comes back once when the list remounts visible. A case
  * being decided leaves the list at once (T105). New cases stay hidden
- * until "Mostrar" (D3, T110).
+ * until "Mostrar" (D3, T110). The scroller is positioned: the collapse's
+ * snapshot of the leaving case sits in it (T114).
  */
 export function CaseListbox({
   aba,
@@ -54,8 +56,18 @@ export function CaseListbox({
     visibleIds,
     observeList,
     online,
+    setCollapse,
   } = useFila();
   const scroller = useRef<HTMLDivElement>(null);
+
+  // T114: the gap a decided case leaves closes with a FLIP (useDecide
+  // captures before the removal; this plays once the list rendered without it).
+  const collapse = useCollapse(scroller);
+  useLayoutEffect(() => setCollapse(collapse), [collapse, setCollapse]);
+  const leaving = removal?.id ?? null;
+  useLayoutEffect(() => {
+    if (leaving !== null) collapse.play();
+  }, [leaving, collapse]);
 
   const serverIds = options.map((option) => option.id);
   const visible = new Set(visibleIds(query, serverIds, selectedId));
@@ -112,7 +124,7 @@ export function CaseListbox({
       // At lg the list scrolls inside itself (plan § 6): the viewport minus
       // the shell bar, the Fila header and the tabs (≈ 16rem; a layout
       // measure, not a design token).
-      className="flex flex-col gap-4 lg:max-h-[calc(100dvh-16rem)] lg:overflow-y-auto lg:overscroll-contain"
+      className="relative flex flex-col gap-4 lg:max-h-[calc(100dvh-16rem)] lg:overflow-y-auto lg:overscroll-contain"
     >
       <Listbox
         options={
