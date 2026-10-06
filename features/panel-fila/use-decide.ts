@@ -42,7 +42,7 @@ export function useDecide(): {
   decide: (caseId: string, decisao: QuickDecisao, razao: string) => void;
   busy: boolean;
 } {
-  const { setRemoval, list, openCase } = useFila();
+  const { setRemoval, list, openCase, markDecided, wasDecided } = useFila();
   const { take, release } = useIntentKey();
   const { show } = useToast();
   const { pause, resume, pollNow } = useShellStatus();
@@ -54,7 +54,12 @@ export function useDecide(): {
       const intent = { caseId, action: "decide", body: { decisao } };
       const idempotencyKey = take(intent);
       const { ids, query } = list();
-      const next = nextCaseId(ids, caseId);
+      // R1: a list that lags (or a stale snapshot) may still show a case
+      // decided here; it is never the next one.
+      const next = nextCaseId(
+        ids.filter((id) => !wasDecided(id)),
+        caseId,
+      );
       setBusy(true);
       pause();
       startTransition(async () => {
@@ -72,6 +77,7 @@ export function useDecide(): {
         resume();
         setBusy(false);
         if (!result.ok) return;
+        markDecided(caseId);
         show(
           fill(filaCopy[TOAST[decisao]], { razao_social: razao }),
           filaCopy["toast.audit"],
@@ -90,6 +96,8 @@ export function useDecide(): {
       take,
       release,
       list,
+      wasDecided,
+      markDecided,
       setRemoval,
       pause,
       resume,

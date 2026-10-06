@@ -61,4 +61,57 @@ describe("useSoftNavigate (the Next 15.5 soft-navigation stall, T83)", () => {
     });
     expect(router.replace).not.toHaveBeenCalled();
   });
+
+  it("R1 (T105): a timer whose navigation committed never acts, even after the user moved on (the stale-target case)", () => {
+    const stalled = vi.fn();
+    window.history.replaceState(null, "", "/fila/a");
+    const first = renderHook(() => useSoftNavigate(stalled));
+    const second = renderHook(() => useSoftNavigate(stalled));
+    act(() => first.result.current("/fila/b", { push: true }));
+    window.history.pushState(null, "", "/fila/b"); // committed
+    act(() => vi.advanceTimersByTime(1_000));
+    // The next decision, from another instance (the old one stays mounted).
+    act(() => second.result.current("/fila/c", { push: true }));
+    window.history.pushState(null, "", "/fila/c"); // committed
+    act(() => vi.advanceTimersByTime(STALL_MS * 2));
+    expect(stalled).not.toHaveBeenCalled();
+  });
+
+  it("fires only while the location is still the origin: a stalled navigation still falls back", () => {
+    const stalled = vi.fn();
+    window.history.replaceState(null, "", "/fila/a");
+    const { result } = renderHook(() => useSoftNavigate(stalled));
+    act(() => result.current("/fila/b", { push: true }));
+    act(() => vi.advanceTimersByTime(STALL_MS));
+    expect(stalled).toHaveBeenCalledWith("/fila/b");
+  });
+
+  it("a newer navigation from any instance makes older timers inert (generation)", () => {
+    const stalled = vi.fn();
+    window.history.replaceState(null, "", "/fila/a");
+    const first = renderHook(() => useSoftNavigate(stalled));
+    const second = renderHook(() => useSoftNavigate(stalled));
+    act(() => first.result.current("/fila/b", { push: true }));
+    act(() => second.result.current("/fila/c", { push: true }));
+    act(() => vi.advanceTimersByTime(STALL_MS));
+    expect(stalled).toHaveBeenCalledTimes(1);
+    expect(stalled).toHaveBeenCalledWith("/fila/c");
+  });
+
+  it("a navigation to the URL already shown arms no fallback", () => {
+    const stalled = vi.fn();
+    const { result } = renderHook(() => useSoftNavigate(stalled));
+    act(() => result.current("/lote/abc?status=erro"));
+    act(() => vi.advanceTimersByTime(STALL_MS));
+    expect(stalled).not.toHaveBeenCalled();
+  });
+
+  it("unmounting cancels the timer", () => {
+    const stalled = vi.fn();
+    const { result, unmount } = renderHook(() => useSoftNavigate(stalled));
+    act(() => result.current("/lote/abc"));
+    unmount();
+    act(() => vi.advanceTimersByTime(STALL_MS));
+    expect(stalled).not.toHaveBeenCalled();
+  });
 });

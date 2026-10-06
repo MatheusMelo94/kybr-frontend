@@ -58,6 +58,9 @@ type FilaValue = {
   intentKey: (intent: string) => string;
   /** After a definitive result (ok, 409, a 4xx) or a changed body. */
   releaseKey: (intent: string) => void;
+  /** R1: the cases decided in this session, never a "next" case (a lagging list may still show them). */
+  markDecided: (id: string) => void;
+  wasDecided: (id: string) => boolean;
 };
 
 const FilaContext = createContext<FilaValue | null>(null);
@@ -76,6 +79,7 @@ export function FilaProvider({
   );
   const listRef = useRef<ListSnapshot>({ ids: [], query: "" });
   const keys = useRef(new Map<string, string>());
+  const decided = useRef(new Set<string>());
 
   const openCase = useCallback((id: string) => {
     setPendingCaseId(id);
@@ -110,6 +114,11 @@ export function FilaProvider({
     keys.current.delete(intent);
   }, []);
 
+  const markDecided = useCallback((id: string) => {
+    decided.current.add(id);
+  }, []);
+  const wasDecided = useCallback((id: string) => decided.current.has(id), []);
+
   const value = useMemo<FilaValue>(
     () => ({
       pendingCaseId,
@@ -125,6 +134,8 @@ export function FilaProvider({
       list,
       intentKey,
       releaseKey,
+      markDecided,
+      wasDecided,
     }),
     [
       pendingCaseId,
@@ -139,6 +150,8 @@ export function FilaProvider({
       list,
       intentKey,
       releaseKey,
+      markDecided,
+      wasDecided,
     ],
   );
   return <FilaContext.Provider value={value}>{children}</FilaContext.Provider>;

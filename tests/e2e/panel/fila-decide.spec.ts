@@ -138,23 +138,40 @@ test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", (
     await page.goto(`/fila/${ids[0]}`);
     await expect(page.locator("[data-detail-heading]:visible")).toBeVisible();
     const loads = countLoads(page);
-
-    for (const [i, id] of ids.entries()) {
-      await expect(page).toHaveURL(new RegExp(`/fila/${id}$`));
-      // Alerts (origem monitoramento) carry Manter aprovado instead.
-      await page
-        .getByRole("button", { name: /^(Aprovar|Manter aprovado)$/ })
-        .click();
-      const next = ids[i + 1];
-      await expect(page).toHaveURL(
-        next === undefined ? /\/fila$/ : new RegExp(`/fila/${next}$`),
-      );
+    const diag: string[] = [];
+    const t0 = Date.now();
+    page.on("framenavigated", (f) => {
+      if (f === page.mainFrame())
+        diag.push(`${Date.now() - t0} framenavigated ${f.url()}`);
+    });
+    page.on("load", () => diag.push(`${Date.now() - t0} LOAD ${page.url()}`));
+    // R1 diagnosis (T105): the navigations, loads and clicks, attached.
+    const dump = () =>
+      testInfo.attach("r1-navigations", {
+        body: `${diag.join("\n")}\nIDS ${ids.join(",")}`,
+        contentType: "text/plain",
+      });
+    try {
+      for (const [i, id] of ids.entries()) {
+        await expect(page).toHaveURL(new RegExp(`/fila/${id}$`));
+        diag.push(`${Date.now() - t0} CLICK ${i} ${id}`);
+        // Alerts (origem monitoramento) carry Manter aprovado instead.
+        await page
+          .getByRole("button", { name: /^(Aprovar|Manter aprovado)$/ })
+          .click();
+        const next = ids[i + 1];
+        await expect(page).toHaveURL(
+          next === undefined ? /\/fila$/ : new RegExp(`/fila/${next}$`),
+        );
+      }
+      await expect(
+        page.locator("[data-detail-heading]:visible", {
+          hasText: "Nenhum caso aberto",
+        }),
+      ).toBeFocused();
+    } finally {
+      await dump();
     }
-    await expect(
-      page.locator("[data-detail-heading]:visible", {
-        hasText: "Nenhum caso aberto",
-      }),
-    ).toBeFocused();
     testInfo.annotations.push({
       type: "R1 fallbacks",
       description: String(loads()),

@@ -205,6 +205,23 @@ describe("Aprovar / Manter aprovado (AC 31, AC 33; D13; F5, F6, F7)", () => {
     });
   });
 
+  it("R1: a case decided here is never the next one, even when a stale list still shows it", async () => {
+    decideAction.mockResolvedValue({ ok: true });
+    const { rerender } = render(
+      <Screen caseId="caso-b" ids={["caso-b", "caso-c"]} />,
+    );
+    await act(async () => fireEvent.click(approve()));
+    expect(router.push).toHaveBeenLastCalledWith("/fila/caso-c?ate=50", {
+      scroll: false,
+    });
+    // The next page's list still has the decided case above it (lagging).
+    rerender(<Screen caseId="caso-c" ids={["caso-b", "caso-c"]} />);
+    await act(async () => fireEvent.click(approve()));
+    expect(router.push).toHaveBeenLastCalledWith("/fila?ate=50", {
+      scroll: false,
+    });
+  });
+
   it("focus lands on the next case's heading when it renders", async () => {
     decideAction.mockResolvedValue({ ok: true });
     const { rerender } = render(<Screen caseId="caso-a" ids={IDS} />);

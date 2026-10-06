@@ -17,11 +17,23 @@ export function fullNavigate(url: string): void {
  * cases), with a fallback. On Next 15.5 such a navigation that
  * changes only the query on /lote/[batchId] fetched its payload (200) but now
  * and then never committed (E2E, T83). If the URL hasn't become the target
- * after 4 s, the same URL loads fully, so Renata is never stuck.
+ * after 4 s, the same URL loads fully, so Renata is never stuck. The
+ * fallback acts only if the location is still the origin and no newer soft
+ * navigation started (R1, T105); unmounting cancels it.
  * Pre-Convention: a workaround pending the Architect's investigation
  * (plan-m6 § 17 drift 2). Delete when a Next patch commits these
  * navigations reliably (looped E2E in T105).
  */
+/** The current path + query: what the fallbacks compare. */
+export function currentUrl(): string {
+  return window.location.pathname + window.location.search;
+}
+
+// R1 (T105): every soft navigation, from any instance, takes the next
+// generation. A timer acts only for the latest one, so a timer that outlived
+// its navigation (its component stayed mounted) can never move Renata.
+let generation = 0;
+
 export type SoftNavigateOptions = {
   /** A new history entry (opening a case, T99) instead of a replace. */
   push?: boolean;
@@ -48,12 +60,18 @@ export function useSoftNavigate(
       { push = false, scroll = false }: SoftNavigateOptions = {},
     ) => {
       if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = null;
+      const origin = currentUrl();
+      const mine = ++generation;
       if (push) router.push(url, { scroll });
       else router.replace(url, { scroll });
+      // Already there: nothing can stall.
+      if (url === origin) return;
       timer.current = setTimeout(() => {
         timer.current = null;
-        const here = window.location.pathname + window.location.search;
-        if (here !== url) onStall(url);
+        // A stall is "still on the origin" (never "not on the target": the
+        // user may have moved on since), and only for the latest navigation.
+        if (mine === generation && currentUrl() === origin) onStall(url);
       }, STALL_MS);
     },
     [onStall, router],

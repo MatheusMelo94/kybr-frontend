@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
-import { fullNavigate } from "@/lib/navigation/soft-navigate";
+import { currentUrl, fullNavigate } from "@/lib/navigation/soft-navigate";
 
 const EVERY_MS = 2_000;
 const MAX_REFRESHES = 5;
@@ -32,10 +32,12 @@ export function useRefreshUntilReplaced(): () => void {
 
   return useCallback(() => {
     let count = 1;
+    const origin = currentUrl();
     router.refresh();
     if (timer.current !== null) clearInterval(timer.current);
     timer.current = setInterval(() => {
-      if (count >= MAX_REFRESHES) {
+      // R1 (T105): the location moved on; this view's refresh is moot.
+      if (count >= MAX_REFRESHES || currentUrl() !== origin) {
         if (timer.current !== null) clearInterval(timer.current);
         timer.current = null;
         return;
@@ -82,12 +84,14 @@ export function useRefreshUntil(
     stop();
     if (latest.current()) return;
     let count = 1;
+    const origin = currentUrl();
     router.refresh();
     timer.current = setInterval(() => {
-      if (latest.current()) return stop();
+      // R1 (T105): never refresh or reload a page the user has moved to.
+      if (latest.current() || currentUrl() !== origin) return stop();
       if (count >= MAX_REFRESHES) {
         stop();
-        onGiveUp(window.location.pathname + window.location.search);
+        onGiveUp(origin);
         return;
       }
       count += 1;

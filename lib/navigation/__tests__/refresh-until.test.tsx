@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
-import { useRefreshUntil, useRefreshUntilReplaced } from "@/lib/navigation/refresh-until";
+import {
+  useRefreshUntil,
+  useRefreshUntilReplaced,
+} from "@/lib/navigation/refresh-until";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -21,6 +24,15 @@ describe("useRefreshUntilReplaced", () => {
     expect(router.refresh).toHaveBeenCalledTimes(1);
     act(() => vi.advanceTimersByTime(20_000));
     expect(router.refresh).toHaveBeenCalledTimes(5);
+  });
+
+  it("R1 (T105): stops once the location moved on", () => {
+    window.history.replaceState(null, "", "/lote/abc");
+    const { result } = renderHook(() => useRefreshUntilReplaced());
+    act(() => result.current());
+    window.history.pushState(null, "", "/lote");
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
   });
 
   it("stops once the component is replaced (unmounted)", () => {
@@ -79,9 +91,12 @@ describe("useRefreshUntil (the Fila's decided id / renderedAt, T90)", () => {
 
   it("reads the latest predicate on each tick", () => {
     const giveUp = vi.fn();
-    const { result, rerender } = renderHook(({ done }) => useRefreshUntil(() => done, giveUp), {
-      initialProps: { done: false },
-    });
+    const { result, rerender } = renderHook(
+      ({ done }) => useRefreshUntil(() => done, giveUp),
+      {
+        initialProps: { done: false },
+      },
+    );
     act(() => result.current());
     rerender({ done: true });
     act(() => vi.advanceTimersByTime(20_000));
@@ -90,10 +105,23 @@ describe("useRefreshUntil (the Fila's decided id / renderedAt, T90)", () => {
 
   it("stops when unmounted", () => {
     const giveUp = vi.fn();
-    const { result, unmount } = renderHook(() => useRefreshUntil(() => false, giveUp));
+    const { result, unmount } = renderHook(() =>
+      useRefreshUntil(() => false, giveUp),
+    );
     act(() => result.current());
     unmount();
     act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+
+  it("R1 (T105): after the location moved on, it stops: no refresh and no full load of another page", () => {
+    window.history.replaceState(null, "", "/fila/a");
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => false, giveUp));
+    act(() => result.current());
+    window.history.pushState(null, "", "/fila/b");
+    act(() => vi.advanceTimersByTime(60_000));
     expect(router.refresh).toHaveBeenCalledTimes(1);
     expect(giveUp).not.toHaveBeenCalled();
   });
