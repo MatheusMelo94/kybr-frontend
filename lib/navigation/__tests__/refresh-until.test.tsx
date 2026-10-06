@@ -15,6 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("useRefreshUntilReplaced", () => {
@@ -123,6 +124,20 @@ describe("useRefreshUntil (the Fila's decided id / renderedAt, T90)", () => {
     window.history.pushState(null, "", "/fila/b");
     act(() => vi.advanceTimersByTime(60_000));
     expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+  it("offline mid-loop, a tick neither refreshes nor gives up: the loop ends (T111's reconnect re-reads)", () => {
+    window.history.replaceState(null, "", "/fila/a");
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => false, giveUp));
+    act(() => result.current());
+    act(() => vi.advanceTimersByTime(2_000));
+    online.mockReturnValue(false);
+    act(() => vi.advanceTimersByTime(60_000));
+    online.mockReturnValue(true);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(router.refresh).toHaveBeenCalledTimes(2);
     expect(giveUp).not.toHaveBeenCalled();
   });
 });

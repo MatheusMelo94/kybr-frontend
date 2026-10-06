@@ -53,7 +53,8 @@ export function useRefreshUntilReplaced(): () => void {
  * router.refresh() until `done()` holds (the Fila: the decided id has left
  * the list, or `renderedAt` changed): now, and again every 2 s while it
  * doesn't, at most 5 times. If the 5th still didn't take, the current URL
- * loads fully, once. `done` is read fresh on every tick.
+ * loads fully, once. `done` is read fresh on every tick. A tick that finds
+ * the browser offline ends the loop without the full load.
  * Pre-Convention: the same Next 15.5 workaround as useRefreshUntilReplaced
  * (plan-m6 § 17 drift 2). Delete when a Next patch commits these
  * navigations reliably (looped E2E in T105).
@@ -90,6 +91,9 @@ export function useRefreshUntil(
     timer.current = setInterval(() => {
       // R1 (T105): never refresh or reload a page the user has moved to.
       if (latest.current() || currentUrl() !== origin) return stop();
+      // Offline: a refresh can't land and the give-up would be a full load
+      // into a network error. End the loop; reconnecting re-reads (T111).
+      if (!navigator.onLine) return stop();
       if (count >= MAX_REFRESHES) {
         stop();
         onGiveUp(origin);
