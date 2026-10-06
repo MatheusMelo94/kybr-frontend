@@ -119,6 +119,7 @@ export function BatchActions({
           ) : (
             <Button
               size="panel"
+              className="tabular-nums"
               busy={busy === "queue"}
               onClick={() => void run("queue")}
             >

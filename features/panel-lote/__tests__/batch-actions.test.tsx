@@ -64,6 +64,10 @@ describe("BatchActions: to the Fila (AC 23)", () => {
     expect(
       screen.getByRole("button", { name: "Mandar os 31 para a fila" }),
     ).toBeVisible();
+    // AC 76: the count in the label is tabular.
+    expect(
+      screen.getByRole("button", { name: "Mandar os 31 para a fila" }),
+    ).toHaveClass("tabular-nums");
     unmount();
     renderActions({ contagens: { ok: 3, warn: 0, bad: 0, erro: 0 } });
     expect(

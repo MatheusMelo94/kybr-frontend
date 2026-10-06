@@ -100,7 +100,10 @@ test.describe("Lote: the table below lg @feature-ops-panel @panel-lote @panel-ph
       scroll: el.scrollWidth,
       client: el.clientWidth,
     }));
-    expect(sizes.scroll).toBeGreaterThan(sizes.client);
+    // The table is 35rem wide at least: it scrolls when the card is narrower
+    // (360), and fits as it is at 768.
+    if (sizes.client < 560) expect(sizes.scroll).toBeGreaterThan(sizes.client);
+    else expect(sizes.scroll).toBe(sizes.client);
     await page.setViewportSize({ width: 320, height: 700 });
     expect(await horizontalOverflow(page)).toBe(0);
   });

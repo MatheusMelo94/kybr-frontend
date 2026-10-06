@@ -38,7 +38,8 @@ export function BatchResult({ batch }: { batch: Batch }): JSX.Element {
       <p className="text-body text-ink tabular-nums">{summary}</p>
       <div className="flex flex-wrap items-center gap-6">
         <BatchDonut contagens={batch.contagens} />
-        <div className="min-w-48 flex-1">
+        {/* Wraps under the donut below 12rem; shrinks at 200 % text (AC 74). */}
+        <div className="min-w-0 flex-[1_1_12rem]">
           <BatchLegend contagens={batch.contagens} />
         </div>
       </div>
