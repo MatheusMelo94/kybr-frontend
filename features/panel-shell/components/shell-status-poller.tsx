@@ -11,6 +11,7 @@ import {
   canPoll,
 } from "@/features/panel-shell/polling";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
+import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
 
 /**
  * Refreshes the shell's counts and plan every 60 s while the tab is visible
@@ -18,8 +19,8 @@ import { useShellStatus } from "@/features/panel-shell/shell-status-context";
  * Never router.refresh(): only the polled projection changes. Nothing
  * fires while a Fila decision has paused it (plan-m6 § 3.3). A failure
  * hides the counts silently (AC 11); the next success restores them. A
- * missing session is never a result: requireSession() redirects from the
- * action and the client router leaves the shell (ADR-0011 Addendum 1).
+ * missing session is SESSAO_EXPIRADA (ADR-0011 Addendum 2): the session-
+ * expiry path once (perdido=1 when a dialog holds a draft), and no more polls.
  */
 export function ShellStatusPoller(): JSX.Element | null {
   const { update, pollRequests, isPaused } = useShellStatus();
@@ -28,6 +29,10 @@ export function ShellStatusPoller(): JSX.Element | null {
   updateRef.current = update;
   const pausedRef = useRef(isPaused);
   pausedRef.current = isPaused;
+  const expire = useSessionExpiry();
+  const expireRef = useRef(expire);
+  expireRef.current = expire;
+  const expired = useRef(false);
   const pollRef = useRef<() => Promise<void>>(async () => undefined);
 
   // pollNow(): a poll right away (a Lote batch ended: the plan's usage moved).
@@ -37,7 +42,13 @@ export function ShellStatusPoller(): JSX.Element | null {
 
   useEffect(() => {
     async function poll(): Promise<void> {
-      if (inFlight.current || pausedRef.current() || !canPoll()) return;
+      if (
+        expired.current ||
+        inFlight.current ||
+        pausedRef.current() ||
+        !canPoll()
+      )
+        return;
       inFlight.current = true;
       let result: ShellStatusResult;
       try {
@@ -46,6 +57,11 @@ export function ShellStatusPoller(): JSX.Element | null {
         result = { ok: false, code: "FAILED" };
       }
       inFlight.current = false;
+      if (!result.ok && result.code === "SESSAO_EXPIRADA") {
+        expired.current = true;
+        expireRef.current();
+        return;
+      }
       updateRef.current(
         result.ok
           ? { contagens: result.contagens, plano: result.plano }

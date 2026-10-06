@@ -187,8 +187,9 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     ).toHaveCount(0);
   });
 
-  // AC 7 perdido=1 pending session-shape decision (lead, 2026-10-06).
-  test.fixme("AC 7: a typed note is a dirty draft: an expiry on submit brings perdido=1", async ({
+  // ADR-0011 Addendum 2: decideAction returns SESSAO_EXPIRADA, the client
+  // expiry adds perdido=1 (a boolean only; the draft never reaches the URL).
+  test("AC 7: a typed note is a dirty draft: an expiry on submit brings perdido=1", async ({
     page,
     request,
   }, testInfo) => {
@@ -210,6 +211,10 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     expect(new URL(page.url()).searchParams.get("volta")).toBe(
       `/fila/${first?.id}`,
     );
+    expect(page.url()).not.toContain("rascunho");
+    await expect(
+      page.getByText("O que estava aberto num formulário não foi salvo."),
+    ).toBeVisible();
   });
 });
 

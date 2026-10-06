@@ -28,10 +28,7 @@ vi.mock("@/lib/api/panel/cookies", () => ({
 }));
 vi.mock("@/lib/monitoring", () => ({ reportMarker: vi.fn() }));
 
-import {
-  pollShellStatusAction,
-  type ShellStatusResult,
-} from "@/features/panel-shell/actions";
+import { pollShellStatusAction } from "@/features/panel-shell/actions";
 import { POLL_TIMEOUT_MS } from "@/features/panel-shell/polling";
 
 beforeEach(() => {
@@ -57,26 +54,21 @@ describe("pollShellStatusAction (ADR-0011 rule 3, AC 11)", () => {
     expect(JSON.stringify(result)).not.toContain(PANEL_EMAILS.renata);
   });
 
-  it("a session the API rejects: requireSession() redirects to /entrar (ADR-0011 note)", async () => {
+  it("a session the API rejects: SESSAO_EXPIRADA as a result, never a redirect (ADR-0011 Addendum 2)", async () => {
     state.headers.set("x-kybr-panel-path", "/fila");
     panelStore().sessions.clear();
-    await expect(pollShellStatusAction()).rejects.toThrow(
-      "NEXT_REDIRECT /entrar?motivo=sessao&volta=%2Ffila",
-    );
+    expect(await pollShellStatusAction()).toEqual({
+      ok: false,
+      code: "SESSAO_EXPIRADA",
+    });
   });
 
-  it("no session is a thrown redirect, never a result: the union is ok | FAILED (ADR-0011 Addendum 1)", () => {
-    // @ts-expect-error SESSAO_EXPIRADA can't be returned since requireSession()
-    const expired: ShellStatusResult = { ok: false, code: "SESSAO_EXPIRADA" };
-    const failed: ShellStatusResult = { ok: false, code: "FAILED" };
-    expect([expired, failed]).toHaveLength(2);
-  });
-
-  it("no cookie: the same redirect, with no API call", async () => {
+  it("no cookie: the same result, with no API call", async () => {
     state.token = undefined;
-    await expect(pollShellStatusAction()).rejects.toThrow(
-      "NEXT_REDIRECT /entrar?motivo=sessao",
-    );
+    expect(await pollShellStatusAction()).toEqual({
+      ok: false,
+      code: "SESSAO_EXPIRADA",
+    });
     expect(panelStore().calls).toEqual([]);
   });
 

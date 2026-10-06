@@ -162,6 +162,84 @@ describe("requireSession", () => {
   });
 });
 
+describe("requireSession({ onMissing: 'result' }) (ADR-0011 Addendum 2)", () => {
+  it("no cookie: a typed AppError('SESSAO_EXPIRADA'), no API call, no redirect", async () => {
+    state.token = undefined;
+    const seen = meReplies();
+    const { requireSession } = await freshSession();
+
+    await expect(requireSession({ onMissing: "result" })).rejects.toMatchObject(
+      { name: "AppError", code: "SESSAO_EXPIRADA" },
+    );
+    expect(seen.calls).toBe(0);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("the full check still runs: /me answering 401 is the same typed error", async () => {
+    const seen = meReplies(401);
+    const { requireSession } = await freshSession();
+
+    await expect(requireSession({ onMissing: "result" })).rejects.toMatchObject(
+      { code: "SESSAO_EXPIRADA" },
+    );
+    expect(seen.calls).toBe(1);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("any other /me failure keeps its own code, never SESSAO_EXPIRADA", async () => {
+    server.use(
+      http.get(`${API}/v1/me`, () =>
+        HttpResponse.json({ code: "X", message: "m" }, { status: 503 }),
+      ),
+    );
+    const { requireSession } = await freshSession();
+
+    const error: unknown = await requireSession({ onMissing: "result" }).catch(
+      (thrown: unknown) => thrown,
+    );
+    expect(error).toMatchObject({ name: "AppError" });
+    expect((error as { code: string }).code).not.toBe("SESSAO_EXPIRADA");
+  });
+
+  it("returns the session when there is one", async () => {
+    meReplies();
+    const { requireSession } = await freshSession();
+
+    expect((await requireSession({ onMissing: "result" })).email).toBe(
+      "renata@exemplo.test",
+    );
+  });
+});
+
+describe("sessionExpiredResult (decision 7: only the typed error maps)", () => {
+  it("maps AppError('SESSAO_EXPIRADA') to the result", async () => {
+    const { sessionExpiredResult } = await freshSession();
+    const { AppError } = await import("@/lib/api/errors");
+
+    expect(
+      sessionExpiredResult(new AppError({ code: "SESSAO_EXPIRADA" })),
+    ).toEqual({ ok: false, code: "SESSAO_EXPIRADA" });
+  });
+
+  it("rethrows everything else unchanged: another AppError, notFound(), a redirect, a plain Error", async () => {
+    const { sessionExpiredResult } = await freshSession();
+    const { AppError } = await import("@/lib/api/errors");
+    const notFound = Object.assign(new Error("NEXT_HTTP_ERROR_FALLBACK;404"), {
+      digest: "NEXT_HTTP_ERROR_FALLBACK;404",
+    });
+    const redirected = Object.assign(new Error("NEXT_REDIRECT"), {
+      digest: "NEXT_REDIRECT;replace;/entrar;307;",
+    });
+    for (const error of [
+      new AppError({ code: "UNAVAILABLE" }),
+      notFound,
+      redirected,
+      new Error("bug"),
+    ])
+      expect(() => sessionExpiredResult(error)).toThrow(error);
+  });
+});
+
 describe("meSchema (D-W1, AC 11)", () => {
   it("treats contagens and plano as optional", () => {
     const { plano, contagens, ...workspace } = ME.workspace;

@@ -141,15 +141,28 @@ describe("decideAction (D-C3; ADR-0011 order; ADR-0008 Addendum 2)", () => {
     });
   });
 
-  it("no session: requireSession() redirects to /entrar, no decide call", async () => {
+  it("no session: SESSAO_EXPIRADA as a result (ADR-0011 Addendum 2): no redirect, no API call", async () => {
     state.token = undefined;
-    await expect(
-      decideAction({
+    expect(
+      await decideAction({
         caseId: idOf("link"),
         idempotencyKey: KEY,
         decisao: "aprovar",
       }),
-    ).rejects.toThrow("NEXT_REDIRECT /entrar?motivo=sessao");
+    ).toEqual({ ok: false, code: "SESSAO_EXPIRADA" });
+    expect(panelStore().calls).toEqual([]);
+    expect(decidePosts()).toEqual([]);
+  });
+
+  it("a session the API rejects at /me: the same result, no decide call", async () => {
+    panelStore().sessions.clear();
+    expect(
+      await decideAction({
+        caseId: idOf("link"),
+        idempotencyKey: KEY,
+        decisao: "aprovar",
+      }),
+    ).toEqual({ ok: false, code: "SESSAO_EXPIRADA" });
     expect(decidePosts()).toEqual([]);
   });
 

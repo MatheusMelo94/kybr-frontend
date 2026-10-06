@@ -5,6 +5,10 @@ const pollShellStatusAction = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("@/features/panel-shell/actions", () => ({ pollShellStatusAction }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+const expire = vi.hoisted(() => vi.fn());
+vi.mock("@/features/panel-shell/use-session-expiry", () => ({
+  useSessionExpiry: () => expire,
+}));
 
 import { SHELL_STATUS_INTERVAL_MS } from "@/features/panel-shell/polling";
 import { ShellStatusPoller } from "@/features/panel-shell/components/shell-status-poller";
@@ -126,6 +130,20 @@ describe("ShellStatusPoller (ADR-0011 rule 3, AC 11)", () => {
 
     await tick();
     expect(screen.getByTestId("probe")).toHaveTextContent("fila=8");
+  });
+
+  it("SESSAO_EXPIRADA (ADR-0011 Addendum 2): the session-expiry path, once; no more polls", async () => {
+    pollShellStatusAction.mockResolvedValueOnce({
+      ok: false,
+      code: "SESSAO_EXPIRADA",
+    });
+    renderPoller();
+    await tick();
+    expect(expire).toHaveBeenCalledTimes(1);
+    await tick();
+    await tick();
+    expect(expire).toHaveBeenCalledTimes(1);
+    expect(pollShellStatusAction).toHaveBeenCalledTimes(1);
   });
 
   it("an unreachable action counts as a failed poll", async () => {

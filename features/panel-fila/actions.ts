@@ -7,7 +7,7 @@ import { decideSchema } from "@/features/panel-fila/schemas";
 import { AppError, type DecisaoAnterior } from "@/lib/api/errors";
 import { decideCase } from "@/lib/api/panel/cases";
 import { assertPanelHost } from "@/lib/api/panel/host";
-import { requireSession } from "@/lib/api/panel/session";
+import { requireSession, sessionExpiredResult } from "@/lib/api/panel/session";
 import { panelPath } from "@/lib/panel-paths";
 import { safeReturnPath } from "@/lib/safe-return-path";
 
@@ -55,7 +55,12 @@ export async function decideAction(input: unknown): Promise<DecideResult> {
   await assertPanelHost();
   const parsed = decideSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "VALOR_INVALIDO" };
-  await requireSession();
+  // ADR-0011 Addendum 2: no session is a result, before any API call.
+  try {
+    await requireSession({ onMissing: "result" });
+  } catch (error) {
+    return sessionExpiredResult(error);
+  }
 
   const { caseId, idempotencyKey, decisao, motivoCodigo, notaVendedor } =
     parsed.data;
