@@ -15,6 +15,8 @@ type Props = {
   /** ?aba= and ?ate= as they are, kept when a case opens. */
   query: string;
   selectedId: string | null;
+  /** The page's gerado_em (C-M6-1): D3's snapshot and the poll's desde. */
+  generatedAt?: string;
   /** Below the options, inside the scroller ("Carregar mais"). */
   children?: ReactNode;
 };
@@ -30,22 +32,48 @@ function twoPanes(): boolean {
  * heading takes focus when it lands. At lg the list scrolls inside itself
  * (plan § 6) and keeps its position; one pane starts the case at the top.
  * The position comes back once when the list remounts visible. A case
- * being decided leaves the list at once (T105).
+ * being decided leaves the list at once (T105). New cases stay hidden
+ * until "Mostrar" (D3, T110).
  */
 export function CaseListbox({
   aba,
   options,
   query,
   selectedId,
+  generatedAt,
   children,
 }: Props): JSX.Element {
   const navigate = useSoftNavigate();
-  const { openCase, focusCase, saveScroll, takeScroll, removal, reportList } =
-    useFila();
+  const {
+    openCase,
+    focusCase,
+    saveScroll,
+    takeScroll,
+    removal,
+    reportList,
+    visibleIds,
+    observeList,
+  } = useFila();
   const scroller = useRef<HTMLDivElement>(null);
 
+  const serverIds = options.map((option) => option.id);
+  const visible = new Set(visibleIds(query, serverIds, selectedId));
+  const shown = options.filter((option) => visible.has(option.id));
+
+  // D3: every server render of the list, as the server ordered it.
+  const all = serverIds.join("\n");
+  useLayoutEffect(() => {
+    if (generatedAt === undefined) return;
+    observeList({
+      aba,
+      query,
+      ids: all === "" ? [] : all.split("\n"),
+      desde: generatedAt,
+    });
+  }, [aba, all, query, generatedAt, observeList]);
+
   // The next case after a decision comes from what is rendered here (D5).
-  const ids = options.map((option) => option.id).join("\n");
+  const ids = shown.map((option) => option.id).join("\n");
   useLayoutEffect(() => {
     reportList({ ids: ids === "" ? [] : ids.split("\n"), query });
   }, [ids, query, reportList]);
@@ -88,8 +116,8 @@ export function CaseListbox({
       <Listbox
         options={
           removal === null
-            ? options
-            : options.filter((option) => option.id !== removal.id)
+            ? shown
+            : shown.filter((option) => option.id !== removal.id)
         }
         // A decision in flight selects the next case before the URL moves (D13).
         selectedId={removal === null ? selectedId : removal.next}

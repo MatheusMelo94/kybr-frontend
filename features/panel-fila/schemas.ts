@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { NOTA_VENDEDOR_MAX } from "@/features/panel-fila/limits";
+import {
+  DESDE_MAX_AGE_MS,
+  NOTA_VENDEDOR_MAX,
+} from "@/features/panel-fila/limits";
 import {
   DECISAO_TIPOS,
   DOCUMENTO_TIPOS,
@@ -50,3 +53,15 @@ export const requestDocumentsSchema = z
   .strict();
 
 export type RequestDocumentsInput = z.infer<typeof requestDocumentsSchema>;
+
+/**
+ * pollNewCasesAction's input (D-C1 `desde`, C-M6-1): the list's gerado_em,
+ * an ISO date-time with its offset, at most DESDE_MAX_AGE_MS old.
+ */
+export const pollNewCasesSchema = z
+  .object({
+    desde: z.iso
+      .datetime({ offset: true })
+      .refine((desde) => Date.now() - Date.parse(desde) <= DESDE_MAX_AGE_MS),
+  })
+  .strict();

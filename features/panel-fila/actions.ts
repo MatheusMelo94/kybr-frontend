@@ -16,7 +16,9 @@ import { safeReturnPath } from "@/lib/safe-return-path";
 
 // The Fila's Server Actions (plan-m6 § 3.2; ADR-0011 order: host → zod
 // .strict() → requireSession() → API → a result union). Owned by
-// /fila/[caseId] and always posted from it (ADR-0008 Addendum 2, D13, F7).
+// /fila/[caseId] and always posted from it (ADR-0008 Addendum 2, D13, F7);
+// the read-only new-case poll lives in poll-action.ts, so /fila (which the
+// poll's layout leaf reaches) never owns these.
 // Nothing here logs the seller's note or the seller's link.
 
 export type DecideResult =

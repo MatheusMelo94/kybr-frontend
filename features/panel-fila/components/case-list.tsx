@@ -49,6 +49,7 @@ export async function CaseList({
       aba={aba}
       selectedId={selectedId}
       query={query}
+      generatedAt={gerado_em}
       options={itens.map((item) => ({
         id: item.id,
         content: (

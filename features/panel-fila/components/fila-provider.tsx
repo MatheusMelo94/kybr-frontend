@@ -21,8 +21,9 @@ import { useRefreshUntil } from "@/lib/navigation/refresh-until";
 // focus intent (the detail heading after an open) and the list's scroll per
 // tab (T99), the optimistic removal of a case being decided and the intent
 // Idempotency-Keys (F5, T105), the decide flashes, the offline hint and the
-// re-read after a failed decision (T106). The new-case poll and the online
-// state arrive with T110 and T111.
+// re-read after a failed decision (T106), and the new-case snapshot (T110,
+// D3): the ids Renata has been shown, the poll's desde and generation, and
+// the notice's count. The online state arrives with T111.
 
 /** /fila's key for the pane (DetailPane's caseId null): case ids are never empty. */
 export const FILA_NO_CASE = "";
@@ -43,6 +44,28 @@ export type Flash =
 
 /** The list as rendered: its ids in order and its ?aba=&ate= (the next case, D5). */
 type ListSnapshot = { ids: readonly string[]; query: string };
+
+/**
+ * D3: what Renata has been shown on Para decidir. A server render under the
+ * same list (a revalidation, a case switch) hides any id outside it until
+ * "Mostrar"; another list (a tab, "Carregar mais") is a fresh snapshot.
+ * `gen` tags each poll (E4): a result for an older generation is dropped.
+ */
+type Shown = {
+  query: string;
+  ids: ReadonlySet<string>;
+  desde: string;
+  gen: number;
+};
+
+/** The list pane reports each render (CaseListbox). */
+type ListRender = {
+  aba: FilaAba;
+  query: string;
+  ids: readonly string[];
+  /** The page's gerado_em (C-M6-1): the next poll's desde. */
+  desde: string;
+};
 
 type FilaValue = {
   /** A case the user opened that hasn't rendered yet (DetailPane's skeleton). */
@@ -83,6 +106,22 @@ type FilaValue = {
   hintOffline: () => void;
   /** Re-read the current page until the server re-renders it (renderedAt). */
   reread: () => void;
+  /** D3: the ids of a rendered list Renata may see (the open case always). */
+  visibleIds: (
+    query: string,
+    ids: readonly string[],
+    selectedId: string | null,
+  ) => readonly string[];
+  /** After a list render: keep the snapshot, or take a fresh one. */
+  observeList: (render: ListRender) => void;
+  /** The poll's input, or null when there is nothing to poll for. */
+  pollTarget: () => { desde: string; gen: number } | null;
+  /** A poll's count, applied only for the current generation (E4). */
+  reportNovos: (novos: number, gen: number) => void;
+  /** The notice's count (Para decidir only). */
+  novos: number;
+  /** "Mostrar": the notice clears, the page re-reads, the snapshot resets. */
+  showNew: () => void;
 };
 
 const FilaContext = createContext<FilaValue | null>(null);
@@ -108,6 +147,13 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
   const [offlineHint, setOfflineHint] = useState(false);
   const rendered = useRef(renderedAt);
   const rereadFrom = useRef(renderedAt);
+  const [shown, setShown] = useState<Shown | null>(null);
+  const shownRef = useRef<Shown | null>(null);
+  const gen = useRef(0);
+  const [novos, setNovos] = useState(0);
+  // "Mostrar" pressed at this render; the next server render resets.
+  const [resetFrom, setResetFrom] = useState<number | null>(null);
+  const resetDue = resetFrom !== null && resetFrom !== renderedAt;
 
   useEffect(() => {
     rendered.current = renderedAt;
@@ -130,6 +176,49 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
     rereadFrom.current = rendered.current;
     refreshUntilRendered();
   }, [refreshUntilRendered]);
+
+  useEffect(() => {
+    shownRef.current = shown;
+  }, [shown]);
+
+  const visibleIds = useCallback(
+    (query: string, ids: readonly string[], selectedId: string | null) => {
+      if (shown === null || shown.query !== query || resetDue) return ids;
+      return ids.filter((id) => shown.ids.has(id) || id === selectedId);
+    },
+    [shown, resetDue],
+  );
+  const observeList = useCallback(
+    ({ aba, query, ids, desde }: ListRender) => {
+      if (aba !== "aberto") {
+        gen.current += 1;
+        setShown(null);
+        setNovos(0);
+        return;
+      }
+      if (shown !== null && shown.query === query && !resetDue) return;
+      gen.current += 1;
+      setShown({ query, ids: new Set(ids), desde, gen: gen.current });
+      setNovos(0);
+      setResetFrom(null);
+    },
+    [shown, resetDue],
+  );
+  const pollTarget = useCallback(() => {
+    const current = shownRef.current;
+    return current === null || current.gen !== gen.current
+      ? null
+      : { desde: current.desde, gen: current.gen };
+  }, []);
+  const reportNovos = useCallback((count: number, at: number) => {
+    if (at === gen.current) setNovos(count);
+  }, []);
+  const showNew = useCallback(() => {
+    gen.current += 1;
+    setNovos(0);
+    setResetFrom(rendered.current);
+    reread();
+  }, [reread]);
 
   const openCase = useCallback(
     (id: string) => {
@@ -195,6 +284,12 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       offlineHint,
       hintOffline,
       reread,
+      visibleIds,
+      observeList,
+      pollTarget,
+      reportNovos,
+      novos,
+      showNew,
     }),
     [
       pendingCaseId,
@@ -216,6 +311,12 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       offlineHint,
       hintOffline,
       reread,
+      visibleIds,
+      observeList,
+      pollTarget,
+      reportNovos,
+      novos,
+      showNew,
     ],
   );
   return <FilaContext.Provider value={value}>{children}</FilaContext.Provider>;

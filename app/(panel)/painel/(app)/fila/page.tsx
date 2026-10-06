@@ -8,6 +8,7 @@ import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
 import { FilaTabs } from "@/features/panel-fila/components/fila-tabs";
 import { IdleDetail } from "@/features/panel-fila/components/idle-detail";
 import { ListSkeleton } from "@/features/panel-fila/components/list-skeleton";
+import { NewCasesNotice } from "@/features/panel-fila/components/new-cases-notice";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { parseFilaSearch } from "@/features/panel-fila/search-params";
 import { requireSession } from "@/lib/api/panel/session";
@@ -36,6 +37,7 @@ export default async function FilaPage({
       list={
         <>
           <FilaTabs aba={search.aba} contagens={me.workspace.contagens} />
+          <NewCasesNotice aba={search.aba} />
           <Suspense fallback={<ListSkeleton />}>
             <CaseList {...search} selectedId={null} />
           </Suspense>

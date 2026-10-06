@@ -12,6 +12,7 @@ import { DetailPane } from "@/features/panel-fila/components/detail-pane";
 import { FilaScreen } from "@/features/panel-fila/components/fila-screen";
 import { FilaTabs } from "@/features/panel-fila/components/fila-tabs";
 import { ListSkeleton } from "@/features/panel-fila/components/list-skeleton";
+import { NewCasesNotice } from "@/features/panel-fila/components/new-cases-notice";
 import { RequestLinkPanel } from "@/features/panel-fila/components/request-link-panel";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { documentsSettings } from "@/features/panel-fila/document-route";
@@ -56,6 +57,7 @@ export default async function CasePage({
       list={
         <>
           <FilaTabs aba={search.aba} contagens={me.workspace.contagens} />
+          <NewCasesNotice aba={search.aba} />
           <Suspense fallback={<ListSkeleton />}>
             <CaseList {...search} selectedId={caseId} />
           </Suspense>

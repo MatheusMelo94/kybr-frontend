@@ -8,3 +8,6 @@ export const LG_MEDIA = "(min-width: 64rem)";
 
 /** D-C3 / D-C4 nota_vendedor's cap (C-M6-4): the actions' schemas and the dialogs' fields. */
 export const NOTA_VENDEDOR_MAX = 280;
+
+/** C-M6-1: the oldest `desde` the new-case poll may send (the API refuses older). */
+export const DESDE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
