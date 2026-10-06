@@ -17,7 +17,9 @@ export function fullNavigate(url: string): void {
  * changes only the query on /lote/[batchId] fetched its payload (200) but now
  * and then never committed (E2E, T83). If the URL hasn't become the target
  * after 4 s, the same URL loads fully, so Renata is never stuck.
- * Pre-Convention: a workaround pending the Architect's investigation.
+ * Pre-Convention: a workaround pending the Architect's investigation
+ * (plan-m6 § 17 drift 2). Delete when a Next patch commits these
+ * navigations reliably (looped E2E in T105).
  */
 export function useSoftNavigate(
   onStall: (url: string) => void = fullNavigate,

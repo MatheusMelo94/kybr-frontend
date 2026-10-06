@@ -6,7 +6,7 @@ import { useEffect, useRef, type JSX } from "react";
 import { Select } from "@/components/panel/select";
 import { STATUS_WORDS } from "@/features/panel-lote/components/status-word";
 import { loteCopy } from "@/features/panel-lote/copy";
-import { useSoftNavigate } from "@/features/panel-lote/soft-navigate";
+import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
 import {
   BATCH_ROW_STATUSES,
   type BatchRowStatus,

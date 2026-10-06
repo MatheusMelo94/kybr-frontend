@@ -11,7 +11,7 @@ import {
 import { useBatchFocus } from "@/features/panel-lote/components/batch-focus-keeper";
 import { BatchLegend } from "@/features/panel-lote/components/batch-legend";
 import { loteCopy } from "@/features/panel-lote/copy";
-import { fullNavigate } from "@/features/panel-lote/soft-navigate";
+import { fullNavigate } from "@/lib/navigation/soft-navigate";
 import { isBatchId } from "@/features/panel-lote/validation";
 import { fill, formatNumber } from "@/features/panel-shell/format";
 import {

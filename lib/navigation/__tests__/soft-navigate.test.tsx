@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
-import { STALL_MS, useSoftNavigate } from "@/features/panel-lote/soft-navigate";
+import { STALL_MS, useSoftNavigate } from "@/lib/navigation/soft-navigate";
 
 beforeEach(() => {
   vi.useFakeTimers();

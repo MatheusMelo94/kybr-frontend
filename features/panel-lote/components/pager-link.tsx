@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { JSX, ReactNode } from "react";
 
-import { useSoftNavigate } from "@/features/panel-lote/soft-navigate";
+import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
 
 type Props = { href: string; className: string; children: ReactNode };
 

@@ -6,7 +6,7 @@ vi.mock("@/features/panel-lote/actions", () => ({ pollBatchAction: poll }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const fullNavigate = vi.hoisted(() => vi.fn());
-vi.mock("@/features/panel-lote/soft-navigate", () => ({ fullNavigate }));
+vi.mock("@/lib/navigation/soft-navigate", () => ({ fullNavigate }));
 const expire = vi.hoisted(() => vi.fn());
 vi.mock("@/features/panel-shell/use-session-expiry", () => ({
   useSessionExpiry: () => expire,
