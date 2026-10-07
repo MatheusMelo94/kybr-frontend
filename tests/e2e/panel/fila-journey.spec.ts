@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { casesFor, seedCases, type MockCase } from "../fixtures/fila-mock.ts";
 import { MOCK_API } from "../fixtures/mock-api.ts";
+import { guardLifted } from "../fixtures/fila-timing.ts";
 import { createAccount, uniqueEmail } from "../fixtures/panel-mock.ts";
 
 // T117: the decide-the-queue journey (criterion 2's Fila half, Pre-Contract
@@ -210,6 +211,8 @@ test.describe("the M6 journey at 360 (T117) @feature-ops-panel @panel-fila @pane
     await sheet.getByRole("button", { name: "Bloquear vendedor" }).click();
     await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
 
+    // QA-M6-004: the next case ignores a tap for ADVANCE_GUARD_MS.
+    await guardLifted(page);
     await page.getByRole("button", { name: "Aprovar" }).click();
     await expect(page).toHaveURL(/\/fila$/);
     await expect(
