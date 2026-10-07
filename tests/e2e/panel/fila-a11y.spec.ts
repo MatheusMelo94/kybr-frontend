@@ -31,6 +31,8 @@ import { SETTLE } from "../fixtures/fila-timing.ts";
 const SENTINEL = "MSG-BACKEND-NAO-EXIBIR";
 const GENDERED = /bem-vind|obrigad|você mesm/i;
 const UNKNOWN_ID = "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b";
+const DECIDE_ERROR =
+  "Não conseguimos registrar a decisão. O caso voltou para a fila. Tente de novo.";
 
 const byKind = (cases: MockCase[], kind: string): MockCase => {
   const found = cases.find((c) => c.kind === kind);
@@ -368,7 +370,10 @@ test.describe("Fila accessibility: every state (T115) @feature-ops-panel @panel-
 
     await caseSeed(request, email, "decide-falha", { n: 1 });
     await page.getByRole("button", { name: "Aprovar", exact: true }).click();
-    await expect(page.getByRole("alert").first()).toBeVisible();
+    // QA-M6-003: by its text; Next's empty route announcer is an alert too.
+    await expect(
+      page.getByRole("alert").filter({ hasText: DECIDE_ERROR }),
+    ).toBeVisible(SETTLE);
     await check(page, "decide error");
 
     const lote = byKind(cases, "lote");
