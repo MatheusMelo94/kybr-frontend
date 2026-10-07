@@ -236,7 +236,7 @@ test.describe("Fila decisions: the last case (T105, F7) @feature-ops-panel @pane
         page.locator("[data-detail-heading]:visible", {
           hasText: "Nenhum caso aberto",
         }),
-      ).toBeFocused();
+      ).toBeFocused(SETTLE);
     else
       await expect(
         page.getByRole("heading", { name: "Nenhum caso aberto" }),
