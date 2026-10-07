@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 import { REFRESH_SETTLE_MS } from "../../../lib/navigation/refresh-timing.ts";
 
@@ -51,4 +51,16 @@ export async function twoFrames(page: Page): Promise<void> {
         requestAnimationFrame(() => requestAnimationFrame(() => done())),
       ),
   );
+}
+
+/**
+ * QA-M6-004: the case an advance landed on ignores pointer activations of
+ * its decisions for ADVANCE_GUARD_MS (data-advance-guard on its bar). A
+ * click right after an advance waits it out first; the guard itself is
+ * fila-advance-guard.spec's.
+ */
+export async function guardLifted(page: Page): Promise<void> {
+  const bar = page.locator("[data-case-actions]:visible");
+  await expect(bar).toBeVisible(SETTLE);
+  await expect(bar).not.toHaveAttribute("data-advance-guard");
 }

@@ -87,8 +87,12 @@ const bar = () => document.querySelector<HTMLElement>("[data-case-actions]");
 describe("the action bar (T112)", () => {
   it("holds the decisions in order: the primary full width, then Pedir documento | Bloquear", () => {
     render(<Actions />);
+    // The decisions sit in the advance guard's display: contents wrapper
+    // (QA-M6-004), so they stay the bar's grid items.
+    const guard = bar()?.querySelector(":scope > div");
+    expect(guard).toHaveClass("contents");
     const buttons = Array.from(
-      bar()?.querySelectorAll(":scope > button") ?? [],
+      guard?.querySelectorAll(":scope > button") ?? [],
     );
     expect(buttons.map((b) => b.textContent)).toEqual([
       "Aprovar",

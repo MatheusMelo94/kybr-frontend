@@ -147,7 +147,10 @@ test.describe("Fila collapse at 1280 (T114) @feature-ops-panel @panel-fila", () 
     await expect(page).toHaveURL(new RegExp(`/fila/${open[1]?.id}$`));
     // The next case's list has streamed in (Suspense): there is a list to collapse.
     await expect(options(page)).toHaveCount(24);
-    await decide.click();
+    // Quick: by the keyboard, which the advance guard never holds back
+    // (QA-M6-004); a pointer would wait ADVANCE_GUARD_MS.
+    await decide.focus();
+    await page.keyboard.press("Enter");
     await expect(options(page)).toHaveCount(23);
     await expect(page).toHaveURL(new RegExp(`/fila/${open[2]?.id}$`));
     const recorded = await samples(page);

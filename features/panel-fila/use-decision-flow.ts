@@ -86,6 +86,7 @@ export function useDecisionFlow(): {
     list,
     wasDecided,
     markDecided,
+    markAdvanced,
     openCase,
     setFlash,
     hintOffline,
@@ -160,6 +161,8 @@ export function useDecisionFlow(): {
       pollNow();
       if (!here) return;
       openCase(next ?? FILA_NO_CASE);
+      // QA-M6-004: its actions ignore a pointer for ADVANCE_GUARD_MS.
+      if (next !== null) markAdvanced(next);
       navigate(
         next === null
           ? `/fila${query}`
@@ -167,7 +170,7 @@ export function useDecisionFlow(): {
         { push: true, scroll: false },
       );
     },
-    [markDecided, show, pollNow, openCase, navigate],
+    [markDecided, markAdvanced, show, pollNow, openCase, navigate],
   );
 
   const conflict = useCallback(

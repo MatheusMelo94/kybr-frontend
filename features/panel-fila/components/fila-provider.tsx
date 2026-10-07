@@ -101,6 +101,9 @@ type FilaValue = {
   /** R1: the cases decided in this session, never a "next" case (a lagging list may still show them). */
   markDecided: (id: string) => void;
   wasDecided: (id: string) => boolean;
+  /** QA-M6-004: the case a decision advanced to, until another case is opened. */
+  markAdvanced: (id: string) => void;
+  wasAdvancedTo: (id: string) => boolean;
   /** T114: the list registers its collapse; a quick decision captures it before the removal. */
   /** Returns the unregister (a no-op once another list registered). */
   setCollapse: (collapse: Collapse) => () => void;
@@ -156,6 +159,7 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
   const listRef = useRef<ListSnapshot>({ ids: [], query: "" });
   const keys = useRef(new Map<string, string>());
   const decided = useRef(new Set<string>());
+  const advancedTo = useRef<string | null>(null);
   const [flash, setFlashes] = useState<Readonly<Record<string, Flash>>>({});
   const [offlineHint, setOfflineHint] = useState(false);
   const rendered = useRef(renderedAt);
@@ -243,6 +247,7 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
 
   const openCase = useCallback(
     (id: string) => {
+      advancedTo.current = null;
       setPendingCaseId(id);
       setFocusIntent(id);
       setFlash(id, null);
@@ -282,6 +287,13 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
     decided.current.add(id);
   }, []);
   const wasDecided = useCallback((id: string) => decided.current.has(id), []);
+  const markAdvanced = useCallback((id: string) => {
+    advancedTo.current = id;
+  }, []);
+  const wasAdvancedTo = useCallback(
+    (id: string) => advancedTo.current === id,
+    [],
+  );
 
   const collapse = useRef<Collapse | null>(null);
   // The latest list to mount wins; an older one's cleanup (which can run
@@ -313,6 +325,8 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       releaseKey,
       markDecided,
       wasDecided,
+      markAdvanced,
+      wasAdvancedTo,
       setCollapse,
       captureCollapse,
       flash,
@@ -345,6 +359,8 @@ export function FilaProvider({ renderedAt, children }: Props): JSX.Element {
       releaseKey,
       markDecided,
       wasDecided,
+      markAdvanced,
+      wasAdvancedTo,
       setCollapse,
       captureCollapse,
       flash,

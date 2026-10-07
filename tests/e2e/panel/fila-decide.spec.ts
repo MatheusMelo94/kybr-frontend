@@ -14,7 +14,12 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
-import { SETTLE, holdNextAction, twoFrames } from "../fixtures/fila-timing.ts";
+import {
+  SETTLE,
+  guardLifted,
+  holdNextAction,
+  twoFrames,
+} from "../fixtures/fila-timing.ts";
 
 // T105: Aprovar / Manter aprovado (AC 31 action half, AC 33; plan-m6 § 3.3,
 // D13 "await, then navigate"; Security F5, F6, F7; risk R1). The case
@@ -154,6 +159,9 @@ test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", (
     try {
       for (const [i, id] of ids.entries()) {
         await expect(page).toHaveURL(new RegExp(`/fila/${id}$`));
+        // QA-M6-004: every case but the first was reached by an advance;
+        // its decisions ignore a pointer for ADVANCE_GUARD_MS.
+        if (i > 0) await guardLifted(page);
         diag.push(`${Date.now() - t0} CLICK ${i} ${id}`);
         // Alerts (origem monitoramento) carry Manter aprovado instead.
         await page

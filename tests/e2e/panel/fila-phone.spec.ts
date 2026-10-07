@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { casesFor, seedCases } from "../fixtures/fila-mock.ts";
+import { guardLifted } from "../fixtures/fila-timing.ts";
 import {
   createAccount,
   horizontalOverflow,
@@ -121,6 +122,8 @@ test.describe("the Fila on a phone (T112) @feature-ops-panel @panel-fila @panel-
     // After a decision the next case opens, then the empty list.
     await approve.click();
     await expect(page).toHaveURL(new RegExp(`/fila/${second?.id}$`));
+    // QA-M6-004: the next case ignores a tap for ADVANCE_GUARD_MS.
+    await guardLifted(page);
     await page.getByRole("button", { name: "Aprovar" }).click();
     await expect(page).toHaveURL(/\/fila$/);
     await expect(
