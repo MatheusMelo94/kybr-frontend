@@ -72,6 +72,8 @@ function run(
     child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
     child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
     child.on("close", (status) => done({ status, output }));
+    // A refusal exits before it reads stdin; the pending write then gets EPIPE (QA-M6-001).
+    child.stdin.on("error", () => {});
     child.stdin.end(urls.map((url) => `${url}\n`).join(""));
   });
 }
@@ -248,6 +250,16 @@ describe("check-documents-domain.sh (T116, Security F3)", () => {
     expect(output).toMatch(/Usage/);
     expect(output).toMatch(/stdin/);
     expect(output).not.toContain("s3cr3t");
+    expect(status).toBe(2);
+  });
+
+  it("M6C-09 / QA-M6-001: a refusal that never reads stdin doesn't crash the run with EPIPE", async () => {
+    // More than a pipe buffer (64 KiB), so the write is still pending when the script exits.
+    const urls = Array.from(
+      { length: 4000 },
+      (_, i) => `https://docs.exemplo.test/${i}?${SIG}`,
+    );
+    const { status } = await run(urls, undefined, ["--"]);
     expect(status).toBe(2);
   });
 
