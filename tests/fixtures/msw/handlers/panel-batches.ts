@@ -10,6 +10,7 @@ import {
   type BatchLinha,
   type BatchRowStatus,
 } from "../../factories/panel.ts";
+import { CSV_CAP_BYTES, csvOfBytes } from "../../factories/panel-sellers.ts";
 import { isValidCnpj } from "../../factories/seller-link.ts";
 import {
   addCase,
@@ -218,12 +219,12 @@ function decodeCursor(cursor: string): number | undefined {
 
 // D-B4 / CR-P8: every field quoted, quotes doubled, a formula-like cell
 // prefixed with ' (unless the csv-sem-escape seed, PB8, turns that off).
-function csvCell(value: string, escape: boolean): string {
+export function csvCell(value: string, escape: boolean): string {
   const safe = escape && /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
-function csvBody(lines: string[][], escape: boolean): string {
+export function csvBody(lines: string[][], escape: boolean): string {
   return `﻿${lines
     .map((cells) => cells.map((cell) => csvCell(cell, escape)).join(";"))
     .join("\r\n")}\r\n`;
@@ -320,6 +321,9 @@ function csvFault(fault: BatchFault | undefined): Response | undefined {
     case "csv-grande":
       // One byte over the shared 4 MiB cap (O-F5), under M5's old 5 MB.
       return reply("x".repeat(4 * 1024 * 1024 + 1));
+    // QA G3: a well-formed file of exactly the cap (it downloads in full).
+    case "csv-exato":
+      return reply(csvOfBytes(CSV_CAP_BYTES));
     case "csv-html":
       return reply("<html><body>erro</body></html>", "text/html");
     case "csv-aspas":

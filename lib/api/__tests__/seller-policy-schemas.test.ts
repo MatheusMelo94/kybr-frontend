@@ -53,6 +53,15 @@ const DETAIL = {
   case_aberto_id: CASE_ID,
 };
 
+function without(
+  value: Record<string, unknown>,
+  keys: string[],
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !keys.includes(key)),
+  );
+}
+
 const LIST = { itens: [ROW], total: 1, pagina: 1, paginas: 1 };
 
 describe("sellerListSchema (D-S1, C-M8-2)", () => {
@@ -61,13 +70,11 @@ describe("sellerListSchema (D-S1, C-M8-2)", () => {
   });
 
   it("accepts a row without the optional fields and a null razão social", () => {
-    const {
-      responsavel: _r,
-      mudou: _m,
-      reverificacao_pendente: _p,
-      ...bare
-    } = ROW;
-    const row = { ...bare, razao_social: null, status: "aprovado" };
+    const row = {
+      ...without(ROW, ["responsavel", "mudou", "reverificacao_pendente"]),
+      razao_social: null,
+      status: "aprovado",
+    };
     expect(sellerListSchema.safeParse({ ...LIST, itens: [row] }).success).toBe(
       true,
     );
@@ -122,7 +129,7 @@ describe("sellerSchema (D-S2, C-M8-3)", () => {
   });
 
   it("G9: no verificacao_atual and no open case still parse", () => {
-    const { verificacao_atual: _v, case_aberto_id: _c, ...rest } = DETAIL;
+    const rest = without(DETAIL, ["verificacao_atual", "case_aberto_id"]);
     expect(sellerSchema.safeParse(rest).success).toBe(true);
   });
 

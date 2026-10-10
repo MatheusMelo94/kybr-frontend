@@ -6,6 +6,7 @@ import {
   type AlertRecord,
   type MonitoringRecord,
   CASE_PRESETS,
+  caseFor,
   casesForPreset,
   foreignCase,
   type CasePreset,
@@ -33,6 +34,16 @@ import {
   type Preset,
   type WorkspaceRecord,
 } from "../factories/panel.ts";
+import {
+  PS10_N,
+  SELLER_EMAILS,
+  SELLER_PRESETS,
+  defaultPolicy,
+  sellersForPreset,
+  type PolicyRecord,
+  type SellerPreset,
+  type SellerRecord,
+} from "../factories/panel-sellers.ts";
 
 // The panel mock's in-memory state (contract-request.md § MSW handler
 // contract): accounts, sessions, codes, reset tokens, an outbox and a request
@@ -80,6 +91,8 @@ export type CallRecord = {
   tipos?: string[];
   /** F7: the page the Server Action was posted from (x-kybr-panel-path). */
   pagePath?: string;
+  /** M8 (QA G5): a policy PUT's versao (never the rules). */
+  versao?: number;
 };
 
 /** QA G2 / G9 / G11: the case endpoints a per-account fault can target. */
@@ -153,6 +166,7 @@ export type BatchFault = {
     | "500"
     | "drop"
     | "csv-grande"
+    | "csv-exato"
     | "csv-html"
     | "csv-aspas"
     | "csv-virgula"
@@ -203,7 +217,10 @@ export type Scenario =
   | "queda-de-rede-lote"
   // M7 (PM7): per account only (QA G2)
   | "alertas-falha"
-  | "monitoramento-falha";
+  | "monitoramento-falha"
+  // M8b (PS9, PR5): per account only (QA G2)
+  | "vendedores-falha"
+  | "regras-falha";
 
 /** QA G2: the alert endpoints a per-account fault can target. */
 export type AlertEndpoint = "alerts" | "monitoring";
@@ -281,6 +298,43 @@ type Store = {
   passwordFailures: Map<string, number[]>;
   /** QA G7: revoked sessions (id → owner and creation), for the sessions read. */
   revokedSessions: Map<string, { email: string; createdAt: number }>;
+  /** M8b (C-M8-2–C-M8-4): every account's sellers, by id. */
+  sellers: Map<string, SellerRecord>;
+  /** The accounts whose sellers were seeded (the others get PS1 on first read). */
+  sellerSeeded: Set<string>;
+  /** A-X7 for D-S3: `${email}|${key}` → the seller and the first reply. */
+  sellerKeys: Map<string, { sellerId: string; status: number; reply: unknown }>;
+  sellerFaults: Map<string, SellerFault>;
+  /** D-R1 (C-M8-6); documentos_habilitados live on the workspace (C-M6-4). */
+  policies: Map<string, PolicyRecord>;
+};
+
+/** QA G2 (M8b): the endpoints a per-account Vendedores/Regras fault can target. */
+export const SELLER_ENDPOINTS = [
+  "sellers",
+  "seller",
+  "reverify",
+  "sellers-csv",
+  "audit-csv",
+  "policy-get",
+  "policy-put",
+] as const;
+export type SellerEndpoint = (typeof SELLER_ENDPOINTS)[number];
+export const SELLER_FAULT_KINDS = [
+  "delay",
+  "500",
+  "503",
+  "drop",
+  // The CSV endpoints only (QA G3): exactly the 4 MiB cap, one byte over, HTML.
+  "csv-exato",
+  "csv-grande",
+  "csv-html",
+] as const;
+export type SellerFault = {
+  kind: (typeof SELLER_FAULT_KINDS)[number];
+  ms?: number;
+  /** How many requests it applies to (unlimited when missing). */
+  times?: number;
 };
 
 /** QA G2 (M8a): the endpoints a per-account Início/settings fault can target. */
@@ -476,6 +530,16 @@ function createStore(): Store {
   );
   nada.workspace.plano = { tipo: "teste", usadas: 0, limite: 200 };
   accounts.set(HOME_EMAILS.nada, nada);
+  // M8b (PS4): an onboarded workspace with no sellers (read-only).
+  accounts.set(
+    SELLER_EMAILS.vazio,
+    accountFor(
+      "pago",
+      SELLER_EMAILS.vazio,
+      "Vazio Exemplo",
+      "Plataforma Vazia",
+    ),
+  );
   for (const record of [
     ...casesForPreset("pc1", PANEL_EMAILS.fila, now),
     ...casesForPreset("um", PANEL_EMAILS.semwebhook, now),
@@ -511,6 +575,11 @@ function createStore(): Store {
     homeFaults: new Map(),
     passwordFailures: new Map(),
     revokedSessions: new Map(),
+    sellers: new Map(),
+    sellerSeeded: new Set([SELLER_EMAILS.vazio]),
+    sellerKeys: new Map(),
+    sellerFaults: new Map(),
+    policies: new Map(),
   };
 }
 
@@ -1160,4 +1229,105 @@ export function workspaceBySlug(slug: string): WorkspaceRecord | undefined {
   for (const account of store.accounts.values())
     if (account.workspace.slug === slug) return account.workspace;
   return undefined;
+}
+
+// --- Vendedores and Regras (M8b) ----------------------------------------------
+
+export function isSellerPreset(value: unknown): value is SellerPreset {
+  return (SELLER_PRESETS as readonly unknown[]).includes(value);
+}
+
+/**
+ * QA G1: replaces an account's sellers with a preset (creating the account
+ * if needed). PS1's PS10 seller gets an open case of its own in the account.
+ */
+export function seedSellers(email: string, preset: SellerPreset): void {
+  const normalized = email.toLowerCase();
+  if (!store.accounts.has(normalized)) createAccount({ email: normalized });
+  for (const seller of [...store.sellers.values()])
+    if (seller.email === normalized) store.sellers.delete(seller.id);
+  store.sellerSeeded.add(normalized);
+  const now = Date.now();
+  for (const seller of sellersForPreset(preset, normalized, now)) {
+    if (seller.n === PS10_N) {
+      const record = caseFor("link", { email: normalized, n: 900, now });
+      record.razao_social = seller.razao_social;
+      record.cnpj = seller.cnpj;
+      record.seller = {
+        id: seller.id,
+        razao_social: seller.razao_social,
+        cnpj: seller.cnpj,
+      };
+      store.cases.set(record.id, record);
+      seller.case_aberto_id = record.id;
+    }
+    store.sellers.set(seller.id, seller);
+  }
+}
+
+/** The account's sellers, newest verification first (PS1 on a first read). */
+export function sellersOf(email: string): SellerRecord[] {
+  if (!store.sellerSeeded.has(email) && store.accounts.has(email))
+    seedSellers(email, "ps1");
+  return [...store.sellers.values()]
+    .filter((seller) => seller.email === email)
+    .sort(
+      (a, b) =>
+        b.verificado_em - a.verificado_em ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+}
+
+export function ownSeller(id: string, email: string): SellerRecord | undefined {
+  const seller = store.sellers.get(id);
+  return seller?.email === email ? seller : undefined;
+}
+
+/** O-21: deciding the seller's open case clears its mudou (and the link). */
+export function sellerCaseDecided(
+  caseId: string,
+  decisao: "aprovar" | "manter" | "bloquear",
+): void {
+  for (const seller of store.sellers.values()) {
+    if (seller.case_aberto_id !== caseId) continue;
+    delete seller.case_aberto_id;
+    delete seller.mudou;
+    seller.status = decisao === "bloquear" ? "bloqueado" : "aprovado";
+  }
+}
+
+/** QA G2: sets (or, with undefined, clears) a per-account M8b fault. */
+export function setSellerFault(
+  email: string,
+  endpoint: SellerEndpoint,
+  fault: SellerFault | undefined,
+): void {
+  const key = `${email.toLowerCase()}|${endpoint}`;
+  if (fault === undefined) store.sellerFaults.delete(key);
+  else store.sellerFaults.set(key, fault);
+}
+
+/** The fault for this request, if any (one fewer left when it's counted). */
+export function takeSellerFault(
+  email: string,
+  endpoint: SellerEndpoint,
+): SellerFault | undefined {
+  const key = `${email}|${endpoint}`;
+  const fault = store.sellerFaults.get(key);
+  if (fault === undefined) return undefined;
+  if (fault.times !== undefined) {
+    if (fault.times <= 1) store.sellerFaults.delete(key);
+    else store.sellerFaults.set(key, { ...fault, times: fault.times - 1 });
+  }
+  return fault;
+}
+
+/** D-R1: the account's policy (PR1 until it saves). */
+export function policyOf(email: string): PolicyRecord {
+  let policy = store.policies.get(email);
+  if (!policy) {
+    policy = defaultPolicy();
+    store.policies.set(email, policy);
+  }
+  return policy;
 }

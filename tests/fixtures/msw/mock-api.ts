@@ -23,13 +23,17 @@ import {
   panelHomeControlHandlers,
   panelHomeHandlers,
 } from "./handlers/panel-home.ts";
+import {
+  panelSellerControlHandlers,
+  panelSellerHandlers,
+} from "./handlers/panel-sellers.ts";
 import { panelWorkspaceHandlers } from "./handlers/panel-workspace.ts";
 import {
   mockControlHandlers,
   sellerLinkHandlers,
 } from "./handlers/seller-link.ts";
 
-// The seller-link (Pre-Contract D1–D6) and panel (D-A1–D-A5, D-W1–D-W3, D-B1–D-B7, D-C1–D-C6) MSW
+// The seller-link (Pre-Contract D1–D6) and panel (D-A1–D-A5, D-W1–D-W3, D-B1–D-B7, D-C1–D-C6, D-M*, D-H*, D-S1–D-S5, D-R1) MSW
 // handlers over HTTP, for `pnpm dev` and Playwright: Server Components and Actions reach it through API_BASE_URL,
 // and the browser uploads to it through API_PUBLIC_BASE_URL (D6, with CORS).
 // Runs with Node's built-in TypeScript type stripping (Node >= 22.18).
@@ -51,9 +55,11 @@ const app = createServer(
   ...panelCaseControlHandlers,
   ...panelAlertControlHandlers,
   ...panelHomeControlHandlers,
+  ...panelSellerControlHandlers,
   ...panelCaseHandlers,
   ...panelAlertHandlers,
   ...panelHomeHandlers,
+  ...panelSellerHandlers,
   ...panelDocumentHandlers,
 );
 

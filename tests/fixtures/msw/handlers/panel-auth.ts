@@ -301,6 +301,8 @@ const SCENARIOS: readonly Scenario[] = [
   "queda-de-rede-lote",
   "alertas-falha",
   "monitoramento-falha",
+  "vendedores-falha",
+  "regras-falha",
 ];
 
 function isPreset(value: unknown): value is Preset {
@@ -354,6 +356,8 @@ export const panelControlHandlers: RequestHandler[] = [
       "queda-de-rede-lote",
       "alertas-falha",
       "monitoramento-falha",
+      "vendedores-falha",
+      "regras-falha",
     ];
     if (
       accountOnly.includes(String(body.scenario)) &&

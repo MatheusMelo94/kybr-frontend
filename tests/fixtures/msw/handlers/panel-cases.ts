@@ -32,6 +32,7 @@ import {
   panelStore,
   recordCall,
   seedCases,
+  sellerCaseDecided,
   sessionAccount,
   setCaseClock,
   CASE_FAULT_KINDS,
@@ -305,6 +306,8 @@ function decide(
 ): void {
   record.estado = "decidido";
   record.decisao = { ...decisao, em: now };
+  // O-21 (M8b): the seller's mudou clears with its case.
+  sellerCaseDecided(record.id, decisao.tipo);
   record.eventos.push({
     tipo: "decidido",
     em: ISO(now),
