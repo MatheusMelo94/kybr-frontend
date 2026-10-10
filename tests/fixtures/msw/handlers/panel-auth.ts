@@ -268,6 +268,8 @@ const SCENARIOS: readonly Scenario[] = [
   "csv-sem-escape",
   "historico-falha",
   "queda-de-rede-lote",
+  "alertas-falha",
+  "monitoramento-falha",
 ];
 
 function isPreset(value: unknown): value is Preset {
@@ -319,6 +321,8 @@ export const panelControlHandlers: RequestHandler[] = [
       "csv-sem-escape",
       "historico-falha",
       "queda-de-rede-lote",
+      "alertas-falha",
+      "monitoramento-falha",
     ];
     if (
       accountOnly.includes(String(body.scenario)) &&

@@ -6,6 +6,7 @@ import {
   type ContatoVendedor,
 } from "../../factories/panel.ts";
 import {
+  alertCount,
   caseCounts,
   hasRunningBatch,
   takeFault,
@@ -34,6 +35,9 @@ function workspaceView(account: Account): Record<string, unknown> {
     fila_vencidos: stored.fila_vencidos + cases.vencidos,
     fila_aguardando: (stored.fila_aguardando ?? 0) + cases.aguardando,
     lote_em_andamento: hasRunningBatch(account.email),
+    // C-M7-4 / QA G7: derived from the alerts store once M7 seeded the account.
+    alertas_criticos_abertos:
+      alertCount(account.email) ?? stored.alertas_criticos_abertos,
   };
   delete (workspace as { contagens?: unknown }).contagens;
   return {

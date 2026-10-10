@@ -4,7 +4,7 @@ import type { JSX } from "react";
 
 import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { filaCopy } from "@/features/panel-fila/copy";
-import { formatDataHora } from "@/features/panel-fila/format";
+import { formatDataHora } from "@/features/panel-shell/format";
 import { fill } from "@/features/panel-shell/format";
 
 type Props = {

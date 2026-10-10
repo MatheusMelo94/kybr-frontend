@@ -4,7 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type JSX } from "react";
 
-import { NavCount } from "@/features/panel-shell/components/nav-count";
+import {
+  MonitorCount,
+  NavCount,
+} from "@/features/panel-shell/components/nav-count";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
 import type { NavItem } from "@/features/panel-shell/nav";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
@@ -24,7 +27,8 @@ function isActive(pathname: string, href: string): boolean {
 
 /**
  * The panel's nav (AC 9): the build's items, the active one marked, the
- * Fila's count from the shell's live status (missing hides it, AC 11), and
+ * Fila's and Monitoramento's counts from the shell's live status (missing
+ * hides them, AC 11), and
  * Lote's nav.lote.running while a batch runs (S5).
  */
 export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
@@ -66,7 +70,9 @@ export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-10 flex-wrap items-center gap-x-2 rounded-md px-3 py-2 text-body text-ink",
+                  // relative: the counts' sr-only text stays inside the tab row's
+                  // scroll box instead of widening the page (AC 74).
+                  "relative flex min-h-10 flex-wrap items-center gap-x-2 rounded-md px-3 py-2 text-body text-ink",
                   "transition-colors duration-(--duration-fast) ease-out-quart motion-reduce:transition-none",
                   "hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                   "pointer-coarse:min-h-11",
@@ -79,6 +85,12 @@ export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
                   <NavCount
                     abertos={counts.fila_abertos}
                     vencidos={counts.fila_vencidos}
+                    active={active}
+                  />
+                )}
+                {item.key === "monitor" && counts !== undefined && (
+                  <MonitorCount
+                    alertas={counts.alertas_criticos_abertos}
                     active={active}
                   />
                 )}

@@ -192,5 +192,9 @@ export const apiPaths = {
       certificate: (verificationId: string): string =>
         `/v1/verifications/${panelIdSegment(verificationId)}/certificate`,
     },
+    /** D-M1: the newest 50, with no paging (C-M7-5). */
+    alerts: (): string => "/v1/alerts?limit=50",
+    /** D-M2 (C-M7-2) */
+    monitoring: (): string => "/v1/monitoring",
   },
 };

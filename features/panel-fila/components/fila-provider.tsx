@@ -15,7 +15,7 @@ import {
 
 import type { FilaAba } from "@/features/panel-fila/search-params";
 import type { Collapse } from "@/features/panel-fila/use-collapse";
-import { useOnline } from "@/features/panel-fila/use-online";
+import { useOnline } from "@/lib/use-online";
 import { useRefreshUntil } from "@/lib/navigation/refresh-until";
 
 // The Fila's layout-scoped client state (plan-m6 § 5), kept across the page

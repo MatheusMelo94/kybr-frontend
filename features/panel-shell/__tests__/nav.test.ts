@@ -23,9 +23,10 @@ describe("nav registry (spec § Screens & Surfaces, O-15)", () => {
     expect(firstThree).toContain("monitor");
   });
 
-  it("shows only the screens this build ships, with no placeholders: M5 adds Lote, in the spec's order", () => {
+  it("shows only the screens this build ships, with no placeholders: M7 adds Monitoramento, in the spec's order", () => {
     expect(navItemsInBuild()).toEqual([
       { key: "fila", href: "/fila", label: "Fila de revisão" },
+      { key: "monitor", href: "/monitoramento", label: "Monitoramento" },
       { key: "lote", href: "/lote", label: "Verificar em lote" },
     ]);
   });

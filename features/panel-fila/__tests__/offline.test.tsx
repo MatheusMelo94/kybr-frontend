@@ -15,7 +15,7 @@ import {
 import { FilaSoftLink } from "@/features/panel-fila/components/fila-soft-link";
 import { FILA_TAB_ACTIVE_ID } from "@/features/panel-fila/components/fila-tabs";
 import { NewCasesNotice } from "@/features/panel-fila/components/new-cases-notice";
-import { OfflineBanner } from "@/features/panel-fila/components/offline-banner";
+import { FilaOfflineBanner } from "@/features/panel-fila/components/offline-banner";
 import { ShellStatusProvider } from "@/features/panel-shell/shell-status-context";
 
 vi.mock("@/features/panel-fila/actions", () => ({
@@ -86,7 +86,7 @@ function Screen({
       <ToastProvider closeLabel="Fechar">
         <FilaProvider renderedAt={renderedAt}>
           <Probe />
-          <OfflineBanner />
+          <FilaOfflineBanner />
           <nav>
             <FilaSoftLink href="/fila?aba=aguardando" className="x">
               Aguardando vendedor
@@ -126,12 +126,12 @@ describe("offline (T111; AC 44; D8; ADR-0011 rule 8; F14)", () => {
   it("online: no banner, everything enabled; the banner's status region is mounted, empty (P6-004)", () => {
     const { container } = render(<Screen />);
     expect(banner()).toBeNull();
-    const region = container.querySelector("[data-fila-offline]");
+    const region = container.querySelector("[data-offline-banner]");
     expect(region).toHaveAttribute("role", "status");
     expect(region).toHaveTextContent("");
     setOnline(false);
     // The same node: only its content switches, so going offline is announced.
-    expect(container.querySelector("[data-fila-offline]")).toBe(region);
+    expect(container.querySelector("[data-offline-banner]")).toBe(region);
     expect(region).toHaveTextContent(/^Sem conexão\./);
     setOnline(true);
     for (const button of decisions()) expect(button).toBeEnabled();

@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatDataHora,
+  formatDuration,
   formatHora,
   formatRelativo,
-} from "@/features/panel-fila/format";
-import { formatDuration } from "@/features/panel-shell/format";
+} from "@/features/panel-shell/format";
 
 // A fixed clock: 2026-03-10 14:00 in Brasília (UTC-3 all year, no DST since 2019).
 const NOW = new Date("2026-03-10T17:00:00Z");
