@@ -165,3 +165,22 @@ export function parseLinkVendedor(
     url.href === value;
   return ok ? value : null;
 }
+
+// M7 alerts (D-M1 + C-M7-1): the closed sets the Monitoramento page keys
+// its copy by (`alert.<TIPO>`, `alert.sev.*`).
+
+/** D-M1 alert types, each with its own `dados` placeholders (C-M7-1). */
+export const ALERT_TIPOS = [
+  "SITUACAO_IRREGULAR",
+  "IE_SUSPENSA",
+  "RESPONSAVEL_SAIU_QSA",
+  "QSA_MUDOU",
+  "CNAE_MUDOU",
+  "REGIME_MUDOU",
+  "WEBHOOK_FALHOU",
+] as const;
+export type AlertTipo = (typeof ALERT_TIPOS)[number];
+
+/** D-M1 severities, most severe first. */
+export const ALERT_SEVERIDADES = ["critico", "atencao", "info"] as const;
+export type AlertSeveridade = (typeof ALERT_SEVERIDADES)[number];
