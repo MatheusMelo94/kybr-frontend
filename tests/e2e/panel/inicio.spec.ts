@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import { dashboardFault, seedDashboard } from "../fixtures/home-mock.ts";
+import { readFileSync } from "node:fs";
+
+import { SETTLE, holdNextAction } from "../fixtures/fila-timing.ts";
+import {
+  dashboardFault,
+  seedDashboard,
+  settingsFault,
+} from "../fixtures/home-mock.ts";
 import { logIn, uniqueEmail } from "../fixtures/panel-mock.ts";
 
 // T132: Início (S9; AC 53 greeting half, AC 54) from one D-H1 read: the
@@ -81,7 +88,7 @@ test.describe("Início @feature-ops-panel @panel-operacao", () => {
 
     await dashboardFault(request, email, { kind: null });
     await queue.getByRole("button", { name: "Tentar de novo" }).click();
-    await expect(queue.getByRole("listitem")).toHaveCount(4);
+    await expect(queue.getByRole("listitem")).toHaveCount(4, SETTLE);
   });
 
   test("PH4: the whole call fails: error.load.* with a retry", async ({
@@ -115,5 +122,78 @@ test.describe("Início @feature-ops-panel @panel-operacao", () => {
     await expect(
       page.getByRole("status").filter({ hasText: "Link copiado" }),
     ).toBeVisible();
+  });
+
+  test("T133 (AC 53): Primeiros passos leads a new workspace; Ocultar hides it after ok and for good @panel-phone", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("inicio-passos", testInfo);
+    await seedDashboard(request, email, "novo");
+    await logIn(page, email);
+
+    const card = page.getByRole("region", { name: "Primeiros passos" });
+    await expect(card).toBeVisible();
+    await expect(page.getByRole("region").first()).toHaveAccessibleName(
+      "Primeiros passos",
+    );
+    await expect(card.getByRole("listitem")).toHaveCount(3);
+    await expect(
+      card.getByRole("link", { name: "Ativar o monitoramento" }),
+    ).toHaveAttribute("href", "/monitoramento");
+
+    // Not optimistic: the card stays while the action is in flight.
+    const release = await holdNextAction(page, "oculto");
+    await card.getByRole("button", { name: "Ocultar" }).click();
+    await expect(card.getByRole("button", { name: "Ocultar" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    await expect(card).toBeVisible();
+    release();
+    await expect(card).toHaveCount(0, SETTLE);
+
+    // PH5: hidden for good.
+    await page.reload();
+    await expect(
+      page
+        .locator("#conteudo")
+        .getByText("Comece verificando a base que você já tem."),
+    ).toBeVisible();
+    await expect(card).toHaveCount(0);
+  });
+
+  test("T133: Ocultar fails: error.network inline and the card stays", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("inicio-passos-falha", testInfo);
+    await seedDashboard(request, email, "novo");
+    await settingsFault(request, email, "first-steps", { kind: "503" });
+    await logIn(page, email);
+
+    const card = page.getByRole("region", { name: "Primeiros passos" });
+    await card.getByRole("button", { name: "Ocultar" }).click();
+    await expect(card.getByRole("alert")).toHaveText(
+      "Não conseguimos falar com o servidor. Confira sua conexão e tente de novo.",
+    );
+    await expect(card).toBeVisible();
+  });
+
+  test("ADR-0008 Addendum 2: hideFirstStepsAction is owned by Início's page", async () => {
+    const manifest = JSON.parse(
+      readFileSync(".next/server/server-reference-manifest.json", "utf8"),
+    ) as {
+      node: Record<
+        string,
+        { exportedName?: string; workers: Record<string, unknown> }
+      >;
+    };
+    const entry = Object.values(manifest.node).find(
+      (value) => value.exportedName === "hideFirstStepsAction",
+    );
+    expect(Object.keys(entry?.workers ?? {})).toContain(
+      "app/(panel)/painel/(app)/(inicio)/page",
+    );
   });
 });

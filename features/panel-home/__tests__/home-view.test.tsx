@@ -167,6 +167,47 @@ describe("HomeView", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("T133: new workspace: Primeiros passos is the first card", () => {
+    render(
+      view({
+        kpis: { verificados: 0, auto: 0, revisao: 0, bloqueados: 0 },
+        fila: [],
+        alertas: [],
+        primeiros_passos: {
+          lote: false,
+          link: false,
+          monitor: false,
+          oculto: false,
+        },
+      }),
+    );
+    const regions = screen.getAllByRole("region");
+    expect(regions[0]).toHaveAccessibleName("Primeiros passos");
+  });
+
+  it("T133: an incomplete checklist shows after the cards; complete or hidden, none", () => {
+    const steps = { lote: true, link: false, monitor: true, oculto: false };
+    const { unmount } = render(view({ ...FULL, primeiros_passos: steps }));
+    const names = screen
+      .getAllByRole("region")
+      .map((region) => region.getAttribute("aria-labelledby"));
+    expect(names.at(-1)).toBe("home-steps-h");
+    unmount();
+
+    for (const done of [
+      { ...steps, link: true },
+      { ...steps, oculto: true },
+    ]) {
+      const { unmount: off } = render(
+        view({ ...FULL, primeiros_passos: done }),
+      );
+      expect(
+        screen.queryByRole("region", { name: "Primeiros passos" }),
+      ).not.toBeInTheDocument();
+      off();
+    }
+  });
+
   it("PH3: each missing card fails alone with home.card.error and a retry", () => {
     render(view({ kpis: FULL.kpis }));
     for (const name of ["Precisa da sua atenção", "Mudanças na base"]) {

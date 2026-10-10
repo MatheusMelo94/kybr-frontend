@@ -4,11 +4,16 @@ import type { JSX } from "react";
 import { CopyLinkButton } from "@/components/panel/copy-link-button";
 import { CardError } from "@/features/panel-home/components/card-error";
 import { FeedCard } from "@/features/panel-home/components/feed-card";
+import { FirstSteps } from "@/features/panel-home/components/first-steps";
 import { Greeting } from "@/features/panel-home/components/greeting";
 import { Kpis } from "@/features/panel-home/components/kpis";
 import { QueueCard } from "@/features/panel-home/components/queue-card";
 import { homeCopy } from "@/features/panel-home/copy";
-import { pickHomeState, summaryKey } from "@/features/panel-home/home-state";
+import {
+  pickHomeState,
+  showFirstSteps,
+  summaryKey,
+} from "@/features/panel-home/home-state";
 import { settingsCopy } from "@/features/panel-settings/copy";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import { fill } from "@/features/panel-shell/format";
@@ -26,10 +31,14 @@ type Props = {
  * Início (S9, AC 53/54) from one D-H1 read: the greeting and summary, the
  * two actions, then the KPIs and the cards. A new workspace (nothing
  * verified) shows home.summary.none and hides the KPIs, queue and feed.
- * Each missing card fails alone (plan-m8 D2).
+ * Each missing card fails alone (plan-m8 D2). Primeiros passos (AC 53)
+ * leads for a new workspace and follows the cards otherwise.
  */
 export function HomeView({ me, dashboard, now }: Props): JSX.Element {
   const state = pickHomeState(dashboard);
+  const steps = showFirstSteps(dashboard.primeiros_passos) ? (
+    <FirstSteps steps={dashboard.primeiros_passos} />
+  ) : null;
   const contagens = me.workspace.contagens;
   const summary =
     state === "new"
@@ -70,6 +79,7 @@ export function HomeView({ me, dashboard, now }: Props): JSX.Element {
           </Link>
         </div>
       </div>
+      {state === "new" && steps}
       {state === "ready" && (
         <>
           {dashboard.kpis ? <Kpis kpis={dashboard.kpis} /> : <CardError />}
@@ -77,6 +87,7 @@ export function HomeView({ me, dashboard, now }: Props): JSX.Element {
             <QueueCard fila={dashboard.fila} />
             <FeedCard alertas={dashboard.alertas} />
           </div>
+          {steps}
         </>
       )}
     </div>

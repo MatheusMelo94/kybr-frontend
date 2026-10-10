@@ -25,3 +25,16 @@ export function summaryKey(cases: number, alerts: number): SummaryKey {
   if (alerts > 0) return `home.summary.alerts.${plural(alerts)}`;
   return "home.summary.clear";
 }
+
+export type FirstStepsState = NonNullable<Dashboard["primeiros_passos"]>;
+
+/** Primeiros passos shows until the three steps are done or it's hidden (AC 53). */
+export function showFirstSteps(
+  steps: Dashboard["primeiros_passos"],
+): steps is FirstStepsState {
+  return (
+    steps !== undefined &&
+    !steps.oculto &&
+    !(steps.lote && steps.link && steps.monitor)
+  );
+}

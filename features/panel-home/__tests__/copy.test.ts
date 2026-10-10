@@ -1,10 +1,14 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { homeCopy } from "@/features/panel-home/copy";
 import { fill } from "@/features/panel-shell/format";
 
 // Spec § Content & Copy › S9 Início, verbatim (the T49 fixture test, extended
-// to S9), plus the plan-m8 § 9 G1 keys (allowlisted defaults, TODO(copy)).
+// to S9). The four home.summary.both.* keys are final (spec changelog
+// 2026-10-10, G1).
 const SPEC_S9: Record<string, string> = {
   "home.greet.morning": "Bom dia, {nome}.",
   "home.greet.afternoon": "Boa tarde, {nome}.",
@@ -15,6 +19,12 @@ const SPEC_S9: Record<string, string> = {
   "home.summary.cases.other": "{n} vendedores esperando decisão.",
   "home.summary.alerts.one": "1 alerta crítico novo.",
   "home.summary.alerts.other": "{n} alertas críticos novos.",
+  "home.summary.both.one_one":
+    "1 vendedor esperando decisão e 1 alerta crítico novo.",
+  "home.summary.both.one_other":
+    "1 vendedor esperando decisão e {m} alertas críticos novos.",
+  "home.summary.both.other_one":
+    "{n} vendedores esperando decisão e 1 alerta crítico novo.",
   "home.summary.both.other_other":
     "{n} vendedores esperando decisão e {m} alertas críticos novos.",
   "home.cta.copy": "Copiar link de cadastro",
@@ -41,20 +51,17 @@ const SPEC_S9: Record<string, string> = {
   "home.steps.hide": "Ocultar",
 };
 
-// G1: the spec names "four keys" for home.summary.both but only spells out
-// other_other; the three .one variants are the plan's defaults.
-const G_KEYS: Record<string, string> = {
-  "home.summary.both.one_one":
-    "1 vendedor esperando decisão e 1 alerta crítico novo.",
-  "home.summary.both.one_other":
-    "1 vendedor esperando decisão e {m} alertas críticos novos.",
-  "home.summary.both.other_one":
-    "{n} vendedores esperando decisão e 1 alerta crítico novo.",
-};
-
 describe("homeCopy (T128, spec § Content & Copy › S9)", () => {
-  it("holds every S9 key verbatim plus the G1 defaults, and nothing else", () => {
-    expect(homeCopy).toEqual({ ...SPEC_S9, ...G_KEYS });
+  it("holds every S9 key verbatim, and nothing else", () => {
+    expect(homeCopy).toEqual(SPEC_S9);
+  });
+
+  it("carries no TODO(copy) placeholder", () => {
+    const source = readFileSync(
+      join(process.cwd(), "features/panel-home/copy.ts"),
+      "utf8",
+    );
+    expect(source).not.toMatch(/TODO\(copy\)/);
   });
 
   it("AC 72: no string addresses the user with a gendered form", () => {

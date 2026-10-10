@@ -12,16 +12,14 @@ export const homeCopy = {
   "home.summary.cases.other": "{n} vendedores esperando decisão.",
   "home.summary.alerts.one": "1 alerta crítico novo.",
   "home.summary.alerts.other": "{n} alertas críticos novos.",
-  "home.summary.both.other_other":
-    "{n} vendedores esperando decisão e {m} alertas críticos novos.",
-  // TODO(copy): plan-m8 G1 defaults; the spec names four keys but spells out
-  // only other_other. Pending the UX Strategist.
   "home.summary.both.one_one":
     "1 vendedor esperando decisão e 1 alerta crítico novo.",
   "home.summary.both.one_other":
     "1 vendedor esperando decisão e {m} alertas críticos novos.",
   "home.summary.both.other_one":
     "{n} vendedores esperando decisão e 1 alerta crítico novo.",
+  "home.summary.both.other_other":
+    "{n} vendedores esperando decisão e {m} alertas críticos novos.",
   "home.cta.copy": "Copiar link de cadastro",
   "home.cta.lote": "Verificar em lote",
   "home.kpi.verified": "vendedores verificados",
