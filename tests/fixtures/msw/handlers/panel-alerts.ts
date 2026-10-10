@@ -60,7 +60,7 @@ async function authed(
 }
 
 /** D-M1 item: case_decisao comes from the case itself (PM6's decision). */
-function alertView(alert: AlertRecord): Record<string, unknown> {
+export function alertView(alert: AlertRecord): Record<string, unknown> {
   const decisao =
     alert.case_id === undefined
       ? undefined

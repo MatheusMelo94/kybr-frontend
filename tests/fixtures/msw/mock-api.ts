@@ -19,6 +19,10 @@ import {
   panelCaseHandlers,
   panelDocumentHandlers,
 } from "./handlers/panel-cases.ts";
+import {
+  panelHomeControlHandlers,
+  panelHomeHandlers,
+} from "./handlers/panel-home.ts";
 import { panelWorkspaceHandlers } from "./handlers/panel-workspace.ts";
 import {
   mockControlHandlers,
@@ -46,8 +50,10 @@ const app = createServer(
   ...panelBatchHandlers,
   ...panelCaseControlHandlers,
   ...panelAlertControlHandlers,
+  ...panelHomeControlHandlers,
   ...panelCaseHandlers,
   ...panelAlertHandlers,
+  ...panelHomeHandlers,
   ...panelDocumentHandlers,
 );
 
@@ -66,6 +72,6 @@ createHttpServer((request, response) => {
   app(request, response);
 }).listen(port, host, () => {
   console.log(
-    `Kybr mock API (Pre-Contract: link D1–D6, panel D-A1–D-A5, D-W1–D-W3, D-B1–D-B7, D-C1–D-C6, D-M1–D-M2) on http://${host}:${port}`,
+    `Kybr mock API (Pre-Contract: link D1–D6, panel D-A1–D-A5, D-W1–D-W3, D-B1–D-B7, D-C1–D-C6, D-M1–D-M2, D-H1–D-H2, D-W4, D-A6) on http://${host}:${port}`,
   );
 });

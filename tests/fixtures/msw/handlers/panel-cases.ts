@@ -74,7 +74,10 @@ const ISO = (ms: number): string => new Date(ms).toISOString();
 
 // --- Wire views ----------------------------------------------------------------
 
-function summaryView(record: CaseRecord, now: number): Record<string, unknown> {
+export function summaryView(
+  record: CaseRecord,
+  now: number,
+): Record<string, unknown> {
   return {
     id: record.id,
     razao_social: record.razao_social,

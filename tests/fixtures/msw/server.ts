@@ -7,6 +7,7 @@ import {
   panelCaseHandlers,
   panelDocumentHandlers,
 } from "./handlers/panel-cases.ts";
+import { panelHomeHandlers } from "./handlers/panel-home.ts";
 import { panelWorkspaceHandlers } from "./handlers/panel-workspace.ts";
 import { sellerLinkHandlers } from "./handlers/seller-link.ts";
 
@@ -18,5 +19,6 @@ export const server = setupServer(
   ...panelBatchHandlers,
   ...panelCaseHandlers,
   ...panelAlertHandlers,
+  ...panelHomeHandlers,
   ...panelDocumentHandlers,
 );

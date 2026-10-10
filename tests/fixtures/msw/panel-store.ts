@@ -14,6 +14,12 @@ import {
   BATCH_SETS,
   FOREIGN_BATCH_ID,
   CODE_TTL_MS,
+  HOME_EMAILS,
+  HOME_NAMES,
+  dashboardFor,
+  slugFor,
+  type DashboardRecord,
+  type HomePreset,
   IDLE_TTL_MS,
   PANEL_EMAILS,
   PANEL_PASSWORD,
@@ -223,6 +229,8 @@ type Store = {
       link?: string;
       /** D-M3: the last mail.alert.* (subject and CTA link). */
       alerta?: { assunto: string; link: string };
+      /** M8: the notices sent (mail.password_changed), never their content. */
+      avisos?: string[];
     }
   >;
   /** A-X7: the first sign-up answer per Idempotency-Key, with its body. */
@@ -265,6 +273,33 @@ type Store = {
   alerts: Map<string, AlertRecord>;
   monitoring: Map<string, MonitoringRecord>;
   alertFaults: Map<string, AlertFault>;
+  /** M8a: each account's dashboard parts (fila/alertas come from the store). */
+  dashboards: Map<string, DashboardRecord>;
+  /** QA G2 (M8): "e-mail|endpoint" → its fault. */
+  homeFaults: Map<string, HomeFault>;
+  /** C-M8-7: failed password changes per e-mail (timestamps, 15 min window). */
+  passwordFailures: Map<string, number[]>;
+  /** QA G7: revoked sessions (id → owner and creation), for the sessions read. */
+  revokedSessions: Map<string, { email: string; createdAt: number }>;
+};
+
+/** QA G2 (M8a): the endpoints a per-account Início/settings fault can target. */
+export type HomeEndpoint =
+  "dashboard" | "first-steps" | "workspace-put" | "me-put" | "password";
+export const HOME_FAULT_KINDS = [
+  "delay",
+  "500",
+  "503",
+  "drop",
+  "omit",
+] as const;
+export type HomeFault = {
+  kind: (typeof HOME_FAULT_KINDS)[number];
+  ms?: number;
+  /** How many requests it applies to (unlimited when missing). */
+  times?: number;
+  /** "omit" only: the D-H1 fields left out (PH3). */
+  sem?: string[];
 };
 
 const SEEDED: Record<
@@ -432,6 +467,15 @@ function createStore(): Store {
     for (const record of seeded.cases) cases.set(record.id, record);
     monitoring.set(email, seeded.monitoring);
   }
+  // M8a (PH2): a new, onboarded workspace with nothing verified (read-only).
+  const nada = accountFor(
+    "zerado",
+    HOME_EMAILS.nada,
+    "Nada Exemplo",
+    "Plataforma Nada",
+  );
+  nada.workspace.plano = { tipo: "teste", usadas: 0, limite: 200 };
+  accounts.set(HOME_EMAILS.nada, nada);
   for (const record of [
     ...casesForPreset("pc1", PANEL_EMAILS.fila, now),
     ...casesForPreset("um", PANEL_EMAILS.semwebhook, now),
@@ -463,6 +507,10 @@ function createStore(): Store {
     alerts,
     monitoring,
     alertFaults: new Map(),
+    dashboards: new Map([[HOME_EMAILS.nada, dashboardFor("novo")]]),
+    homeFaults: new Map(),
+    passwordFailures: new Map(),
+    revokedSessions: new Map(),
   };
 }
 
@@ -561,7 +609,49 @@ export function expireSession(id?: string): void {
 
 export function revokeSessionsOf(email: string): void {
   for (const [id, session] of store.sessions)
-    if (session.email === email) store.sessions.delete(id);
+    if (session.email === email) {
+      store.sessions.delete(id);
+      store.revokedSessions.set(id, { email, createdAt: session.createdAt });
+    }
+}
+
+/**
+ * C-M8-7: revokes every session of the account (this one included) and opens
+ * a new one that keeps this session's absolute deadline (O-F3).
+ */
+export function rotateSessionsOf(
+  currentId: string,
+  email: string,
+): { id: string; expira_em: string } {
+  const createdAt = store.sessions.get(currentId)?.createdAt ?? Date.now();
+  revokeSessionsOf(email);
+  for (const [token, record] of store.resetTokens)
+    if (record.email === email) store.resetTokens.delete(token);
+  const id = randomToken(24);
+  store.sessions.set(id, { email, createdAt, lastActivity: Date.now() });
+  return { id, expira_em: new Date(createdAt + SESSION_TTL_MS).toISOString() };
+}
+
+/** QA G7: an account's sessions, live and revoked, by digest only. */
+export function sessionsOf(
+  email: string,
+): { id: string; createdAt: number; revogada: boolean }[] {
+  return [
+    ...[...store.sessions]
+      .filter(([, session]) => session.email === email)
+      .map(([id, session]) => ({
+        id,
+        createdAt: session.createdAt,
+        revogada: false,
+      })),
+    ...[...store.revokedSessions]
+      .filter(([, session]) => session.email === email)
+      .map(([id, session]) => ({
+        id,
+        createdAt: session.createdAt,
+        revogada: true,
+      })),
+  ];
 }
 
 /** A ticket-bound code (CR-P3), mailed to the outbox. */
@@ -953,4 +1043,121 @@ export function takeAlertFault(
     else store.alertFaults.set(key, { ...fault, times: fault.times - 1 });
   }
   return fault;
+}
+
+// --- Início and settings (M8a) -------------------------------------------------
+
+export function dashboardOf(email: string): DashboardRecord {
+  let record = store.dashboards.get(email);
+  if (!record) {
+    record = dashboardFor("padrao");
+    store.dashboards.set(email, record);
+  }
+  return record;
+}
+
+/**
+ * QA G1: a dashboard preset in the test's own account (created if needed).
+ * populado seeds the PC1 cases and the PM1 alerts, with QA G4's names on
+ * the cards; novo empties the account (PH2).
+ */
+export function seedDashboard(email: string, preset: HomePreset): void {
+  const normalized = email.toLowerCase();
+  const account =
+    store.accounts.get(normalized) ?? createAccount({ email: normalized });
+  if (preset === "novo") {
+    seedCases(normalized, "vazia");
+    seedAlerts(normalized, "vazio");
+    const contagens = account.workspace.contagens;
+    if (contagens)
+      account.workspace.contagens = {
+        ...contagens,
+        alertas_criticos_abertos: 0,
+        vendedores: 0,
+      };
+    if (account.workspace.plano)
+      account.workspace.plano = { ...account.workspace.plano, usadas: 0 };
+  } else {
+    seedCases(normalized, "pc1");
+    seedAlerts(normalized, "pm1");
+    const oldest = casesOf(normalized)
+      .filter((record) => record.estado === "aberto")
+      .sort((a, b) => a.criado_em - b.criado_em);
+    const named = [HOME_NAMES.meiFormatted, HOME_NAMES.hostile];
+    oldest.slice(0, 2).forEach((record, i) => {
+      record.razao_social = named[i] ?? null;
+      record.seller = { ...record.seller, razao_social: named[i] ?? null };
+    });
+    const newest = alertsOf(normalized)[0];
+    if (newest)
+      newest.seller = { ...newest.seller, razao_social: HOME_NAMES.meiBare };
+  }
+  // C-M8-9: its own slug, so D1 shows this workspace's settings alone.
+  account.workspace.slug = slugFor(
+    account.workspace.nome,
+    crypto.randomUUID().slice(0, 8),
+  );
+  store.dashboards.set(normalized, dashboardFor(preset));
+}
+
+/** QA G2: sets (or, with undefined, clears) a per-account M8a fault. */
+export function setHomeFault(
+  email: string,
+  endpoint: HomeEndpoint,
+  fault: HomeFault | undefined,
+): void {
+  const key = `${email.toLowerCase()}|${endpoint}`;
+  if (fault === undefined) store.homeFaults.delete(key);
+  else store.homeFaults.set(key, fault);
+}
+
+/** The fault for this request, if any (one fewer left when it's counted). */
+export function takeHomeFault(
+  email: string,
+  endpoint: HomeEndpoint,
+): HomeFault | undefined {
+  const key = `${email}|${endpoint}`;
+  const fault = store.homeFaults.get(key);
+  if (fault === undefined) return undefined;
+  if (fault.times !== undefined) {
+    if (fault.times <= 1) store.homeFaults.delete(key);
+    else store.homeFaults.set(key, { ...fault, times: fault.times - 1 });
+  }
+  return fault;
+}
+
+const PASSWORD_WINDOW_MS = 15 * 60_000;
+const PASSWORD_FAILURES_ALLOWED = 5;
+
+/** C-M8-7: true once the account failed 5 times in the last 15 minutes. */
+export function passwordLimited(email: string, now = Date.now()): boolean {
+  const recent = (store.passwordFailures.get(email) ?? []).filter(
+    (at) => now - at < PASSWORD_WINDOW_MS,
+  );
+  store.passwordFailures.set(email, recent);
+  return recent.length >= PASSWORD_FAILURES_ALLOWED;
+}
+
+export function recordPasswordFailure(email: string, now = Date.now()): void {
+  store.passwordFailures.set(email, [
+    ...(store.passwordFailures.get(email) ?? []),
+    now,
+  ]);
+}
+
+export function clearPasswordFailures(email: string): void {
+  store.passwordFailures.delete(email);
+}
+
+/** M8: a notice in the outbox (its key, never its content). */
+export function sendNotice(email: string, aviso: string): void {
+  const mail = store.outbox.get(email) ?? {};
+  store.outbox.set(email, { ...mail, avisos: [...(mail.avisos ?? []), aviso] });
+}
+
+/** C-M8-9: the onboarded workspace behind a public slug, for D1. */
+export function workspaceBySlug(slug: string): WorkspaceRecord | undefined {
+  for (const account of store.accounts.values())
+    if (account.workspace.slug === slug) return account.workspace;
+  return undefined;
 }
