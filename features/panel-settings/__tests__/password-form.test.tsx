@@ -143,6 +143,26 @@ describe("PasswordForm (T136)", () => {
     expect(submit()).toBeEnabled();
   });
 
+  it("T136-02: a huge Retry-After is clamped to 3600 s before the timer (no setTimeout overflow)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    change.mockResolvedValue({
+      ok: false,
+      code: "LIMITE_TENTATIVAS",
+      // Past 2^31 - 1 ms, an unclamped setTimeout fires at once.
+      retryAfterSeconds: 3_000_000,
+    });
+    render(view());
+    fireEvent.change(current(), { target: { value: ATUAL } });
+    fireEvent.change(next(), { target: { value: NOVA } });
+    await act(async () => {
+      fireEvent.submit(submit().closest("form") as HTMLFormElement);
+    });
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(submit()).toBeDisabled();
+    act(() => vi.advanceTimersByTime(3_599_000));
+    expect(submit()).toBeEnabled();
+  });
+
   it("O-F2: NETWORK (or a throw) → error.network, sent once, no auto-retry", async () => {
     change.mockRejectedValue(new Error("offline"));
     render(view());

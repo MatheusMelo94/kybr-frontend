@@ -41,6 +41,13 @@ const asFormAction = changePasswordAction as (
 /** Retry-After missing: the minute the copy says (minutesFromSeconds). */
 const DEFAULT_LOCK_SECONDS = 60;
 
+/**
+ * Security T136-02: the lock's timer never waits past an hour. A larger
+ * Retry-After would overflow setTimeout (2^31 - 1 ms) and unlock at once;
+ * the server still answers 429 if it's early.
+ */
+const MAX_LOCK_SECONDS = 3600;
+
 const SHORT = fill(signupCopy["signup.error.password"], {
   n: PASSWORD_MIN_LENGTH,
 });
@@ -84,7 +91,8 @@ export function PasswordForm({ email }: Props): JSX.Element {
   function lockFor(seconds: number): void {
     setLocked(true);
     if (unlock.current !== null) clearTimeout(unlock.current);
-    unlock.current = setTimeout(() => setLocked(false), seconds * 1000);
+    const wait = Math.min(Math.max(seconds, 0), MAX_LOCK_SECONDS);
+    unlock.current = setTimeout(() => setLocked(false), wait * 1000);
   }
 
   function fieldError(field: keyof Errors, message: string): void {

@@ -113,6 +113,14 @@ describe("sessionGrantSchema (D-A6 200, C-M8-7; the login's too, O-F3)", () => {
     ).toBe(true);
   });
 
+  it("T136-01: the exact edge: 7 days + 5 minutes passes, 1 ms more fails", () => {
+    const at = (expira_em: string) =>
+      sessionGrantSchema.safeParse({ sessao: { ...ok.sessao, expira_em } })
+        .success;
+    expect(at("2026-10-17T10:05:00.000Z")).toBe(true);
+    expect(at("2026-10-17T10:05:00.001Z")).toBe(false);
+  });
+
   it("accepts a session with an ISO expiry carrying an offset or Z", () => {
     expect(sessionGrantSchema.safeParse(ok).success).toBe(true);
     expect(
