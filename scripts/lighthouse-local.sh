@@ -110,6 +110,10 @@ case_id=$(mock_post /cases/seed "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\
 # puppeteer-core finds no browser of its own: hand it the runner's Chrome.
 chrome="${CHROME_PATH:-$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)}"
 [ -n "$chrome" ] || { echo "No Chrome found: set CHROME_PATH." >&2; exit 1; }
+# LHCI's healthcheck never sees --collect.chromePath; with a puppeteerScript it
+# asks puppeteer-core for a browser path, gets undefined and fails ("Chrome
+# installation not found"). CHROME_PATH is checked first, so export it.
+export CHROME_PATH="$chrome"
 
 # Mobile preset (lighthouserc.fila.json): the e-mail deep link's case,
 # warn > 2500 ms, fail > 3000 ms LCP (ADR-0007).
