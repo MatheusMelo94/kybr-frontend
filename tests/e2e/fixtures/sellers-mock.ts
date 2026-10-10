@@ -72,3 +72,15 @@ export async function bumpPolicy(
 ): Promise<void> {
   await request.post(`${CONTROLS}/policy/bump`, { data: { email } });
 }
+
+/** PS5 / O-21: the seller's pending lookup finishes (mudou clears). */
+export async function completeReverify(
+  request: APIRequestContext,
+  sellerId: string,
+): Promise<void> {
+  const response = await request.post(
+    `${CONTROLS}/sellers/${sellerId}/complete-reverify`,
+    { data: {} },
+  );
+  if (response.status() !== 204) throw new Error("complete-reverify refused");
+}

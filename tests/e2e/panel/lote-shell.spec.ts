@@ -37,6 +37,7 @@ test.describe("Lote: routes and history @feature-ops-panel @panel-lote", () => {
       /^Monitoramento/,
       "Verificar em lote",
       /^Vendedores/,
+      "Regras",
     ]);
     await nav.getByRole("link", { name: "Verificar em lote" }).click();
     await page.waitForURL("**/lote");

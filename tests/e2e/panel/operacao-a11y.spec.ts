@@ -64,6 +64,8 @@ test.describe("M8 cross-cutting: AC 69–76 on S9–S12 @feature-ops-panel @pane
     page,
     request,
   }, testInfo) => {
+    // axe twice per state plus two reflows: slow at 360.
+    test.slow();
     const email = uniqueEmail("a11y-inicio", testInfo);
     await seedDashboard(request, email, "populado");
     await logIn(page, email);
@@ -96,6 +98,8 @@ test.describe("M8 cross-cutting: AC 69–76 on S9–S12 @feature-ops-panel @pane
     page,
     request,
   }, testInfo) => {
+    // axe twice per state plus two reflows: slow at 360.
+    test.slow();
     const email = uniqueEmail("a11y-vendedores", testInfo);
     await seedSellers(request, email);
     await logIn(page, email, undefined, "/entrar?volta=%2Fvendedores");
@@ -154,6 +158,8 @@ test.describe("M8 cross-cutting: AC 69–76 on S9–S12 @feature-ops-panel @pane
     page,
     request,
   }, testInfo) => {
+    // axe twice per state plus two reflows: slow at 360.
+    test.slow();
     const email = uniqueEmail("a11y-regras", testInfo);
     await createAccount(request, email);
     await logIn(page, email, undefined, "/entrar?volta=%2Fregras");
