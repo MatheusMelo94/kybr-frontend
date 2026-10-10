@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type JSX } from "react";
+import { useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 
 import { Dialog } from "@/components/panel/dialog";
 import { FormAlert } from "@/components/panel/form-alert";
@@ -25,6 +25,10 @@ type Props = {
   cnpj: string;
   /** The server's reverificacao_pendente. */
   pending?: boolean | undefined;
+  /** The row's verificado_em: a change means the reverify already finished (P8-003). */
+  verifiedAt?: string | null | undefined;
+  /** The row's name cell (P8-006): 50 Reverificar buttons need telling apart. */
+  describedBy?: string | undefined;
   /** The allowance is used up or none was granted: disabled, described by plan.exhausted. */
   exhausted?: { describedBy: string } | undefined;
 };
@@ -37,11 +41,15 @@ type Props = {
  * show sellers.reverify.pending until the server's flag takes over; there's
  * no poll (Q4).
  */
+const noFullLoad = (): void => {};
+
 export function ReverifyButton({
   sellerId,
   razaoSocial,
   cnpj,
   pending = false,
+  verifiedAt,
+  describedBy,
   exhausted,
 }: Props): JSX.Element {
   const { key, drop } = useReverifyKey(sellerId);
@@ -49,7 +57,22 @@ export function ReverifyButton({
   const router = useRouter();
   const arm = useNavigationGuard();
   const expire = useSessionExpiry();
-  const refreshUntil = useRefreshUntil(() => pending);
+  // P8-003: re-read until the server shows the flag, or the row's
+  // verification moved on (the backend finished first). Never a full load:
+  // the local "requested" already shows Reverificando… (plan-m8 Q4).
+  const verifiedAtRequest = useRef(verifiedAt);
+  const refreshUntil = useRefreshUntil(
+    () => pending || verifiedAt !== verifiedAtRequest.current,
+    noFullLoad,
+  );
+  // P8-002: the trigger unmounts on ok/409; focus goes to the pending text.
+  const pendingText = useRef<HTMLSpanElement>(null);
+  const [focusPending, setFocusPending] = useState(false);
+  useEffect(() => {
+    if (!focusPending) return;
+    pendingText.current?.focus();
+    setFocusPending(false);
+  }, [focusPending]);
   const [open, setOpen] = useState(false);
   // Mounted on the first open and kept (Dialog returns focus on close): a
   // page of 50 rows doesn't carry 50 closed dialogs.
@@ -67,6 +90,8 @@ export function ReverifyButton({
   function markPending(here: boolean): void {
     close();
     setRequested(true);
+    setFocusPending(true);
+    verifiedAtRequest.current = verifiedAt;
     if (here) refreshUntil();
   }
 
@@ -117,7 +142,11 @@ export function ReverifyButton({
 
   if (pending || requested)
     return (
-      <span className="text-secondary text-ink-muted">
+      <span
+        ref={pendingText}
+        tabIndex={-1}
+        className="text-secondary text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      >
         {sellersCopy["sellers.reverify.pending"]}
       </span>
     );
@@ -129,7 +158,10 @@ export function ReverifyButton({
         variant="secondary"
         size="panel"
         disabled={exhausted !== undefined}
-        aria-describedby={exhausted?.describedBy}
+        aria-describedby={
+          [describedBy, exhausted?.describedBy].filter(Boolean).join(" ") ||
+          undefined
+        }
         onClick={() => {
           setOpened(true);
           setOpen(true);

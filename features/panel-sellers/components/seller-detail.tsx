@@ -92,6 +92,7 @@ export function SellerDetail({
           razaoSocial={seller.razao_social}
           cnpj={seller.cnpj}
           pending={seller.reverificacao_pendente}
+          verifiedAt={seller.verificado_em}
           exhausted={exhausted ? { describedBy: EXHAUSTED_ID } : undefined}
         />
         {current !== undefined && (

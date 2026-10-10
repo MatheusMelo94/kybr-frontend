@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import type { JSX } from "react";
 import {
   afterAll,
   beforeAll,
@@ -12,8 +13,12 @@ import {
 import { ToastProvider } from "@/components/panel/toast";
 import type { ReverifyResult } from "@/features/panel-sellers/actions";
 import { ReverifyButton } from "@/features/panel-sellers/components/reverify-button";
-import { SellersProvider } from "@/features/panel-sellers/components/sellers-provider";
+import {
+  SellersProvider,
+  useReverifyKey,
+} from "@/features/panel-sellers/components/sellers-provider";
 import { SessionExpiryProvider } from "@/features/panel-shell/components/session-expiry-provider";
+import { EVERY_MS, MAX_REFRESHES } from "@/lib/navigation/refresh-timing";
 
 // T141 (AC 56, plan-m8 D6, Q2): Reverificar spends a credit, so it confirms
 // first, keeps the intent key across an unknown outcome and shows the
@@ -27,6 +32,11 @@ const router = vi.hoisted(() => ({
   refresh: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+const fullNavigate = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/navigation/soft-navigate", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  fullNavigate,
+}));
 
 // jsdom has no showModal()/close() (see dialog.test.tsx).
 const proto = HTMLDialogElement.prototype;
@@ -57,10 +67,13 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/vendedores");
 });
 
-function renderButton(
-  props: Partial<Parameters<typeof ReverifyButton>[0]> = {},
-) {
-  return render(
+/** Shows the seller's current intent key (shared across the list and the detail). */
+function KeyProbe(): JSX.Element {
+  return <output data-key={useReverifyKey(SELLER).key} />;
+}
+
+function tree(props: Partial<Parameters<typeof ReverifyButton>[0]>) {
+  return (
     <SessionExpiryProvider>
       <ToastProvider closeLabel="Fechar">
         <SellersProvider>
@@ -68,13 +81,29 @@ function renderButton(
             sellerId={SELLER}
             razaoSocial="Loja Exemplo Ltda"
             cnpj="12.345.***/****-90"
+            verifiedAt="2026-09-01T12:00:00Z"
             {...props}
           />
+          <KeyProbe />
         </SellersProvider>
       </ToastProvider>
-    </SessionExpiryProvider>,
+    </SessionExpiryProvider>
   );
 }
+
+function renderButton(
+  props: Partial<Parameters<typeof ReverifyButton>[0]> = {},
+) {
+  const view = render(tree(props));
+  return {
+    ...view,
+    rerender: (next: Partial<Parameters<typeof ReverifyButton>[0]>) =>
+      view.rerender(tree({ ...props, ...next })),
+  };
+}
+
+const currentKey = (): string | null =>
+  document.querySelector("output[data-key]")?.getAttribute("data-key") ?? null;
 
 function openDialog(): void {
   fireEvent.click(screen.getByRole("button", { name: "Reverificar" }));
@@ -157,26 +186,30 @@ describe("ReverifyButton", () => {
     expect(router.refresh).toHaveBeenCalled();
   });
 
-  it("a retry after NETWORK reuses the intent key", async () => {
-    reverifyAction
-      .mockResolvedValueOnce({ ok: false, code: "NETWORK" })
-      .mockResolvedValueOnce({ ok: true });
-    renderButton();
-    openDialog();
-    await act(async () => {
-      fireEvent.click(submitButton());
-    });
-    expect(screen.getByRole("alert", { hidden: true }).textContent).toBe(
-      NETWORK_ERROR,
-    );
-    await act(async () => {
-      fireEvent.click(submitButton());
-    });
-    const [first, second] = reverifyAction.mock.calls.map(
-      (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
-    );
-    expect(second).toBe(first);
-  });
+  it.each(["NETWORK", "UNAVAILABLE"] as const)(
+    "P8-007: a retry after %s reuses the intent key (O-F7)",
+    async (code) => {
+      reverifyAction
+        .mockResolvedValueOnce({ ok: false, code })
+        .mockResolvedValueOnce({ ok: true });
+      renderButton();
+      openDialog();
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+      expect(screen.getByRole("alert", { hidden: true }).textContent).toBe(
+        NETWORK_ERROR,
+      );
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+      const [first, second] = reverifyAction.mock.calls.map(
+        (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
+      );
+      expect(second).toBe(first);
+      expect(router.refresh).toHaveBeenCalled();
+    },
+  );
 
   it("a definitive outcome spends the key: the next intent gets a fresh one", async () => {
     reverifyAction.mockResolvedValue({ ok: false, code: "SEM_SALDO" });
@@ -192,6 +225,92 @@ describe("ReverifyButton", () => {
       (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
     );
     expect(second).not.toBe(first);
+  });
+
+  it("P8-007: a 409 spends the key too (O-F7)", async () => {
+    reverifyAction.mockResolvedValue({
+      ok: false,
+      code: "REVERIFICACAO_EM_ANDAMENTO",
+    });
+    renderButton();
+    const before = currentKey();
+    openDialog();
+    await act(async () => {
+      fireEvent.click(submitButton());
+    });
+    expect(reverifyAction.mock.calls[0]?.[0]).toMatchObject({
+      idempotencyKey: before,
+    });
+    expect(currentKey()).not.toBe(before);
+  });
+
+  it.each([
+    ["ok", { ok: true }],
+    ["409", { ok: false, code: "REVERIFICACAO_EM_ANDAMENTO" }],
+  ] as const)(
+    "P8-002: %s moves focus to the pending text, never to <body>",
+    async (_name, result) => {
+      reverifyAction.mockResolvedValue(result);
+      renderButton();
+      openDialog();
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement?.textContent).toBe("Reverificando…");
+    },
+  );
+
+  it("P8-003: ok with the flag never set: a few re-reads, never a full load", async () => {
+    vi.useFakeTimers();
+    try {
+      reverifyAction.mockResolvedValue({ ok: true });
+      renderButton({ pending: false });
+      openDialog();
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(EVERY_MS * (MAX_REFRESHES + 3));
+      });
+      expect(router.refresh).toHaveBeenCalledTimes(MAX_REFRESHES);
+      expect(fullNavigate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("P8-003: the re-reads stop once the row's verification changed", async () => {
+    vi.useFakeTimers();
+    try {
+      reverifyAction.mockResolvedValue({ ok: true });
+      const view = renderButton({ pending: false });
+      openDialog();
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+      view.rerender({ verifiedAt: "2026-10-10T12:00:00Z" });
+      await act(async () => {
+        vi.advanceTimersByTime(EVERY_MS * (MAX_REFRESHES + 3));
+      });
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+      expect(fullNavigate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("P8-006: described by the row's name (and the exhausted note)", () => {
+    renderButton({
+      describedBy: "vendedor-nome",
+      exhausted: { describedBy: "sem-saldo" },
+    });
+    expect(
+      screen
+        .getByRole("button", { name: "Reverificar" })
+        .getAttribute("aria-describedby"),
+    ).toBe("vendedor-nome sem-saldo");
   });
 
   it("409: the pending state, with no error", async () => {

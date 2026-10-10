@@ -29,6 +29,9 @@ function statusText(row: SellerRow): string {
  * card scrolls sideways when the six columns don't fit (at 360, and by a
  * few pixels at 768: their min-content is about 780 px). Server-safe.
  */
+/** P8-006: the row's name, which tells its Reverificar apart (ids are isPanelId). */
+const nameId = (id: string): string => `vendedor-${id}`;
+
 export function SellersTable({
   rows,
   exhausted,
@@ -55,6 +58,7 @@ export function SellersTable({
             <Td>
               {/* T143: the name (or the CNPJ standing in for it) opens the detail. */}
               <Link
+                id={nameId(row.id)}
                 href={`/vendedores/${encodeURIComponent(row.id)}`}
                 className={cn(
                   PANEL_LINK,
@@ -92,6 +96,8 @@ export function SellersTable({
                   razaoSocial={row.razao_social}
                   cnpj={row.cnpj}
                   pending={row.reverificacao_pendente}
+                  verifiedAt={row.verificado_em}
+                  describedBy={nameId(row.id)}
                   exhausted={exhausted}
                 />
               </div>

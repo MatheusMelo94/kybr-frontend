@@ -194,8 +194,10 @@ test.describe("Vendedores: Reverificar @feature-ops-panel @panel-operacao @panel
       .locator("#conteudo")
       .getByRole("button", { name: "Reverificar" });
     await expect(buttons.first()).toBeDisabled();
-    const describedBy = await buttons.first().getAttribute("aria-describedby");
-    await expect(page.locator(`#${describedBy}`)).toHaveText(EXHAUSTED);
+    // P8-006: the row's name first, then the plan note.
+    await expect(buttons.first()).toHaveAccessibleDescription(
+      new RegExp(`^.+ ${EXHAUSTED}$`),
+    );
   });
 
   test("O-F7 / F7: reverifyAction is owned by /vendedores and /vendedores/[sellerId]", async () => {

@@ -44,6 +44,23 @@ function rows(...items: SellerRow[]) {
 }
 
 describe("SellersTable", () => {
+  it("P8-006: each Reverificar is described by its row's name", () => {
+    renderTable({
+      rows: [
+        ROW,
+        {
+          ...ROW,
+          id: "b1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          razao_social: null,
+          cnpj: "98.765.***/****-10",
+        },
+      ],
+    });
+    const buttons = screen.getAllByRole("button", { name: "Reverificar" });
+    expect(buttons[0]).toHaveAccessibleDescription("Vendedor Exemplo Ltda");
+    expect(buttons[1]).toHaveAccessibleDescription("98.765.***/****-10");
+  });
+
   it("has the sellers.col.* headers", () => {
     renderTable({ rows: [ROW] });
     expect(
@@ -145,7 +162,10 @@ describe("SellersTable", () => {
     renderTable({ rows: [ROW], exhausted: { describedBy: "sem-saldo" } });
     const button = screen.getByRole("button", { name: "Reverificar" });
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("aria-describedby", "sem-saldo");
+    expect(button).toHaveAttribute(
+      "aria-describedby",
+      `vendedor-${ROW.id} sem-saldo`,
+    );
   });
 
   it("T143: the name links to the seller's detail", () => {
