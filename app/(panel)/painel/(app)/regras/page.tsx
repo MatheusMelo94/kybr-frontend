@@ -3,6 +3,7 @@ import type { JSX } from "react";
 
 import { PolicyForm } from "@/features/panel-regras/components/policy-form";
 import { regrasCopy } from "@/features/panel-regras/copy";
+import { REGRAS_H1_ID } from "@/features/panel-regras/ids";
 import { AppError } from "@/lib/api/errors";
 import { getPolicy } from "@/lib/api/panel/policies";
 import { requireSession } from "@/lib/api/panel/session";
@@ -27,7 +28,11 @@ export default async function RegrasPage(): Promise<JSX.Element> {
   const category = categories.find((item) => item.id === categoria);
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <h1 className="text-title font-title text-ink">
+      <h1
+        id={REGRAS_H1_ID}
+        tabIndex={-1}
+        className="text-title font-title text-ink focus:outline-none"
+      >
         {regrasCopy["regras.h1"]}
       </h1>
       <PolicyForm

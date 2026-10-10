@@ -1,12 +1,17 @@
+import { readFileSync } from "node:fs";
+
 import { expect, test, type Page } from "@playwright/test";
 
+import { SETTLE, holdNextAction } from "../fixtures/fila-timing.ts";
 import {
   createAccount,
+  expireSessions,
   horizontalOverflow,
   logIn,
   seed,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { bumpPolicy, sellersFault } from "../fixtures/sellers-mock.ts";
 
 // T144: Regras (S11, AC 59 first half, plan-m8 D8): the rules with their
 // selects, the days, the document switches, the save bar only while dirty,
@@ -120,5 +125,190 @@ test.describe("Regras @feature-ops-panel @panel-operacao @panel-regras @panel-ph
     await expect(
       content(page).getByRole("button", { name: "Tentar de novo" }),
     ).toBeVisible();
+  });
+});
+
+// T145: save, conflict and the leave guard (AC 59 second half, AC 7, Q3,
+// O-F7, O-F9).
+
+const SAVE_ERROR =
+  "Não conseguimos salvar as regras. Suas mudanças continuam aqui. Tente de novo.";
+const CONFLICT =
+  "As regras mudaram em outra aba. Recarregue a página para ver a versão atual.";
+
+const mei = (page: Page) =>
+  content(page).getByRole("combobox", { name: "MEI" });
+
+async function changeMei(page: Page): Promise<string> {
+  const select = mei(page);
+  const current = await select.inputValue();
+  const next = current === "review" ? "approve" : "review";
+  await select.selectOption(next);
+  return next;
+}
+
+test.describe("Regras: saving and leaving @feature-ops-panel @panel-operacao @panel-regras @panel-phone", () => {
+  test("save: busy, toast.rules_saved, the bar goes and focus lands on the heading; the reload shows it", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-salvar", testInfo);
+    await createAccount(request, email);
+    await openRegras(page, email);
+    const next = await changeMei(page);
+    const release = await holdNextAction(page, '"mei"');
+    const button = saveBar(page).getByRole("button", {
+      name: /Salvar regras|Salvando/,
+    });
+    await button.click();
+    await expect(button).toHaveAttribute("aria-busy", "true");
+    release();
+    await expect(page.getByText("Regras salvas")).toBeVisible(SETTLE);
+    await expect(saveBar(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Regras de aprovação" }),
+    ).toBeFocused();
+    await page.reload();
+    await expect(mei(page)).toHaveValue(next);
+  });
+
+  test("a failed save: regras.save.error in the bar, the draft kept", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-erro", testInfo);
+    await createAccount(request, email);
+    await sellersFault(request, email, "policy-put", "500", { times: 1 });
+    await openRegras(page, email);
+    const next = await changeMei(page);
+    await saveBar(page).getByRole("button", { name: "Salvar regras" }).click();
+    await expect(saveBar(page).getByRole("alert")).toHaveText(
+      SAVE_ERROR,
+      SETTLE,
+    );
+    await expect(mei(page)).toHaveValue(next);
+  });
+
+  test("PR2 (O-F7): saved in another tab → regras.save.conflict, no merge; its reload loads the server copy", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-conflito", testInfo);
+    await createAccount(request, email);
+    await openRegras(page, email);
+    await bumpPolicy(request, email);
+    await content(page)
+      .getByRole("combobox", { name: "Empresa inapta, baixada ou suspensa" })
+      .selectOption("review");
+    await saveBar(page).getByRole("button", { name: "Salvar regras" }).click();
+    const alert = saveBar(page).getByRole("alert");
+    await expect(alert).toHaveText(CONFLICT, SETTLE);
+    await expect(
+      content(page).getByRole("combobox", {
+        name: "Empresa inapta, baixada ou suspensa",
+      }),
+    ).toHaveValue("review");
+    // No beforeunload prompt: the reload is Renata's own choice.
+    let prompted = false;
+    page.on("dialog", (dialog) => {
+      prompted = true;
+      void dialog.accept();
+    });
+    await alert.getByRole("button").click();
+    await expect(saveBar(page)).toHaveCount(0, SETTLE);
+    await expect(
+      content(page).getByRole("combobox", {
+        name: "Empresa inapta, baixada ou suspensa",
+      }),
+    ).toHaveValue("block");
+    expect(prompted).toBe(false);
+  });
+
+  test("dirty + a nav link: regras.leave.*; stay, then leave to the link", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-sair", testInfo);
+    await createAccount(request, email);
+    await openRegras(page, email);
+    await changeMei(page);
+    const fila = page
+      .getByRole("navigation", { name: "Navegação do painel" })
+      .getByRole("link", { name: /^Fila de revisão/ });
+    await fila.click();
+    const dialog = page.getByRole("dialog", { name: "Sair sem salvar?" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Continuar editando" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/\/regras$/);
+    await expect(saveBar(page)).toBeVisible();
+
+    await fila.click();
+    await dialog.getByRole("button", { name: "Sair sem salvar" }).click();
+    await expect(page).toHaveURL(/\/fila(\/[\w-]+)?$/, SETTLE);
+  });
+
+  test("a clean draft: the nav link goes with no dialog", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-limpo", testInfo);
+    await createAccount(request, email);
+    await openRegras(page, email);
+    await page
+      .getByRole("navigation", { name: "Navegação do painel" })
+      .getByRole("link", { name: /^Fila de revisão/ })
+      .click();
+    await expect(page).toHaveURL(/\/fila(\/[\w-]+)?$/, SETTLE);
+  });
+
+  test("dirty + reload: the browser's beforeunload prompt", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-recarregar", testInfo);
+    await createAccount(request, email);
+    await openRegras(page, email);
+    // A real click: beforeunload needs the page's user activation.
+    await content(page).getByRole("switch").first().click();
+    const prompt = new Promise<string>((resolve) => {
+      page.once("dialog", (dialog) => {
+        resolve(dialog.type());
+        void dialog.dismiss();
+      });
+    });
+    void page.reload().catch(() => undefined);
+    expect(await prompt).toBe("beforeunload");
+    await expect(saveBar(page)).toBeVisible();
+  });
+
+  test("dirty + session expiry → /entrar with perdido=1 (AC 7)", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-sessao", testInfo);
+    await createAccount(request, email);
+    await openRegras(page, email);
+    await changeMei(page);
+    await expireSessions(request, email);
+    await saveBar(page).getByRole("button", { name: "Salvar regras" }).click();
+    await page.waitForURL(/\/entrar\?.*perdido=1/, SETTLE);
+  });
+
+  test("F7: savePolicyAction is owned by the /regras page", async () => {
+    const manifest = JSON.parse(
+      readFileSync(".next/server/server-reference-manifest.json", "utf8"),
+    ) as {
+      node: Record<
+        string,
+        { exportedName?: string; workers: Record<string, unknown> }
+      >;
+    };
+    const entry = Object.values(manifest.node).find(
+      (value) => value.exportedName === "savePolicyAction",
+    );
+    expect(Object.keys(entry?.workers ?? {})).toContain(
+      "app/(panel)/painel/(app)/regras/page",
+    );
   });
 });

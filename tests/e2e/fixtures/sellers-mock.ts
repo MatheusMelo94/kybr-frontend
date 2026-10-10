@@ -64,3 +64,11 @@ export async function sellersFault(
     data: { email, endpoint, kind, ...extra },
   });
 }
+
+/** QA G6: another tab saved Regras (versao + 1, mei's action flips). */
+export async function bumpPolicy(
+  request: APIRequestContext,
+  email: string,
+): Promise<void> {
+  await request.post(`${CONTROLS}/policy/bump`, { data: { email } });
+}

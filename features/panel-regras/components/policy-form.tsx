@@ -2,11 +2,18 @@
 
 import { useRef, useState, type FormEvent, type JSX } from "react";
 
+import { Dialog } from "@/components/panel/dialog";
+import { FormAlert } from "@/components/panel/form-alert";
+import { useToast } from "@/components/panel/toast";
+import { Button } from "@/components/ui/button";
+import { callAction } from "@/features/panel-fila/call-action";
+import { savePolicyAction } from "@/features/panel-regras/actions";
 import { DocToggles } from "@/features/panel-regras/components/doc-toggles";
 import { RuleRow } from "@/features/panel-regras/components/rule-row";
 import { SaveBar } from "@/features/panel-regras/components/save-bar";
 import { regrasCopy } from "@/features/panel-regras/copy";
 import {
+  draftInput,
   invalidDias,
   isDirty,
   nodocsOffenders,
@@ -14,8 +21,17 @@ import {
   type Draft,
   type DraftRule,
 } from "@/features/panel-regras/draft";
+import { REGRAS_H1_ID } from "@/features/panel-regras/ids";
+import { useLeaveGuard } from "@/features/panel-regras/use-leave-guard";
+import { globalCopy } from "@/features/panel-shell/copy/global";
 import { fill } from "@/features/panel-shell/format";
+import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
 import type { Policy } from "@/lib/api/schemas/panel/policies";
+import {
+  currentUrl,
+  useNavigationGuard,
+} from "@/lib/navigation/navigation-guard";
+import { fullNavigate } from "@/lib/navigation/soft-navigate";
 
 type Props = {
   policy: Policy;
@@ -30,17 +46,27 @@ const NODOCS_ID = "regras-nodocs";
  * local state only (O-F9). The save bar shows only while the draft differs;
  * Descartar restores the server copy. Saving first checks recente's days and
  * regras.error.nodocs (beside the documents card and each offending rule,
- * focus on the first); the Server Action re-checks both. No simulation
- * anywhere (Non-Goal 4).
+ * focus on the first); the Server Action re-checks both. Then one write
+ * (savePolicyAction, the whole policy with versao): ok → toast.rules_saved
+ * and the saved draft is the new server copy; a failure keeps the draft with
+ * regras.save.error; a 409 is regras.save.conflict, never merged (O-F7): the
+ * server copy loads only when Renata uses its reload. Leaving while dirty
+ * asks regras.leave.* (useLeaveGuard). No simulation anywhere (Non-Goal 4).
  */
 export function PolicyForm({ policy, categoria }: Props): JSX.Element {
-  const [server] = useState(() => toDraft(policy));
+  const [server, setServer] = useState(() => toDraft(policy));
   const [draft, setDraft] = useState<Draft>(server);
   const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<"error" | "conflict" | null>(null);
+  const { show } = useToast();
+  const expire = useSessionExpiry();
+  const arm = useNavigationGuard();
   const selects = useRef(new Map<string, HTMLSelectElement>());
   const days = useRef<HTMLInputElement>(null);
   const dirty = isDirty(draft, server);
   const offenders = checked ? nodocsOffenders(draft) : [];
+  const guard = useLeaveGuard(dirty);
 
   function updateRule(chave: DraftRule["chave"], change: Partial<DraftRule>) {
     setDraft((current) => ({
@@ -51,8 +77,9 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
     }));
   }
 
-  function submit(event: FormEvent<HTMLFormElement>): void {
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (busy) return;
     if (invalidDias(draft)) {
       days.current?.focus();
       return;
@@ -63,7 +90,36 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
       selects.current.get(first)?.focus();
       return;
     }
-    // T145: savePolicyAction.
+    const here = arm();
+    setBusy(true);
+    setFailure(null);
+    const saving = draft;
+    const result = await callAction(savePolicyAction, draftInput(saving));
+    setBusy(false);
+    if (result.ok) {
+      const saved = { ...saving, versao: result.versao };
+      setServer(saved);
+      setDraft(saved);
+      setChecked(false);
+      show(regrasCopy["toast.rules_saved"]);
+      // The bar (and its button) unmounts: the heading takes focus.
+      if (here.stillHere()) document.getElementById(REGRAS_H1_ID)?.focus();
+      return;
+    }
+    if (result.code === "SESSAO_EXPIRADA") {
+      // The expiry's full load must not stop at beforeunload (perdido=1
+      // already tells Renata the draft is gone).
+      guard.disarm();
+      expire();
+    } else
+      setFailure(
+        result.code === "POLITICA_DESATUALIZADA" ? "conflict" : "error",
+      );
+  }
+
+  function reload(): void {
+    guard.disarm();
+    fullNavigate(currentUrl());
   }
 
   return (
@@ -110,12 +166,54 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
       />
       {dirty && (
         <SaveBar
+          busy={busy}
           onDiscard={() => {
             setDraft(server);
             setChecked(false);
+            setFailure(null);
           }}
+          alert={
+            <FormAlert className="basis-full">
+              {failure === "error" && regrasCopy["regras.save.error"]}
+              {failure === "conflict" && (
+                // O-F7: the server copy reloads only when Renata acts.
+                <button
+                  type="button"
+                  onClick={reload}
+                  className="text-left underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                >
+                  {regrasCopy["regras.save.conflict"]}
+                </button>
+              )}
+            </FormAlert>
+          }
         />
       )}
+      <Dialog
+        open={guard.pending !== null}
+        onClose={guard.stay}
+        title={regrasCopy["regras.leave.h"]}
+        closeLabel={globalCopy["common.close"]}
+      >
+        <div className="flex flex-col gap-6">
+          <p className="text-body text-ink">
+            {regrasCopy["regras.leave.body"]}
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="panel"
+              onClick={guard.stay}
+            >
+              {regrasCopy["regras.leave.stay"]}
+            </Button>
+            <Button type="button" size="panel" onClick={guard.leave}>
+              {regrasCopy["regras.leave.confirm"]}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </form>
   );
 }

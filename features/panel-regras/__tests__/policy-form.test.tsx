@@ -1,6 +1,16 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
+import { ToastProvider } from "@/components/panel/toast";
+import type { SavePolicyResult } from "@/features/panel-regras/actions";
 import { PolicyForm } from "@/features/panel-regras/components/policy-form";
 import type { Policy } from "@/lib/api/schemas/panel/policies";
 
@@ -40,14 +50,50 @@ const POLICY: Policy = {
   documentos_habilitados: ["CONTRATO_SOCIAL_OU_CCMEI", "CARTAO_CNPJ"],
 };
 
+const savePolicyAction = vi.hoisted(() => vi.fn());
+vi.mock("@/features/panel-regras/actions", () => ({ savePolicyAction }));
+const nav = vi.hoisted(() => ({ soft: vi.fn(), full: vi.fn() }));
+vi.mock("@/lib/navigation/soft-navigate", () => ({
+  useSoftNavigate: () => nav.soft,
+  fullNavigate: nav.full,
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
+
+// jsdom has no showModal()/close() (see dialog.test.tsx).
+const proto = HTMLDialogElement.prototype;
+const original = { showModal: proto.showModal, close: proto.close };
+beforeAll(() => {
+  proto.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  });
+  proto.close = vi.fn(function (this: HTMLDialogElement) {
+    if (!this.hasAttribute("open")) return;
+    this.removeAttribute("open");
+    this.dispatchEvent(new Event("close"));
+  });
+});
+afterAll(() => {
+  proto.showModal = original.showModal;
+  proto.close = original.close;
+});
+beforeEach(() => {
+  vi.clearAllMocks();
+  window.history.replaceState(null, "", "/regras");
+});
+
 const NODOCS = 'Ative pelo menos um documento para usar "Pedir documento".';
 
 function renderForm(policy: Policy = POLICY) {
   return render(
-    <PolicyForm
-      policy={policy}
-      categoria={{ nome: "Moda e acessórios", descricao: "Lojas de roupa" }}
-    />,
+    <ToastProvider closeLabel="Fechar">
+      <a href="/fila">Fila de revisão</a>
+      <PolicyForm
+        policy={policy}
+        categoria={{ nome: "Moda e acessórios", descricao: "Lojas de roupa" }}
+      />
+    </ToastProvider>,
   );
 }
 
@@ -176,5 +222,115 @@ describe("PolicyForm", () => {
     fireEvent.change(days, { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar regras" }));
     expect(days).toHaveFocus();
+  });
+});
+
+const SAVE_ERROR =
+  "Não conseguimos salvar as regras. Suas mudanças continuam aqui. Tente de novo.";
+const CONFLICT =
+  "As regras mudaram em outra aba. Recarregue a página para ver a versão atual.";
+
+function editMei(value = "review"): void {
+  fireEvent.change(screen.getByRole("combobox", { name: "MEI" }), {
+    target: { value },
+  });
+}
+
+async function save(): Promise<void> {
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Salvar regras" }));
+  });
+}
+
+describe("PolicyForm: save, conflict and leaving (T145)", () => {
+  it("busy, then toast.rules_saved and the bar disappears; the whole policy with versao", async () => {
+    let finish: (result: SavePolicyResult) => void = () => {};
+    savePolicyAction.mockReturnValue(
+      new Promise<SavePolicyResult>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderForm();
+    editMei();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar regras" }));
+    expect(
+      within(saveBar() as HTMLElement).getByRole("button", { busy: true }),
+    ).toBeTruthy();
+    expect(savePolicyAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        versao: 1,
+        documentos_habilitados: ["CONTRATO_SOCIAL_OU_CCMEI", "CARTAO_CNPJ"],
+        regras: expect.arrayContaining([{ chave: "mei", acao: "review" }]),
+      }),
+    );
+    await act(async () => finish({ ok: true, versao: 2 }));
+    expect(screen.getByText("Regras salvas")).toBeTruthy();
+    expect(saveBar()).toBeNull();
+    // The saved draft is the new server copy, with the new versao.
+    savePolicyAction.mockResolvedValue({ ok: true, versao: 3 });
+    editMei("approve");
+    await save();
+    expect(savePolicyAction.mock.calls[1]?.[0]).toMatchObject({ versao: 2 });
+  });
+
+  it("a failure: regras.save.error in the bar, the draft kept", async () => {
+    savePolicyAction.mockResolvedValue({ ok: false, code: "UNAVAILABLE" });
+    renderForm();
+    editMei();
+    await save();
+    expect(
+      within(saveBar() as HTMLElement).getByRole("alert"),
+    ).toHaveTextContent(SAVE_ERROR);
+    expect(screen.getByRole("combobox", { name: "MEI" })).toHaveValue("review");
+  });
+
+  it("409 (PR2): regras.save.conflict, never merged; the reload acts only when asked", async () => {
+    savePolicyAction.mockResolvedValue({
+      ok: false,
+      code: "POLITICA_DESATUALIZADA",
+    });
+    renderForm();
+    editMei();
+    await save();
+    const alert = within(saveBar() as HTMLElement).getByRole("alert");
+    expect(alert).toHaveTextContent(CONFLICT);
+    expect(screen.getByRole("combobox", { name: "MEI" })).toHaveValue("review");
+    expect(nav.full).not.toHaveBeenCalled();
+    fireEvent.click(within(alert).getByRole("button", { name: CONFLICT }));
+    expect(nav.full).toHaveBeenCalledWith("/regras");
+  });
+
+  it("dirty + a nav link: regras.leave.*; Continuar editando stays, Sair sem salvar goes there", () => {
+    renderForm();
+    editMei();
+    fireEvent.click(screen.getByText("Fila de revisão"));
+    expect(
+      screen.getByRole("heading", { name: "Sair sem salvar?", hidden: true }),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continuar editando", hidden: true }),
+    );
+    expect(nav.soft).not.toHaveBeenCalled();
+    expect(saveBar()).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Fila de revisão"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sair sem salvar", hidden: true }),
+    );
+    expect(nav.soft).toHaveBeenCalledWith("/fila", expect.anything());
+  });
+
+  it("a clean draft: links pass with no dialog", () => {
+    renderForm();
+    const event = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    screen.getByText("Fila de revisão").dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.getByRole("dialog", { hidden: true })).not.toHaveAttribute(
+      "open",
+    );
   });
 });
