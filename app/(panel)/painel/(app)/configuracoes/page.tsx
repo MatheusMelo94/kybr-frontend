@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { JSX } from "react";
 
 import { CopyLinkButton } from "@/components/panel/copy-link-button";
+import { PasswordForm } from "@/features/panel-settings/components/password-form";
 import { SettingsForm } from "@/features/panel-settings/components/settings-form";
 import { settingsCopy } from "@/features/panel-settings/copy";
 import { requireSession } from "@/lib/api/panel/session";
@@ -45,6 +46,7 @@ export default async function ConfiguracoesPage(): Promise<JSX.Element> {
           </section>
         }
       />
+      <PasswordForm email={me.email} />
     </div>
   );
 }

@@ -219,3 +219,26 @@ describe("loginAction (D-A4, ADR-0009)", () => {
     expect(panelStore().calls).toEqual([]);
   });
 });
+
+describe("loginAction: the shared session schema (O-F3, T136)", () => {
+  it.each([
+    ["an expiry in the past", new Date(Date.now() - 1000).toISOString()],
+    [
+      "an expiry 8 days ahead",
+      new Date(Date.now() + 8 * 86_400_000).toISOString(),
+    ],
+    ["an expiry without an offset", "2026-10-11T10:00:00"],
+  ])("a 200 with %s sets no cookie", async (_, expira_em) => {
+    server.use(
+      http.post("*/v1/auth/login", () =>
+        HttpResponse.json({ sessao: { id: "s".repeat(32), expira_em } }),
+      ),
+    );
+    const result = await login({
+      email: PANEL_EMAILS.renata,
+      senha: PANEL_PASSWORD,
+    });
+    expect(result.ok).toBe(false);
+    expect(cookies.setSessionCookie).not.toHaveBeenCalled();
+  });
+});

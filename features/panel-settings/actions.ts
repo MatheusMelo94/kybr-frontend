@@ -3,12 +3,19 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 
 import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from "@/features/panel-auth/validation";
+import {
+  changePasswordSchema,
   settingsFields,
   settingsSchema,
   type SettingsField,
 } from "@/features/panel-settings/schemas";
 import type { AppError } from "@/lib/api/errors";
+import { setSessionCookie } from "@/lib/api/panel/cookies";
 import { assertPanelHost } from "@/lib/api/panel/host";
+import { changePassword } from "@/lib/api/panel/password";
 import { requireSession, sessionExpiredResult } from "@/lib/api/panel/session";
 import { saveOwnName, saveWorkspace } from "@/lib/api/panel/workspace";
 import { panelPath } from "@/lib/panel-paths";
@@ -80,4 +87,92 @@ export async function saveSettingsAction(
     return failureOf(me.error);
   }
   return { ok: true };
+}
+
+export type ChangePasswordResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code:
+        | "SENHA_ATUAL_INCORRETA"
+        | "SENHA_CURTA"
+        | "SENHA_FRACA"
+        | "SESSAO_EXPIRADA"
+        | "VALOR_INVALIDO"
+        | "NETWORK";
+    }
+  | { ok: false; code: "LIMITE_TENTATIVAS"; retryAfterSeconds?: number };
+
+/** The two fields of the posted form, and nothing else (O-F2). */
+function passwordFields(input: unknown): Record<string, unknown> {
+  if (!(input instanceof FormData)) return {};
+  return {
+    senha_atual: input.get("senha_atual"),
+    senha_nova: input.get("senha_nova"),
+  };
+}
+
+/** A well-formed request whose only problem is a short new password. */
+function shortNewPassword(values: Record<string, unknown>): boolean {
+  const { senha_atual: current, senha_nova: next } = values;
+  return (
+    typeof current === "string" &&
+    current.length >= 1 &&
+    current.length <= PASSWORD_MAX_LENGTH &&
+    typeof next === "string" &&
+    next.length < PASSWORD_MIN_LENGTH
+  );
+}
+
+/**
+ * "Trocar senha" (AC 60, ADR-0009; Security O-F1..O-F3), posted straight
+ * by <form action> (O-F2: a POST even before hydration). ADR-0011's order:
+ * host, strict zod over the two fields (1..128; the new one ≥ 12), the
+ * session as a result, then D-A6. A 200 sets the cookie from the
+ * response's sessao through the login's helper and schema (O-F3); any
+ * other answer leaves it alone. It returns { ok } or a code, never an echo,
+ * and logs nothing of its input.
+ */
+export async function changePasswordAction(
+  input: unknown,
+): Promise<ChangePasswordResult> {
+  await assertPanelHost();
+  const values = passwordFields(input);
+  const parsed = changePasswordSchema.safeParse(values);
+  if (!parsed.success)
+    return {
+      ok: false,
+      code: shortNewPassword(values) ? "SENHA_CURTA" : "VALOR_INVALIDO",
+    };
+  try {
+    await requireSession({ onMissing: "result" });
+  } catch (error) {
+    return sessionExpiredResult(error);
+  }
+
+  const result = await changePassword(parsed.data);
+  if (result.ok) {
+    await setSessionCookie(result.data.sessao);
+    return { ok: true };
+  }
+  const { error } = result;
+  switch (error.code) {
+    case "SENHA_ATUAL_INCORRETA":
+    case "SENHA_FRACA":
+    case "SESSAO_EXPIRADA":
+    case "VALOR_INVALIDO":
+      return { ok: false, code: error.code };
+    case "LIMITE_TENTATIVAS":
+      return error.retryAfterSeconds === undefined
+        ? { ok: false, code: "LIMITE_TENTATIVAS" }
+        : {
+            ok: false,
+            code: "LIMITE_TENTATIVAS",
+            retryAfterSeconds: error.retryAfterSeconds,
+          };
+    default:
+      // 5xx, a dropped or malformed answer: an unknown outcome, never
+      // retried; the next navigation's requireSession settles it (O-F2).
+      return { ok: false, code: "NETWORK" };
+  }
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { dashboardSchema } from "@/lib/api/schemas/panel/home";
 import {
@@ -96,10 +96,22 @@ describe("dashboardSchema (D-H1, C-M8-1)", () => {
   });
 });
 
-describe("sessionGrantSchema (D-A6 200, C-M8-7)", () => {
+describe("sessionGrantSchema (D-A6 200, C-M8-7; the login's too, O-F3)", () => {
   const ok = {
     sessao: { id: "s".repeat(32), expira_em: "2026-10-17T10:00:00Z" },
   };
+  beforeEach(() => {
+    vi.useFakeTimers({ now: Date.parse("2026-10-10T10:00:00Z") });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("O-F3: accepts up to 7 days ahead plus the clock-skew allowance", () => {
+    expect(
+      sessionGrantSchema.safeParse({
+        sessao: { ...ok.sessao, expira_em: "2026-10-17T10:04:00Z" },
+      }).success,
+    ).toBe(true);
+  });
 
   it("accepts a session with an ISO expiry carrying an offset or Z", () => {
     expect(sessionGrantSchema.safeParse(ok).success).toBe(true);
@@ -123,6 +135,23 @@ describe("sessionGrantSchema (D-A6 200, C-M8-7)", () => {
       "a date-only expiry",
       { sessao: { ...ok.sessao, expira_em: "2026-10-17" } },
     ],
+    [
+      "O-F3: an expiry in the past",
+      { sessao: { ...ok.sessao, expira_em: "2026-10-10T09:59:59Z" } },
+    ],
+    [
+      "O-F3: an expiry right now",
+      { sessao: { ...ok.sessao, expira_em: "2026-10-10T10:00:00Z" } },
+    ],
+    [
+      "O-F3: an expiry more than 7 days ahead",
+      { sessao: { ...ok.sessao, expira_em: "2026-10-17T10:06:00Z" } },
+    ],
+    [
+      "O-F3: an id outside the cookie charset",
+      { sessao: { ...ok.sessao, id: `${"s".repeat(20)} ;x` } },
+    ],
+    ["O-F3: a long id", { sessao: { ...ok.sessao, id: "s".repeat(513) } }],
   ])("rejects %s", (_, body) => {
     expect(sessionGrantSchema.safeParse(body).success).toBe(false);
   });
