@@ -551,11 +551,16 @@ describe("D-C4 request documents (PC14, G7, G10, G11)", () => {
 
 describe("PC16, PC17, C-M6-1: new cases and documents back", () => {
   it("POST /__mock/panel/cases creates a case now; desde counts it", async () => {
-    const { email, token } = await seeded("um");
+    // The clock is fixed BEFORE seeding (QA-M6-005): a seed made at the real
+    // clock would fall after `desde` once the real date passes 2026-10-06.
+    const email = `um-${crypto.randomUUID().slice(0, 8)}@exemplo.test`;
     await control("POST", "/case-clock", {
       email,
       now: "2026-10-06T14:00:00Z",
     });
+    const seed = await control("POST", "/cases/seed", { email, preset: "um" });
+    expect(seed.status).toBe(201);
+    const token = await login(email);
     const desde = "2026-10-06T13:59:00Z";
     const before = await call(
       "GET",
