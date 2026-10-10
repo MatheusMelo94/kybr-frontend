@@ -4,7 +4,7 @@ import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { DocumentDownload } from "@/features/panel-fila/components/document-download";
 import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
-import { formatDataHora } from "@/features/panel-fila/format";
+import { formatDataHora } from "@/features/panel-shell/format";
 import { globalCopy } from "@/features/panel-shell/copy/global";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import { fill } from "@/features/panel-shell/format";

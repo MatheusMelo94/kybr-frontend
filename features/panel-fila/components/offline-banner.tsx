@@ -5,7 +5,7 @@ import { useEffect, useRef, type JSX } from "react";
 import { Notice } from "@/components/panel/notice";
 import { useToast } from "@/components/panel/toast";
 import { useFila } from "@/features/panel-fila/components/fila-provider";
-import { formatHora } from "@/features/panel-fila/format";
+import { formatHora } from "@/features/panel-shell/format";
 import { globalCopy } from "@/features/panel-shell/copy/global";
 import { fill } from "@/features/panel-shell/format";
 

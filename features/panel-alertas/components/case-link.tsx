@@ -1,0 +1,40 @@
+import Link from "next/link";
+import type { JSX } from "react";
+
+import { alertasCopy } from "@/features/panel-alertas/copy";
+import { filaCopy } from "@/features/panel-fila/copy";
+import { fill } from "@/features/panel-shell/format";
+import type { Alert } from "@/lib/api/schemas/panel/alerts";
+
+/** "Decidir": the secondary control's look, ≥ 44 × 44 on coarse pointers (AC 51). */
+export const DECIDIR_CLASS =
+  "inline-flex min-h-(--size-control-panel) min-w-11 items-center justify-center rounded-full border border-field-line px-4 text-body font-strong text-ink " +
+  "transition-colors duration-(--duration-fast) ease-out-quart motion-reduce:transition-none hover:bg-surface-raised " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus pointer-coarse:min-h-11";
+
+/**
+ * The row's case action (AC 48): an open case → alert.case.open to
+ * /fila/{case_id} (the M6 detail); a decided one → alert.case.decided with
+ * the Fila's decision word (G2); no case (atenção / info, WEBHOOK_FALHOU,
+ * AC 52) → nothing.
+ */
+export function CaseLink({ alert }: { alert: Alert }): JSX.Element | null {
+  if (alert.case_id === undefined) return null;
+  if (alert.case_decisao !== undefined)
+    return (
+      <span className="text-secondary font-strong text-ink">
+        {fill(alertasCopy["alert.case.decided"], {
+          decisao: filaCopy[`fila.decision.${alert.case_decisao}`],
+        })}
+      </span>
+    );
+  return (
+    <Link
+      href={`/fila/${encodeURIComponent(alert.case_id)}`}
+      prefetch={false}
+      className={DECIDIR_CLASS}
+    >
+      {alertasCopy["alert.case.open"]}
+    </Link>
+  );
+}

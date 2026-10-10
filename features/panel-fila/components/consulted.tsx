@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 
 import { filaCopy } from "@/features/panel-fila/copy";
-import { formatDataHora } from "@/features/panel-fila/format";
+import { formatDataHora } from "@/features/panel-shell/format";
 import { fill } from "@/features/panel-shell/format";
 import type { CaseView } from "@/lib/api/panel/cases";
 

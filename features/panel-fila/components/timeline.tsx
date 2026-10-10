@@ -2,7 +2,7 @@ import type { JSX } from "react";
 
 import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
-import { formatRelativo } from "@/features/panel-fila/format";
+import { formatRelativo } from "@/features/panel-shell/format";
 import { fill } from "@/features/panel-shell/format";
 import type { CaseEvent } from "@/lib/api/schemas/panel/cases";
 
