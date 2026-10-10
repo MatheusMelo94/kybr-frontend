@@ -5,6 +5,7 @@ import { AlertList } from "@/features/panel-alertas/components/alert-list";
 import { MonEmpty } from "@/features/panel-alertas/components/mon-empty";
 import { EmailCard } from "@/features/panel-alertas/components/email-card";
 import { MonHeader } from "@/features/panel-alertas/components/mon-header";
+import { MonOffline } from "@/features/panel-alertas/components/mon-offline";
 import { MonLayout } from "@/features/panel-alertas/components/mon-layout";
 import { alertasCopy } from "@/features/panel-alertas/copy";
 import { loadMonitoramento } from "@/features/panel-alertas/data";
@@ -19,7 +20,12 @@ export default async function MonitoramentoPage(): Promise<JSX.Element> {
   const { alerts, monitoring, state } = await loadMonitoramento();
   return (
     <MonLayout
-      header={<MonHeader monitoring={monitoring} />}
+      header={
+        <>
+          <MonOffline renderedAt={Date.now()} />
+          <MonHeader monitoring={monitoring} />
+        </>
+      }
       main={
         <AlertList
           alerts={alerts}

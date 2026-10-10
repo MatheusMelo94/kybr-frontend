@@ -1,6 +1,6 @@
-import Link from "next/link";
 import type { JSX } from "react";
 
+import { OfflineAwareLink } from "@/features/panel-alertas/components/offline-aware-link";
 import { alertasCopy } from "@/features/panel-alertas/copy";
 import type { MonState } from "@/features/panel-alertas/state";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
@@ -22,9 +22,15 @@ export function MonEmpty({ state }: Props): JSX.Element {
             })}
       </p>
       {state.kind === "unmonitored" && (
-        <Link href="/lote" className={`${PANEL_LINK} self-start`}>
-          {alertasCopy["mon.empty.unmonitored.cta"]}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <OfflineAwareLink
+            href="/lote"
+            className={`${PANEL_LINK} aria-disabled:cursor-not-allowed aria-disabled:text-ink-muted`}
+            note
+          >
+            {alertasCopy["mon.empty.unmonitored.cta"]}
+          </OfflineAwareLink>
+        </div>
       )}
     </div>
   );

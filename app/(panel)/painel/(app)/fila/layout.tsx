@@ -2,7 +2,7 @@ import type { JSX, ReactNode } from "react";
 
 import { FilaProvider } from "@/features/panel-fila/components/fila-provider";
 import { NewCasesPoller } from "@/features/panel-fila/components/new-cases-poller";
-import { OfflineBanner } from "@/features/panel-fila/components/offline-banner";
+import { FilaOfflineBanner } from "@/features/panel-fila/components/offline-banner";
 
 // The Fila's client state lives here, above both pages, so it survives the
 // navigation between /fila and /fila/{id} (plan-m6 § 5). No loading.tsx: the
@@ -17,7 +17,7 @@ export default function FilaLayout({
   return (
     <FilaProvider renderedAt={Date.now()}>
       <NewCasesPoller />
-      <OfflineBanner />
+      <FilaOfflineBanner />
       {children}
     </FilaProvider>
   );

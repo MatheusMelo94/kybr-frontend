@@ -15,14 +15,23 @@ const TONES: Record<AlertSeveridade, StatusTone> = {
   info: "neutral",
 };
 
-type Props = { alert: Alert; now: Date };
+type Props = {
+  alert: Alert;
+  now: Date;
+  /** The page's first open case: its link carries offline.actions (G6). */
+  firstOpen?: boolean;
+};
 
 /**
  * One alert (S8): severity, the alert.<TIPO> sentence (the article's name),
  * when, alert.pedido_aberto, and the case action. Below lg the parts stack
  * in that order (AC 51).
  */
-export function AlertRow({ alert, now }: Props): JSX.Element {
+export function AlertRow({
+  alert,
+  now,
+  firstOpen = false,
+}: Props): JSX.Element {
   const sentenceId = `alerta-${alert.id}`;
   return (
     <article
@@ -46,8 +55,8 @@ export function AlertRow({ alert, now }: Props): JSX.Element {
           )}
         </p>
       </div>
-      <div className="flex shrink-0 flex-wrap">
-        <CaseLink alert={alert} />
+      <div className="flex shrink-0 flex-wrap gap-2 lg:max-w-56">
+        <CaseLink alert={alert} note={firstOpen} />
       </div>
     </article>
   );

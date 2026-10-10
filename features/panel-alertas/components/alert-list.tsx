@@ -15,6 +15,9 @@ type Props = {
 
 /** mon.alerts.h, mon.alerts.sub and the alerts (S8 success, AC 48). */
 export function AlertList({ alerts, now, empty }: Props): JSX.Element {
+  const firstOpen = alerts.find(
+    (alert) => alert.case_id !== undefined && alert.case_decisao === undefined,
+  )?.id;
   return (
     <section aria-labelledby="mon-alerts-h" className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -31,7 +34,11 @@ export function AlertList({ alerts, now, empty }: Props): JSX.Element {
         <ul className="flex flex-col gap-3">
           {alerts.map((alert) => (
             <li key={alert.id} className="min-w-0">
-              <AlertRow alert={alert} now={now} />
+              <AlertRow
+                alert={alert}
+                now={now}
+                firstOpen={alert.id === firstOpen}
+              />
             </li>
           ))}
         </ul>
