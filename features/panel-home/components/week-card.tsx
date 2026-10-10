@@ -1,11 +1,16 @@
 import type { CSSProperties, JSX } from "react";
 
 import { CardError } from "@/features/panel-home/components/card-error";
-import { HomeCard } from "@/features/panel-home/components/home-card";
+import {
+  cardHeadingId,
+  HomeCard,
+} from "@/features/panel-home/components/home-card";
 import { homeCopy } from "@/features/panel-home/copy";
 import { weekRows, type WeekRow } from "@/features/panel-home/home-state";
 import { formatNumber } from "@/features/panel-shell/format";
 import type { Dashboard } from "@/lib/api/schemas/panel/home";
+
+const WEEK_ID = "home-week";
 
 type Props = { semana: Dashboard["semana"] };
 
@@ -19,12 +24,12 @@ type Props = { semana: Dashboard["semana"] };
 export function WeekCard({ semana }: Props): JSX.Element {
   return (
     <HomeCard
-      id="home-week"
+      id={WEEK_ID}
       title={homeCopy["home.week.h"]}
       sub={homeCopy["home.week.sub"]}
     >
       {semana === undefined ? (
-        <CardError />
+        <CardError describedBy={cardHeadingId(WEEK_ID)} />
       ) : (
         <WeekChart rows={weekRows(semana)} />
       )}

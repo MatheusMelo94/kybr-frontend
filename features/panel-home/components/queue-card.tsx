@@ -2,10 +2,15 @@ import Link from "next/link";
 import type { JSX } from "react";
 
 import { CardError } from "@/features/panel-home/components/card-error";
-import { HomeCard } from "@/features/panel-home/components/home-card";
+import {
+  cardHeadingId,
+  HomeCard,
+} from "@/features/panel-home/components/home-card";
 import { homeCopy } from "@/features/panel-home/copy";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import type { Dashboard } from "@/lib/api/schemas/panel/home";
+
+const QUEUE_ID = "home-queue";
 
 type Props = { fila: Dashboard["fila"] };
 
@@ -18,13 +23,13 @@ type Props = { fila: Dashboard["fila"] };
 export function QueueCard({ fila }: Props): JSX.Element {
   return (
     <HomeCard
-      id="home-queue"
+      id={QUEUE_ID}
       title={homeCopy["home.queue.h"]}
       sub={homeCopy["home.queue.sub"]}
       cta={{ href: "/fila", label: homeCopy["home.queue.cta"] }}
     >
       {fila === undefined ? (
-        <CardError />
+        <CardError describedBy={cardHeadingId(QUEUE_ID)} />
       ) : fila.length === 0 ? (
         <p className="text-body text-ink">{homeCopy["home.queue.empty"]}</p>
       ) : (

@@ -16,12 +16,22 @@ const notYet = (): boolean => false;
  * page fully once if Next dropped every refresh (useRefreshUntil, the same
  * Pre-Convention workaround as the Fila's). The other cards stay.
  */
-export function CardError(): JSX.Element {
+export function CardError({
+  describedBy,
+}: {
+  /** The card's heading (P8-006): up to four retries on one page. */
+  describedBy?: string | undefined;
+} = {}): JSX.Element {
   const retry = useRefreshUntil(notYet);
   return (
     <div className="flex flex-col items-start gap-2">
       <p className="text-body text-ink-muted">{homeCopy["home.card.error"]}</p>
-      <Button variant="secondary" size="panel" onClick={retry}>
+      <Button
+        variant="secondary"
+        size="panel"
+        aria-describedby={describedBy}
+        onClick={retry}
+      >
         {globalCopy["error.load.cta"]}
       </Button>
     </div>

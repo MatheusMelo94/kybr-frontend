@@ -4,10 +4,15 @@ import { StatusDot, type StatusTone } from "@/components/ui/status-dot";
 import { alertasCopy } from "@/features/panel-alertas/copy";
 import { alertSentence } from "@/features/panel-alertas/sentence";
 import { CardError } from "@/features/panel-home/components/card-error";
-import { HomeCard } from "@/features/panel-home/components/home-card";
+import {
+  cardHeadingId,
+  HomeCard,
+} from "@/features/panel-home/components/home-card";
 import { homeCopy } from "@/features/panel-home/copy";
 import type { Dashboard } from "@/lib/api/schemas/panel/home";
 import type { AlertSeveridade } from "@/lib/panel-api-values";
+
+const FEED_ID = "home-feed";
 
 // DDR-0003: the signal is the dot; the word says it (AC 71).
 const TONES: Record<AlertSeveridade, StatusTone> = {
@@ -26,12 +31,12 @@ type Props = { alertas: Dashboard["alertas"] };
 export function FeedCard({ alertas }: Props): JSX.Element {
   return (
     <HomeCard
-      id="home-feed"
+      id={FEED_ID}
       title={homeCopy["home.feed.h"]}
       cta={{ href: "/monitoramento", label: homeCopy["home.feed.cta"] }}
     >
       {alertas === undefined ? (
-        <CardError />
+        <CardError describedBy={cardHeadingId(FEED_ID)} />
       ) : alertas.length === 0 ? (
         <p className="text-body text-ink">{homeCopy["home.feed.empty"]}</p>
       ) : (

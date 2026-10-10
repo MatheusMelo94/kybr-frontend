@@ -12,6 +12,9 @@ type Props = {
 };
 
 /** An Início card: a region named by its h2, an optional line under it, its content and one link. */
+/** The card's h2 id (P8-006: its CardError retry is described by it). */
+export const cardHeadingId = (id: string): string => `${id}-h`;
+
 export function HomeCard({
   id,
   title,
@@ -19,7 +22,7 @@ export function HomeCard({
   cta,
   children,
 }: Props): JSX.Element {
-  const headingId = `${id}-h`;
+  const headingId = cardHeadingId(id);
   return (
     <section
       aria-labelledby={headingId}

@@ -242,6 +242,17 @@ describe("HomeView", () => {
     expect(screen.getByText("vendedores verificados")).toBeInTheDocument();
   });
 
+  it("P8-006: each card's Tentar de novo is described by its heading", () => {
+    render(view({ kpis: FULL.kpis }));
+    const retries = screen.getAllByRole("button", { name: "Tentar de novo" });
+    expect(
+      retries.map((button) => button.getAttribute("aria-describedby")),
+    ).toEqual(["home-queue-h", "home-feed-h", "home-week-h"]);
+    expect(retries[0]).toHaveAccessibleDescription("Precisa da sua atenção");
+    expect(retries[1]).toHaveAccessibleDescription("Mudanças na base");
+    expect(retries[2]).toHaveAccessibleDescription("Semana");
+  });
+
   it("PH3: missing KPIs show the card error in their place", () => {
     render(view({ fila: [], alertas: [], semana: WEEK }));
     expect(
