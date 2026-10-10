@@ -97,6 +97,8 @@ test.describe("M4 access journey, keyboard only @feature-ops-panel @panel-access
       page,
       page.getByRole("button", { name: "Conta" }).locator("visible=true"),
     );
+    // Configurações comes first (M8, T135).
+    await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("menuitem", { name: "Sair" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/entrar\?motivo=saiu$/);

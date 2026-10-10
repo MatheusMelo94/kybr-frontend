@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AccountMenu } from "@/features/panel-shell/components/account-menu";
+
+let pathname = "/";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
 function renderMenu() {
   render(
@@ -65,5 +68,27 @@ describe("AccountMenu (plan § 2.8: a menu button)", () => {
     expect(
       screen.queryByRole("menuitem", { name: "Configurações" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("T135: a navigation (Configurações) closes it", () => {
+    const { rerender } = render(
+      <AccountMenu>
+        <a href="/configuracoes" role="menuitem">
+          Configurações
+        </a>
+      </AccountMenu>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Conta" }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    pathname = "/configuracoes";
+    rerender(
+      <AccountMenu>
+        <a href="/configuracoes" role="menuitem">
+          Configurações
+        </a>
+      </AccountMenu>,
+    );
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    pathname = "/";
   });
 });

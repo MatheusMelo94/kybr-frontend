@@ -56,9 +56,9 @@ describe("Conta below lg: the plan variant (AC 10)", () => {
     expect(menu).toHaveAccessibleDescription(
       "Teste grátis 40 de 200 verificações",
     );
-    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "Sair",
-    ]);
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Configurações", "Sair"]);
   });
 
   it("shows the plan above Sair", () => {
@@ -90,7 +90,11 @@ describe("Conta below lg: the plan variant (AC 10)", () => {
       `Teste grátis 200 de 200 verificações ${EXHAUSTED_TEXT}`,
     );
     const items = screen.getAllByRole("menuitem");
-    expect(items.map((item) => item.textContent)).toEqual(["Contratar", "Sair"]);
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Contratar",
+      "Configurações",
+      "Sair",
+    ]);
     expect(items[0]).toHaveAttribute("href", MAILTO);
   });
 
@@ -116,9 +120,9 @@ describe("Conta below lg: the plan variant (AC 10)", () => {
 
     const menu = screen.getByRole("menu");
     expect(menu).not.toHaveAttribute("aria-describedby");
-    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "Sair",
-    ]);
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Configurações", "Sair"]);
   });
 });
 

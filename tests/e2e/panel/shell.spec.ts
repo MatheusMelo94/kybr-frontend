@@ -130,7 +130,7 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     await expect(sidebar.getByText(/vendedores/)).toHaveCount(0);
   });
 
-  test("the account menu is a menu button: Enter opens on Sair, Esc closes and returns focus; no Configurações yet", async ({
+  test("the account menu is a menu button: Enter opens on Configurações (M8), then Sair; Esc closes and returns focus", async ({
     page,
     request,
   }, testInfo) => {
@@ -142,10 +142,11 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     await button.focus();
     await page.keyboard.press("Enter");
     await expect(button).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("menuitem", { name: "Sair" })).toBeFocused();
     await expect(
       page.getByRole("menuitem", { name: "Configurações" }),
-    ).toHaveCount(0);
+    ).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Sair" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);
     await expect(button).toBeFocused();

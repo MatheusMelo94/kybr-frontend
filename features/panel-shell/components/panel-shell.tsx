@@ -3,6 +3,7 @@ import type { JSX, ReactNode } from "react";
 import { ToastProvider } from "@/components/panel/toast";
 import { AccountMenu } from "@/features/panel-shell/components/account-menu";
 import { LogoutItem } from "@/features/panel-shell/components/logout-item";
+import { SettingsItem } from "@/features/panel-shell/components/settings-item";
 import { PanelNav } from "@/features/panel-shell/components/panel-nav";
 import { SkipLink } from "@/features/panel-shell/components/skip-link";
 import { BfcacheGuard } from "@/features/panel-shell/components/bfcache-guard";
@@ -67,6 +68,7 @@ export function PanelShell({ shell, children }: Props): JSX.Element {
               <div className="mt-auto flex flex-col gap-3">
                 <LivePlanBlock contratarHref={shell.contratarHref} />
                 <AccountMenu>
+                  <SettingsItem />
                   <LogoutItem />
                 </AccountMenu>
               </div>

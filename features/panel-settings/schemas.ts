@@ -5,19 +5,20 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
 } from "@/features/panel-auth/validation";
+import {
+  OWN_NAME_MAX_LENGTH,
+  PLATFORM_NAME_MAX_LENGTH,
+  type SettingsField,
+} from "@/features/panel-settings/validation";
+
+export type { SettingsField };
 
 // The Configurações actions' input schemas (plan-m8 D4, D7), authoritative
 // and server-side. Unknown keys are refused (.strict, plan § 4).
 
-/** C-M8-8 D-W4: the user's own name, 1..80 after trimming. */
-export const OWN_NAME_MAX_LENGTH = 80;
-
 export const ownNameSchema = z.strictObject({
   nome: z.string().trim().min(1).max(OWN_NAME_MAX_LENGTH),
 });
-
-/** The D-W3 platform name (C-M8-9: shown on the seller link). */
-export const PLATFORM_NAME_MAX_LENGTH = 80;
 
 /**
  * saveSettingsAction: the platform (D-W3) and the own name (D-W4). There is
@@ -30,7 +31,6 @@ export const settingsSchema = z.strictObject({
 });
 
 export type SettingsInput = z.infer<typeof settingsSchema>;
-export type SettingsField = "nome_plataforma" | "valor" | "nome";
 
 /** The fields a refused settings input breaks, in form order (shape only). */
 export function settingsFields(input: unknown): SettingsField[] {
