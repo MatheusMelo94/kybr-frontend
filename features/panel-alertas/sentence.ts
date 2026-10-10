@@ -12,30 +12,30 @@ export function alertSentence(alert: Alert): string {
   switch (alert.tipo) {
     case "SITUACAO_IRREGULAR":
       return fill(alertasCopy["alert.SITUACAO_IRREGULAR"], {
-        razao_social,
         ...alert.dados,
+        razao_social,
       });
     case "IE_SUSPENSA":
       return fill(alertasCopy["alert.IE_SUSPENSA"], {
-        razao_social,
         ...alert.dados,
+        razao_social,
       });
     case "RESPONSAVEL_SAIU_QSA":
       return fill(alertasCopy["alert.RESPONSAVEL_SAIU_QSA"], {
-        razao_social,
         ...alert.dados,
+        razao_social,
       });
     case "QSA_MUDOU":
       return fill(alertasCopy["alert.QSA_MUDOU"], { razao_social });
     case "CNAE_MUDOU":
       return fill(alertasCopy["alert.CNAE_MUDOU"], {
-        razao_social,
         ...alert.dados,
+        razao_social,
       });
     case "REGIME_MUDOU":
       return fill(alertasCopy["alert.REGIME_MUDOU"], {
-        razao_social,
         ...alert.dados,
+        razao_social,
       });
     case "WEBHOOK_FALHOU":
       return fill(alertasCopy["alert.WEBHOOK_FALHOU"], { razao_social });

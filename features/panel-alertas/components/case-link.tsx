@@ -41,6 +41,7 @@ export function CaseLink({
       href={`/fila/${encodeURIComponent(alert.case_id)}`}
       className={DECIDIR_CLASS}
       note={note}
+      describedBy={`alerta-${alert.id}`}
     >
       {alertasCopy["alert.case.open"]}
     </OfflineAwareLink>

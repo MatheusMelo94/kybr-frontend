@@ -150,7 +150,28 @@ describe("the list offline (G6, Q5)", () => {
     const [first, second] = screen.getAllByRole("link", { name: "Decidir" });
     expect(screen.getAllByText(ACTIONS)).toHaveLength(1);
     expect(first?.nextElementSibling).toHaveTextContent(ACTIONS);
-    expect(second).toHaveAttribute("aria-describedby", MON_OFFLINE_ACTIONS_ID);
+    expect(second?.getAttribute("aria-describedby")?.split(" ")).toContain(
+      MON_OFFLINE_ACTIONS_ID,
+    );
+  });
+
+  it("P7-002: online, each Decidir is described by its own alert's sentence", () => {
+    render(
+      <AlertList
+        alerts={[open("a".repeat(16)), open("b".repeat(16))]}
+        now={new Date(RENDERED)}
+      />,
+    );
+    const [first, second] = screen.getAllByRole("link", { name: "Decidir" });
+    expect(first).toHaveAttribute(
+      "aria-describedby",
+      `alerta-${"a".repeat(16)}`,
+    );
+    expect(second).toHaveAttribute(
+      "aria-describedby",
+      `alerta-${"b".repeat(16)}`,
+    );
+    expect(first).not.toHaveAccessibleDescription("");
   });
 
   it("F14: no Monitoramento code touches browser storage", () => {

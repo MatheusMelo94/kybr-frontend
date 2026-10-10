@@ -99,7 +99,10 @@ test.describe("Monitoramento offline, phone and accessibility (T125) @feature-op
     await context.setOffline(true);
     await expect(banner(page)).toBeVisible();
     await expect(decidir(page)).toHaveAttribute("aria-disabled", "true");
-    await expect(decidir(page)).toHaveAccessibleDescription(OFFLINE_ACTIONS);
+    // P7-002: the alert's sentence, then offline.actions.
+    await expect(decidir(page)).toHaveAccessibleDescription(
+      new RegExp(`\\. ${OFFLINE_ACTIONS}$`),
+    );
     await expect(main(page).getByText(OFFLINE_ACTIONS)).toBeVisible();
     await decidir(page).click({ force: true });
     await expect(page).toHaveURL(/\/monitoramento$/);

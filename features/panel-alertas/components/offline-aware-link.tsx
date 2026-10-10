@@ -16,6 +16,8 @@ type Props = {
   children: ReactNode;
   /** The first link on the page carries the visible offline.actions (G6). */
   note?: boolean;
+  /** An element id that tells same-named links apart (P7-002): an id only. */
+  describedBy?: string;
 };
 
 /**
@@ -29,8 +31,13 @@ export function OfflineAwareLink({
   className,
   children,
   note = false,
+  describedBy,
 }: Props): JSX.Element {
   const offline = !useOnline();
+  const description =
+    [describedBy, offline ? MON_OFFLINE_ACTIONS_ID : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
   return (
     <>
       <Link
@@ -38,7 +45,7 @@ export function OfflineAwareLink({
         prefetch={false}
         className={className}
         aria-disabled={offline || undefined}
-        aria-describedby={offline ? MON_OFFLINE_ACTIONS_ID : undefined}
+        aria-describedby={description}
         onClick={(event) => {
           if (offline) event.preventDefault();
         }}
