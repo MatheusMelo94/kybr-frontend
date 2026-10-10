@@ -375,6 +375,7 @@ describe("the panel's events (T61, P16)", () => {
         "TURNSTILE_FAILED",
         "REDIRECT_REFUSED",
         "ALERT_SCHEMA_INVALID",
+        "DASHBOARD_SCHEMA_INVALID",
       ]),
     );
   });

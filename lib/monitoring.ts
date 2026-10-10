@@ -105,6 +105,8 @@ export function initMonitoring(dsn: string | undefined): void {
  *   document URL off PANEL_DOCUMENTS_ORIGIN, F2; the case id only).
  * - The Monitoramento's (M7, F11, A-F2): ALERT_SCHEMA_INVALID (an alerts or
  *   monitoring response failed its schema; paths only).
+ * - Início's (M8, F11, O-F4): DASHBOARD_SCHEMA_INVALID (a dashboard response
+ *   failed its schema; paths only).
  */
 export const MARKERS = [
   "REDIRECT_REFUSED",
@@ -116,6 +118,7 @@ export const MARKERS = [
   "LINK_VENDEDOR_INVALID",
   "DOCUMENT_ORIGIN_REFUSED",
   "ALERT_SCHEMA_INVALID",
+  "DASHBOARD_SCHEMA_INVALID",
 ] as const;
 
 export type Marker = (typeof MARKERS)[number];

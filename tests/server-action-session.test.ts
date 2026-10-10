@@ -25,8 +25,10 @@ const REDIRECT_ALLOWLIST: Record<string, string> = {
 const SESSION_MODULES = [
   "features/panel-fila/actions.ts",
   "features/panel-fila/poll-action.ts",
+  "features/panel-home/actions.ts",
   "features/panel-lote/actions.ts",
   "features/panel-onboarding/actions.ts",
+  "features/panel-settings/actions.ts",
   "features/panel-shell/actions.ts",
 ];
 
