@@ -12,6 +12,7 @@ import {
 import { ToastProvider } from "@/components/panel/toast";
 import type { SavePolicyResult } from "@/features/panel-regras/actions";
 import { PolicyForm } from "@/features/panel-regras/components/policy-form";
+import { REGRAS_H1_ID } from "@/features/panel-regras/ids";
 import type { Policy } from "@/lib/api/schemas/panel/policies";
 
 // T144 (AC 59 first half, plan-m8 D8): the rules in the spec's order with
@@ -89,6 +90,9 @@ function renderForm(policy: Policy = POLICY) {
   return render(
     <ToastProvider closeLabel="Fechar">
       <a href="/fila">Fila de revisão</a>
+      <h1 id={REGRAS_H1_ID} tabIndex={-1}>
+        Regras
+      </h1>
       <PolicyForm
         policy={policy}
         categoria={{ nome: "Moda e acessórios", descricao: "Lojas de roupa" }}
@@ -196,6 +200,17 @@ describe("PolicyForm", () => {
     ).toHaveAttribute("aria-checked", "false");
   });
 
+  it("P8-002: Descartar moves focus to the h1, never to <body>", () => {
+    renderForm();
+    editMei();
+    const discard = screen.getByRole("button", { name: "Descartar" });
+    discard.focus();
+    fireEvent.click(discard);
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 1 }),
+    );
+  });
+
   it("Pedir documento with no document: nodocs beside the card and the rule, the save blocked, focus on the rule", () => {
     renderForm();
     for (const name of ["Contrato social ou CCMEI", "Cartão CNPJ atualizado"])
@@ -276,6 +291,25 @@ describe("PolicyForm: save, conflict and leaving (T145)", () => {
     editMei("approve");
     await save();
     expect(savePolicyAction.mock.calls[1]?.[0]).toMatchObject({ versao: 2 });
+  });
+
+  it("P8-004: the rules and switches are locked while a save is in flight", async () => {
+    let finish: (result: SavePolicyResult) => void = () => {};
+    savePolicyAction.mockReturnValue(
+      new Promise<SavePolicyResult>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderForm();
+    editMei();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar regras" }));
+    for (const select of selects()) expect(select).toBeDisabled();
+    for (const toggle of screen.getAllByRole("switch"))
+      expect(toggle).toBeDisabled();
+    await act(async () => finish({ ok: true, versao: 2 }));
+    for (const select of selects()) expect(select).toBeEnabled();
+    for (const toggle of screen.getAllByRole("switch"))
+      expect(toggle).toBeEnabled();
   });
 
   it("a failure: regras.save.error in the bar, the draft kept", async () => {

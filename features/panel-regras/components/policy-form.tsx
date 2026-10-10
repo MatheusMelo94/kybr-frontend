@@ -129,48 +129,56 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
       <p className="text-lead font-lead text-ink-muted">
         {fill(regrasCopy["regras.lead"], { categoria: categoria.nome })}
       </p>
-      <ul className="flex flex-col gap-4">
-        {draft.regras.map((regra) => (
-          <RuleRow
-            key={regra.chave}
-            regra={regra}
-            descricaoCategoria={categoria.descricao}
-            onAcao={(acao) => updateRule(regra.chave, { acao })}
-            onDias={(dias) => updateRule(regra.chave, { dias })}
-            daysError={
-              daysChecked && invalidDias(draft)
-                ? regrasCopy["regras.error.days"]
-                : undefined
-            }
-            error={
-              offenders.includes(regra.chave)
-                ? regrasCopy["regras.error.nodocs"]
-                : undefined
-            }
-            selectRef={(element) => {
-              if (element) selects.current.set(regra.chave, element);
-              else selects.current.delete(regra.chave);
-            }}
-            {...(regra.dias !== undefined && { daysRef: days })}
-          />
-        ))}
-      </ul>
-      <DocToggles
-        enabled={draft.documentos}
-        onToggle={(tipo, on) =>
-          setDraft((current) => ({
-            ...current,
-            documentos: on
-              ? [...current.documentos, tipo]
-              : current.documentos.filter((item) => item !== tipo),
-          }))
-        }
-        error={
-          offenders.length > 0
-            ? { id: NODOCS_ID, text: regrasCopy["regras.error.nodocs"] }
-            : undefined
-        }
-      />
+      {/* P8-004: locked while a save is in flight, so no edit is replaced
+          by the saved snapshot unseen. A disabled fieldset disables every
+          native control in it, the switches' buttons included. */}
+      <fieldset
+        disabled={busy}
+        className="m-0 flex min-w-0 flex-col gap-6 border-0 p-0"
+      >
+        <ul className="flex flex-col gap-4">
+          {draft.regras.map((regra) => (
+            <RuleRow
+              key={regra.chave}
+              regra={regra}
+              descricaoCategoria={categoria.descricao}
+              onAcao={(acao) => updateRule(regra.chave, { acao })}
+              onDias={(dias) => updateRule(regra.chave, { dias })}
+              daysError={
+                daysChecked && invalidDias(draft)
+                  ? regrasCopy["regras.error.days"]
+                  : undefined
+              }
+              error={
+                offenders.includes(regra.chave)
+                  ? regrasCopy["regras.error.nodocs"]
+                  : undefined
+              }
+              selectRef={(element) => {
+                if (element) selects.current.set(regra.chave, element);
+                else selects.current.delete(regra.chave);
+              }}
+              {...(regra.dias !== undefined && { daysRef: days })}
+            />
+          ))}
+        </ul>
+        <DocToggles
+          enabled={draft.documentos}
+          onToggle={(tipo, on) =>
+            setDraft((current) => ({
+              ...current,
+              documentos: on
+                ? [...current.documentos, tipo]
+                : current.documentos.filter((item) => item !== tipo),
+            }))
+          }
+          error={
+            offenders.length > 0
+              ? { id: NODOCS_ID, text: regrasCopy["regras.error.nodocs"] }
+              : undefined
+          }
+        />
+      </fieldset>
       {dirty && (
         <SaveBar
           busy={busy}
@@ -178,6 +186,8 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
             setDraft(server);
             setChecked(false);
             setFailure(null);
+            // P8-002: the bar (and the focused Descartar) unmounts.
+            document.getElementById(REGRAS_H1_ID)?.focus();
           }}
           alert={
             <FormAlert className="basis-full">

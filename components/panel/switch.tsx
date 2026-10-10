@@ -38,6 +38,9 @@ export function Switch({
       className={cn(
         "flex min-h-6 w-full items-center justify-between gap-4 text-left text-secondary text-ink pointer-coarse:min-h-11",
         "rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
+        // Disabled only for a moment (a save in flight, P8-004): the colours
+        // keep their contrast; the cursor says it's locked.
+        "disabled:cursor-not-allowed",
         className,
       )}
     >
