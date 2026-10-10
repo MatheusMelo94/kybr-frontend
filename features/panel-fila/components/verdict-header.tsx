@@ -17,7 +17,16 @@ const VERDICTS: Record<
 
 const NAME = "text-body font-strong text-ink focus:outline-none";
 
-type Props = { view: CaseView };
+type Props = {
+  view: Pick<CaseView, "variante" | "veredito" | "razao_social" | "cnpj"> & {
+    verification: Pick<CaseView["verification"], "checagens">;
+  };
+  /**
+   * "split" (the Fila, D9): an h1 below lg, an h2 at lg beside the list.
+   * "h1": the page's only heading at every width (the seller detail, T143).
+   */
+  heading?: "split" | "h1";
+};
 
 /**
  * The case's header (identity.md § VerdictHeader, spec AC 29): the ≈ 16 px
@@ -26,7 +35,10 @@ type Props = { view: CaseView };
  * G3), the CNPJ, and the counts. D9: the name is the h1 below lg and an h2
  * at lg; exactly one is displayed, and both take focus after an open.
  */
-export function VerdictHeader({ view }: Props): JSX.Element {
+export function VerdictHeader({
+  view,
+  heading: level = "split",
+}: Props): JSX.Element {
   const noData = view.variante === "DADOS_NAO_ENCONTRADOS";
   const { word, tone } = VERDICTS[view.veredito];
   const name = view.razao_social ?? view.cnpj;
@@ -47,20 +59,26 @@ export function VerdictHeader({ view }: Props): JSX.Element {
         </span>
       </p>
       <div className="flex min-w-0 flex-col gap-1">
-        <h1
-          data-detail-heading
-          tabIndex={-1}
-          className={cn(heading, "lg:hidden")}
-        >
-          {name}
-        </h1>
-        <h2
-          data-detail-heading
-          tabIndex={-1}
-          className={cn(heading, "max-lg:hidden")}
-        >
-          {name}
-        </h2>
+        {level === "h1" ? (
+          <h1 className={heading}>{name}</h1>
+        ) : (
+          <>
+            <h1
+              data-detail-heading
+              tabIndex={-1}
+              className={cn(heading, "lg:hidden")}
+            >
+              {name}
+            </h1>
+            <h2
+              data-detail-heading
+              tabIndex={-1}
+              className={cn(heading, "max-lg:hidden")}
+            >
+              {name}
+            </h2>
+          </>
+        )}
         <p className="text-secondary text-ink-muted tabular-nums">
           {view.cnpj}
         </p>

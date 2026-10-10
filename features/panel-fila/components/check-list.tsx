@@ -4,7 +4,11 @@ import { filaCopy } from "@/features/panel-fila/copy";
 import { StatusWord } from "@/features/panel-lote/components/status-word";
 import type { CaseView } from "@/lib/api/panel/cases";
 
-type Props = { view: CaseView };
+type Props = {
+  view: Pick<CaseView, "origem" | "responsavel_informado"> & {
+    verification: Pick<CaseView["verification"], "checagens">;
+  };
+};
 
 /**
  * The six checks (spec AC 30): the backend's titulo, descricao and valor as

@@ -569,7 +569,16 @@ export const panelCaseHandlers: RequestHandler[] = [
       const record = casesOf(account.email).find(
         (candidate) => candidate.verification.id === String(params.id),
       );
-      if (!record || record.variante === "DADOS_NAO_ENCONTRADOS")
+      // T143: a seller's current verification (D-S2) has one too.
+      const ofSeller = [...panelStore().sellers.values()].some(
+        (seller) =>
+          seller.email === account.email &&
+          seller.verification.id === String(params.id),
+      );
+      if (
+        (!record && !ofSeller) ||
+        record?.variante === "DADOS_NAO_ENCONTRADOS"
+      )
         return apiError(404, "RECURSO_NAO_ENCONTRADO");
       if (fault?.kind === "html")
         return fileReply(

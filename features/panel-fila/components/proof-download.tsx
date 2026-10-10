@@ -9,7 +9,8 @@ import { useFileDownload } from "@/features/panel-shell/use-file-download";
 import { cn } from "@/lib/utils";
 
 type Props = {
-  caseId: string;
+  /** The proof handler: /fila/{id}/comprovante or /vendedores/{id}/comprovante. */
+  href: string;
   /** Placement only (T115: body below lg, the last action at lg). */
   className?: string;
 };
@@ -19,10 +20,9 @@ type Props = {
  * useFileDownload (no redirects followed, blob URL revoked, F12), busy with
  * its label unchanged (G14), fila.proof.error inline on any failure.
  */
-export function ProofDownload({ caseId, className }: Props): JSX.Element {
-  const { busy, failed, download } = useFileDownload(
-    `/fila/${encodeURIComponent(caseId)}/comprovante`,
-    () => proofFilename(new Date()),
+export function ProofDownload({ href, className }: Props): JSX.Element {
+  const { busy, failed, download } = useFileDownload(href, () =>
+    proofFilename(new Date()),
   );
 
   return (

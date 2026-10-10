@@ -325,6 +325,22 @@ describe("Seller detail D-S2 (PS8, PS10)", () => {
   });
 });
 
+describe("the seller's proof (T143, D-C5 via D-S2)", () => {
+  it("the current verification's certificate is a PDF for its account only", async () => {
+    const mine = await seeded();
+    const theirs = await seeded();
+    const target = await needle(mine.email, 1);
+    const seller = sellerSchema.parse(
+      await (await call("GET", `/v1/sellers/${target.id}`, mine.token)).json(),
+    );
+    const path = `/v1/verifications/${seller.verificacao_atual?.id}/certificate`;
+    const response = await call("GET", path, mine.token);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/pdf");
+    expect((await call("GET", path, theirs.token)).status).toBe(404);
+  });
+});
+
 describe("Reverificar D-S3 (PS5, QA G9)", () => {
   it("202 { reverificacao_pendente: true }, one credit, and the row reads pending", async () => {
     const { email, token } = await seeded();

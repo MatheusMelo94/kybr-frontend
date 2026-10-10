@@ -198,7 +198,7 @@ test.describe("Vendedores: Reverificar @feature-ops-panel @panel-operacao @panel
     await expect(page.locator(`#${describedBy}`)).toHaveText(EXHAUSTED);
   });
 
-  test("O-F7 / F7: reverifyAction is owned by the /vendedores page", async () => {
+  test("O-F7 / F7: reverifyAction is owned by /vendedores and /vendedores/[sellerId]", async () => {
     const manifest = JSON.parse(
       readFileSync(".next/server/server-reference-manifest.json", "utf8"),
     ) as {
@@ -212,5 +212,8 @@ test.describe("Vendedores: Reverificar @feature-ops-panel @panel-operacao @panel
     );
     const workers = Object.keys(entry?.workers ?? {});
     expect(workers).toContain("app/(panel)/painel/(app)/vendedores/page");
+    expect(workers).toContain(
+      "app/(panel)/painel/(app)/vendedores/[sellerId]/page",
+    );
   });
 });

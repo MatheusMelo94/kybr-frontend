@@ -54,7 +54,7 @@ describe("ProofDownload (AC 42, G14, F12)", () => {
         headers: { "Content-Type": "application/pdf" },
       }),
     );
-    render(<ProofDownload caseId={CASE} />);
+    render(<ProofDownload href={`/fila/${CASE}/comprovante`} />);
     fireEvent.click(screen.getByRole("button", { name: "Baixar comprovante" }));
     await vi.waitFor(() => expect(clicked).toHaveLength(1));
     expect(fetchMock).toHaveBeenCalledWith(
@@ -76,7 +76,7 @@ describe("ProofDownload (AC 42, G14, F12)", () => {
         resolve = r;
       }),
     );
-    render(<ProofDownload caseId={CASE} />);
+    render(<ProofDownload href={`/fila/${CASE}/comprovante`} />);
     const button = screen.getByRole("button", { name: "Baixar comprovante" });
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-busy", "true");
@@ -91,7 +91,7 @@ describe("ProofDownload (AC 42, G14, F12)", () => {
     "a %i → fila.proof.error next to the button (alert), nothing saved",
     async (status) => {
       fetchMock.mockResolvedValue(new Response(null, { status }));
-      render(<ProofDownload caseId={CASE} />);
+      render(<ProofDownload href={`/fila/${CASE}/comprovante`} />);
       fireEvent.click(
         screen.getByRole("button", { name: "Baixar comprovante" }),
       );
@@ -108,14 +108,14 @@ describe("ProofDownload (AC 42, G14, F12)", () => {
 
   it("a network failure → fila.proof.error", async () => {
     fetchMock.mockRejectedValue(new TypeError("offline"));
-    render(<ProofDownload caseId={CASE} />);
+    render(<ProofDownload href={`/fila/${CASE}/comprovante`} />);
     fireEvent.click(screen.getByRole("button", { name: "Baixar comprovante" }));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
 
   it("an opaque redirect is the session ending", async () => {
     fetchMock.mockResolvedValue({ type: "opaqueredirect", ok: false });
-    render(<ProofDownload caseId={CASE} />);
+    render(<ProofDownload href={`/fila/${CASE}/comprovante`} />);
     fireEvent.click(screen.getByRole("button", { name: "Baixar comprovante" }));
     await waitFor(() => expect(expire).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

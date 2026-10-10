@@ -5,7 +5,11 @@ import { formatDataHora } from "@/features/panel-shell/format";
 import { fill } from "@/features/panel-shell/format";
 import type { CaseView } from "@/lib/api/panel/cases";
 
-type Props = { view: CaseView };
+type Props = {
+  view: Pick<CaseView, "consultado_em"> & {
+    verification: Pick<CaseView["verification"], "modo" | "criado_em">;
+  };
+};
 
 /** When the data was read (spec S6): fila.consulted, or .cache for stored data. */
 export function Consulted({ view }: Props): JSX.Element {

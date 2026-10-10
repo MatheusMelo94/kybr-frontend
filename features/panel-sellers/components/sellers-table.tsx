@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { JSX } from "react";
 
 import { Table, Td, Th } from "@/components/panel/table";
@@ -5,9 +6,11 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { filaCopy } from "@/features/panel-fila/copy";
 import { ReverifyButton } from "@/features/panel-sellers/components/reverify-button";
 import { sellersCopy } from "@/features/panel-sellers/copy";
+import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import { SELLER_STATUS_WORDS } from "@/features/panel-sellers/status-words";
 import { fill, formatDate } from "@/features/panel-shell/format";
 import type { SellerRow } from "@/lib/api/schemas/panel/sellers";
+import { cn } from "@/lib/utils";
 
 /** "Mudou: {resumo}" when the backend sent one, else the filter's word. */
 function statusText(row: SellerRow): string {
@@ -50,18 +53,16 @@ export function SellersTable({
         {rows.map((row) => (
           <tr key={row.id} data-seller-row={row.id}>
             <Td>
-              {row.razao_social !== null && (
-                <span className="block font-strong break-words">
-                  {row.razao_social}
-                </span>
-              )}
-              <span
-                className={
-                  row.razao_social !== null ? "block text-ink-muted" : "block"
-                }
+              {/* T143: the name (or the CNPJ standing in for it) opens the detail. */}
+              <Link
+                href={`/vendedores/${encodeURIComponent(row.id)}`}
+                className={cn(PANEL_LINK, "break-words")}
               >
-                {row.cnpj}
-              </span>
+                {row.razao_social ?? row.cnpj}
+              </Link>
+              {row.razao_social !== null && (
+                <span className="block text-ink-muted">{row.cnpj}</span>
+              )}
             </Td>
             <Td>{row.responsavel ?? sellersCopy["sellers.resp.none"]}</Td>
             <Td>

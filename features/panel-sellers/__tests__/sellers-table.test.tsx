@@ -147,4 +147,13 @@ describe("SellersTable", () => {
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute("aria-describedby", "sem-saldo");
   });
+
+  it("T143: the name links to the seller's detail", () => {
+    const [row] = rows(ROW);
+    expect(
+      within(row as HTMLElement)
+        .getByRole("link", { name: "Vendedor Exemplo Ltda" })
+        .getAttribute("href"),
+    ).toBe(`/vendedores/${ROW.id}`);
+  });
 });
