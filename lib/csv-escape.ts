@@ -92,7 +92,19 @@ export function writeCsv(rows: string[][]): string {
   return `${BOM}${rows.map((cells) => `${cells.map(quote).join(";")}\r\n`).join("")}`;
 }
 
-/** The backend's CSV, every cell escaped again. Throws on a malformed file. */
-export function reEscapeCsv(text: string): string {
-  return writeCsv(parseCsv(text).map((cells) => cells.map(escapeCell)));
+/**
+ * The backend's CSV, every cell escaped again. Throws on a malformed file.
+ * `prepare` sees each body cell with its column's header first (M8C-01).
+ */
+export function reEscapeCsv(
+  text: string,
+  prepare: (cell: string, column: string) => string = (cell) => cell,
+): string {
+  const [header = [], ...rows] = parseCsv(text);
+  return writeCsv([
+    header.map(escapeCell),
+    ...rows.map((cells) =>
+      cells.map((cell, i) => escapeCell(prepare(cell, header[i] ?? ""))),
+    ),
+  ]);
 }

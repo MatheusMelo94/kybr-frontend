@@ -58,6 +58,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   unseedScenario("csv-sem-escape");
+  unseedScenario("csv-cpf-cru");
   setSellerFault(EMAIL, "sellers-csv", undefined);
   setSellerFault(EMAIL, "audit-csv", undefined);
 });
@@ -104,6 +105,21 @@ describe("sellersCsvResponse (D-S4)", () => {
     expect(await response.text()).toBe("");
     expect(apiCalls("/v1/sellers/export").length).toBe(before);
   });
+
+  it.each([
+    ["sellers", sellers],
+    ["audit", audit],
+  ] as const)(
+    "M8C-01: the %s CSV masks a CPF the backend left in the name columns",
+    async (_name, get) => {
+      seedScenario("csv-cpf-cru", EMAIL);
+      const response = await get();
+      expect(response.status).toBe(200);
+      const text = await response.text();
+      expect(text).toContain("***.***.***-**");
+      expect(text).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}|\D\d{11}\D/);
+    },
+  );
 
   it("the cap: exactly 4 MiB passes", async () => {
     setSellerFault(EMAIL, "sellers-csv", { kind: "csv-exato", times: 1 });

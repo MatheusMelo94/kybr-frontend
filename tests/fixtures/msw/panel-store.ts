@@ -220,7 +220,9 @@ export type Scenario =
   | "monitoramento-falha"
   // M8b (PS9, PR5): per account only (QA G2)
   | "vendedores-falha"
-  | "regras-falha";
+  | "regras-falha"
+  // M8 fix round (M8C-01): the backend forgets the CPF mask in both CSVs
+  | "csv-cpf-cru";
 
 /** QA G2: the alert endpoints a per-account fault can target. */
 export type AlertEndpoint = "alerts" | "monitoring";

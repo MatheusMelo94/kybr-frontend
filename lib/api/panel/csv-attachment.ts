@@ -1,5 +1,7 @@
 import "server-only";
 
+import { CSV_MAX_BYTES } from "@/lib/api/panel/csv-limits";
+import { maskCpf } from "@/lib/cpf";
 import { reEscapeCsv } from "@/lib/csv-escape";
 
 // The tail every panel CSV download handler shares (M5 T86, M8 T142): the
@@ -7,7 +9,10 @@ import { reEscapeCsv } from "@/lib/csv-escape";
 // again (P08: idempotent with the backend, every cell, headers included),
 // then a private attachment under a server-dated name. A malformed or
 // oversized file is refused whole: 502 with no detail, never a partial
-// body. Nothing here logs the body (P16).
+// body. Nothing here logs the body (P16). The cap holds on what we send
+// too: the re-escape can grow a file (M8C-02). Named columns get the CPF
+// backstop on top of the backend's masking (O-F4, M8C-01); never every
+// cell, since an unformatted 11-digit run elsewhere isn't a CPF.
 
 const NO_STORE = "private, no-store";
 
@@ -30,14 +35,20 @@ export function badRequest(): Response {
 export async function csvAttachment(
   body: ReadableStream<Uint8Array>,
   filename: string,
+  { maskCpfIn = [] }: { maskCpfIn?: readonly string[] } = {},
 ): Promise<Response> {
   let csv: string;
   try {
     const bytes = await new Response(body).arrayBuffer();
-    csv = reEscapeCsv(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    csv = reEscapeCsv(
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      (cell, column) => (maskCpfIn.includes(column) ? maskCpf(cell) : cell),
+    );
   } catch {
     return badGateway();
   }
+  if (new TextEncoder().encode(csv).byteLength > CSV_MAX_BYTES)
+    return badGateway();
   return new Response(csv, {
     status: 200,
     headers: {

@@ -337,6 +337,8 @@ export const panelSellerHandlers: RequestHandler[] = [
     const filter = filterFrom(new URL(request.url).searchParams);
     if ("bad" in filter) return invalid(filter.bad);
     const escape = !scenarioApplies("csv-sem-escape", auth.account.email);
+    // M8C-01: csv-cpf-cru puts raw MEI names in every name column.
+    const raw = scenarioApplies("csv-cpf-cru", auth.account.email);
     return csvReply(
       [
         [
@@ -350,8 +352,10 @@ export const panelSellerHandlers: RequestHandler[] = [
         ],
         ...filtered(auth.account.email, filter).map((seller) => [
           maskedCnpj(seller.cnpj),
-          maskCpf(seller.razao_social ?? ""),
-          seller.responsavel ?? "",
+          raw
+            ? (seller.razao_social ?? "")
+            : maskCpf(seller.razao_social ?? ""),
+          raw ? (seller.razao_social ?? "") : (seller.responsavel ?? ""),
           seller.origem === "link" ? "Link" : "Lote",
           brDateTime(seller.verificado_em),
           STATUS_LABEL[seller.status] ?? seller.status,
@@ -438,6 +442,8 @@ export const panelSellerHandlers: RequestHandler[] = [
     const range = auditRange(new URL(request.url).searchParams);
     if (!range) return invalid("de");
     const escape = !scenarioApplies("csv-sem-escape", auth.account.email);
+    // M8C-01: csv-cpf-cru puts raw MEI names in every name column.
+    const raw = scenarioApplies("csv-cpf-cru", auth.account.email);
     return csvReply(
       [
         ["Data e hora", "Ação", "Vendedor", "CNPJ", "Detalhe"],
@@ -446,9 +452,9 @@ export const panelSellerHandlers: RequestHandler[] = [
           .map((row) => [
             brDateTime(row.em),
             row.acao,
-            maskCpf(row.vendedor),
+            raw ? row.vendedor : maskCpf(row.vendedor),
             maskedCnpj(row.cnpj),
-            row.detalhe,
+            raw ? row.vendedor : row.detalhe,
           ]),
       ],
       escape,

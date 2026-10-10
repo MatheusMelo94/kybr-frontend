@@ -30,16 +30,22 @@ function queryOf(url: URL): Record<string, string> | undefined {
   return Object.keys(query).length === entries.length ? query : undefined;
 }
 
+// M8C-01: the name columns that can carry a MEI owner's CPF get the
+// frontend's backstop (O-F4); the backend masks them first (C-M8-5).
+const SELLERS_CPF_COLUMNS = ["Razão social", "Responsável"] as const;
+const AUDIT_CPF_COLUMNS = ["Vendedor", "Detalhe"] as const;
+
 async function attachment(
   result: CsvStream,
   filename: string,
+  maskCpfIn: readonly string[],
 ): Promise<Response> {
   if (!result.ok) {
     if (result.error.code === "SESSAO_EXPIRADA")
       redirect(await sessionExpiredUrl());
     return badGateway();
   }
-  return csvAttachment(result.data.body, filename);
+  return csvAttachment(result.data.body, filename, { maskCpfIn });
 }
 
 /** D-S4: the sellers CSV for the list's current q + status. */
@@ -49,7 +55,11 @@ export async function sellersCsvResponse(url: URL): Promise<Response> {
   if (!parsed.success) return badRequest();
   await requireSession();
   const result = await streamSellersCsv(parsed.data);
-  return attachment(result, `kybr-vendedores-${fileDay(new Date())}.csv`);
+  return attachment(
+    result,
+    `kybr-vendedores-${fileDay(new Date())}.csv`,
+    SELLERS_CPF_COLUMNS,
+  );
 }
 
 /** D-S5: the audit trail over de..ate (default: the last 3 months, G11). */
@@ -64,5 +74,9 @@ export async function auditCsvResponse(url: URL): Promise<Response> {
   if (!parsed.success) return badRequest();
   await requireSession();
   const result = await streamAuditCsv(parsed.data);
-  return attachment(result, `kybr-auditoria-${fileDay(new Date())}.csv`);
+  return attachment(
+    result,
+    `kybr-auditoria-${fileDay(new Date())}.csv`,
+    AUDIT_CPF_COLUMNS,
+  );
 }

@@ -303,6 +303,7 @@ const SCENARIOS: readonly Scenario[] = [
   "monitoramento-falha",
   "vendedores-falha",
   "regras-falha",
+  "csv-cpf-cru",
 ];
 
 function isPreset(value: unknown): value is Preset {
@@ -358,6 +359,7 @@ export const panelControlHandlers: RequestHandler[] = [
       "monitoramento-falha",
       "vendedores-falha",
       "regras-falha",
+      "csv-cpf-cru",
     ];
     if (
       accountOnly.includes(String(body.scenario)) &&
