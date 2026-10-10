@@ -28,6 +28,8 @@ const SESSION_MODULES = [
   "features/panel-home/actions.ts",
   "features/panel-lote/actions.ts",
   "features/panel-onboarding/actions.ts",
+  "features/panel-regras/actions.ts",
+  "features/panel-sellers/actions.ts",
   "features/panel-settings/actions.ts",
   "features/panel-shell/actions.ts",
 ];

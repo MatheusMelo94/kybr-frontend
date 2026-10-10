@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { ApiResult } from "@/lib/api/client";
 import { AppError } from "@/lib/api/errors";
 import { panelRequest, panelStreamRequest } from "@/lib/api/panel/client";
-import { CSV_MAX_BYTES } from "@/lib/api/panel/csv-limits";
+import { cappedCsv } from "@/lib/api/panel/csv-limits";
 import { sessionToken } from "@/lib/api/panel/session";
 import { apiPaths } from "@/lib/api/path";
 import {
@@ -168,24 +168,6 @@ export async function resumeBatch(id: string): Promise<ApiResult<undefined>> {
   });
 }
 
-/** Errors the stream with UNAVAILABLE once more than `max` bytes went through. */
-function capped(
-  body: ReadableStream<Uint8Array>,
-  max: number,
-): ReadableStream<Uint8Array> {
-  let seen = 0;
-  return body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        seen += chunk.byteLength;
-        if (seen > max)
-          controller.error(new AppError({ code: "UNAVAILABLE", status: 502 }));
-        else controller.enqueue(chunk);
-      },
-    }),
-  );
-}
-
 /**
  * D-B4: the backend's CSV as a stream for the download handlers (T86), which
  * re-escape it. Anything but text/csv is refused (INVALID_RESPONSE), and the
@@ -210,24 +192,5 @@ export async function streamBatchCsv(
     forwardClientIp: true,
   });
   if (!result.ok) return { ok: false, error: batchError(result.error) };
-  const { response } = result;
-  const requestId = response.headers.get("x-request-id") ?? undefined;
-  const contentType = response.headers.get("content-type") ?? "";
-  const fail = (code: "INVALID_RESPONSE" | "UNAVAILABLE") => {
-    void response.body?.cancel();
-    return {
-      ok: false as const,
-      error: new AppError({ code, status: response.status, requestId }),
-    };
-  };
-  if (!/^text\/csv(?:;|$)/i.test(contentType) || response.body === null)
-    return fail("INVALID_RESPONSE");
-  const declared = Number(response.headers.get("content-length") ?? "0");
-  if (declared > CSV_MAX_BYTES) return fail("UNAVAILABLE");
-  return {
-    ok: true,
-    status: response.status,
-    requestId,
-    data: { body: capped(response.body, CSV_MAX_BYTES), contentType },
-  };
+  return cappedCsv(result.response);
 }
