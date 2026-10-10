@@ -109,3 +109,75 @@ describe("PanelNav: the Lote item (S5 batch running, T77)", () => {
     ).toHaveAccessibleName("Verificar em lote");
   });
 });
+
+describe("PanelNav: the Monitoramento count (S5, T122)", () => {
+  const MON_ITEMS = [
+    { key: "monitor", href: "/monitoramento", label: "Monitoramento" },
+  ] as const;
+
+  function renderMonitor(alertas: number): void {
+    render(
+      <ShellStatusProvider
+        initial={{
+          contagens: { ...counts(0, 0), alertas_criticos_abertos: alertas },
+          plano: undefined,
+        }}
+      >
+        <PanelNav items={MON_ITEMS} />
+      </ShellStatusProvider>,
+    );
+  }
+
+  it("shows the undecided critical alerts, named by nav.monitor.count_sr.*", () => {
+    pathname.value = "/fila";
+    renderMonitor(2);
+    expect(
+      screen.getByRole("link", {
+        name: "Monitoramento 2 alertas críticos sem decisão",
+      }),
+    ).toHaveAttribute("href", "/monitoramento");
+    expect(screen.getByTestId("nav-count-monitor")).toHaveTextContent("2");
+  });
+
+  it("the singular, and zero hidden", () => {
+    pathname.value = "/fila";
+    renderMonitor(1);
+    expect(
+      screen.getByRole("link", {
+        name: "Monitoramento 1 alerta crítico sem decisão",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("zero is hidden", () => {
+    pathname.value = "/fila";
+    renderMonitor(0);
+    expect(
+      screen.getByRole("link", { name: "Monitoramento" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-count-monitor")).toBeNull();
+  });
+});
+
+describe("PanelNav: the tab row's hidden count text (AC 74)", () => {
+  it("each link (both variants share the class) is a positioning box, so a count's sr-only text can't widen the page", () => {
+    pathname.value = "/fila";
+    render(
+      <ShellStatusProvider
+        initial={{
+          contagens: { ...counts(7, 2), alertas_criticos_abertos: 1 },
+          plano: undefined,
+        }}
+      >
+        <PanelNav
+          items={[
+            { key: "fila", href: "/fila", label: "Fila de revisão" },
+            { key: "monitor", href: "/monitoramento", label: "Monitoramento" },
+          ]}
+        />
+      </ShellStatusProvider>,
+    );
+    for (const link of screen.getAllByRole("link"))
+      expect(link).toHaveClass("relative");
+  });
+});

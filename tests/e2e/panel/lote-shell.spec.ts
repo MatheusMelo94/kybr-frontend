@@ -33,6 +33,7 @@ test.describe("Lote: routes and history @feature-ops-panel @panel-lote", () => {
       .getByRole("navigation", { name: "Navegação do painel" });
     await expect(nav.getByRole("link")).toHaveText([
       /^Fila de revisão/,
+      /^Monitoramento/,
       "Verificar em lote",
     ]);
     await nav.getByRole("link", { name: "Verificar em lote" }).click();

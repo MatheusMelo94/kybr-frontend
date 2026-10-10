@@ -79,3 +79,33 @@ export function NavCount({
     </>
   );
 }
+
+/**
+ * Monitoramento's count (S5): the undecided critical alerts, in the same
+ * neutral pill, the number aria-hidden and the link's accessible name
+ * carrying nav.monitor.count_sr.*. Zero hides it.
+ */
+export function MonitorCount({
+  alertas,
+  active = false,
+}: {
+  alertas: number;
+  active?: boolean;
+}): JSX.Element | null {
+  if (alertas <= 0) return null;
+  const n = formatNumber(alertas);
+  return (
+    <>
+      <VisuallyHidden>
+        {fill(plural(shellCopy, "nav.monitor.count_sr", alertas), { n })}
+      </VisuallyHidden>
+      <span
+        data-testid="nav-count-monitor"
+        aria-hidden="true"
+        className={navCountClassName(active)}
+      >
+        {n}
+      </span>
+    </>
+  );
+}
