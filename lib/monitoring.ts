@@ -103,6 +103,8 @@ export function initMonitoring(dsn: string | undefined): void {
  *   its schema; paths only), LINK_VENDEDOR_INVALID (a seller link failed
  *   parseLinkVendedor and was dropped), DOCUMENT_ORIGIN_REFUSED (a signed
  *   document URL off PANEL_DOCUMENTS_ORIGIN, F2; the case id only).
+ * - The Monitoramento's (M7, F11, A-F2): ALERT_SCHEMA_INVALID (an alerts or
+ *   monitoring response failed its schema; paths only).
  */
 export const MARKERS = [
   "REDIRECT_REFUSED",
@@ -113,6 +115,7 @@ export const MARKERS = [
   "CASE_SCHEMA_INVALID",
   "LINK_VENDEDOR_INVALID",
   "DOCUMENT_ORIGIN_REFUSED",
+  "ALERT_SCHEMA_INVALID",
 ] as const;
 
 export type Marker = (typeof MARKERS)[number];

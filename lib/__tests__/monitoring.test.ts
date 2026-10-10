@@ -374,6 +374,7 @@ describe("the panel's events (T61, P16)", () => {
         "SESSION_REJECTED",
         "TURNSTILE_FAILED",
         "REDIRECT_REFUSED",
+        "ALERT_SCHEMA_INVALID",
       ]),
     );
   });
