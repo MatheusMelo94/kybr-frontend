@@ -698,11 +698,19 @@ export const panelBatchControlHandlers: RequestHandler[] = [
   // PB4 / PB16 (QA G10 calls it /plan): sets an account's plan usage or limit.
   http.post("*/__mock/panel/plan*", async ({ request }) => {
     const { email, usadas, limite } = await controlBody(request);
-    const current =
-      typeof email === "string" ? plano(email.toLowerCase()) : undefined;
-    if (!current) return new HttpResponse(null, { status: 404 });
-    if (typeof usadas === "number") current.usadas = usadas;
-    if (typeof limite === "number") current.limite = limite;
+    const account =
+      typeof email === "string"
+        ? panelStore().accounts.get(email.toLowerCase())
+        : undefined;
+    const current = account?.workspace.plano;
+    if (!account || !current) return new HttpResponse(null, { status: 404 });
+    // T141: on a copy. Presets share their plan objects, so an in-place
+    // write leaked into every other account of the preset (parallel tests).
+    account.workspace.plano = {
+      ...current,
+      ...(typeof usadas === "number" && { usadas }),
+      ...(typeof limite === "number" && { limite }),
+    };
     return new HttpResponse(null, { status: 204 });
   }),
 ];

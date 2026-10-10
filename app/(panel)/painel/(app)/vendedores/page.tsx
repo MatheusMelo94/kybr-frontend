@@ -8,6 +8,8 @@ import { SellersSkeleton } from "@/features/panel-sellers/components/sellers-ske
 import { SellersTable } from "@/features/panel-sellers/components/sellers-table";
 import { StatusFilter } from "@/features/panel-sellers/components/status-filter";
 import { sellersCopy } from "@/features/panel-sellers/copy";
+import { shellCopy } from "@/features/panel-shell/copy/shell";
+import { planGate } from "@/features/panel-shell/plan-variant";
 import {
   parseSellersSearch,
   type SellersSearch,
@@ -16,6 +18,8 @@ import { listSellers } from "@/lib/api/panel/sellers";
 import { requireSession } from "@/lib/api/panel/session";
 
 // O-F6: a static title, never the search.
+const EXHAUSTED_ID = "vendedores-sem-saldo";
+
 export const metadata: Metadata = { title: sellersCopy["sellers.h1"] };
 
 type Props = {
@@ -62,9 +66,21 @@ async function SellersBody({
   const page = await listSellers(search);
   if (page.total === 0)
     return <SellersEmpty search={search} linkUrl={me.workspace.link_url} />;
+  // T141: Reverificar spends a credit; with none left every row's button is
+  // disabled and described by one plan.exhausted note (the server still
+  // answers SEM_SALDO, plan-m8 § 6).
+  const exhausted = planGate(me.workspace.plano) !== undefined;
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <SellersTable rows={page.itens} />
+      {exhausted && (
+        <p id={EXHAUSTED_ID} className="text-secondary text-ink-muted">
+          {shellCopy["plan.exhausted"]}
+        </p>
+      )}
+      <SellersTable
+        rows={page.itens}
+        exhausted={exhausted ? { describedBy: EXHAUSTED_ID } : undefined}
+      />
       <SellersPager search={search} paginas={page.paginas} />
     </div>
   );

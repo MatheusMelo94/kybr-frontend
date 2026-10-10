@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import type { ComponentProps } from "react";
+import { describe, expect, it, vi } from "vitest";
 
+import { ToastProvider } from "@/components/panel/toast";
+import { SellersProvider } from "@/features/panel-sellers/components/sellers-provider";
 import { SellersTable } from "@/features/panel-sellers/components/sellers-table";
 import type { SellerRow } from "@/lib/api/schemas/panel/sellers";
 
@@ -18,14 +21,31 @@ const ROW: SellerRow = {
   monitorado: true,
 };
 
+vi.mock("@/features/panel-sellers/actions", () => ({
+  reverifyAction: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
+
+function renderTable(props: ComponentProps<typeof SellersTable>) {
+  return render(
+    <ToastProvider closeLabel="Fechar">
+      <SellersProvider>
+        <SellersTable {...props} />
+      </SellersProvider>
+    </ToastProvider>,
+  );
+}
+
 function rows(...items: SellerRow[]) {
-  render(<SellersTable rows={items} />);
+  renderTable({ rows: items });
   return screen.getAllByRole("row").slice(1);
 }
 
 describe("SellersTable", () => {
   it("has the sellers.col.* headers", () => {
-    render(<SellersTable rows={[ROW]} />);
+    renderTable({ rows: [ROW] });
     expect(
       screen.getAllByRole("columnheader").map((th) => th.textContent),
     ).toEqual([
@@ -97,10 +117,34 @@ describe("SellersTable", () => {
   });
 
   it("the table scrolls inside its card (a labelled, focusable region)", () => {
-    render(<SellersTable rows={[ROW]} />);
+    renderTable({ rows: [ROW] });
     expect(screen.getByRole("region", { name: "Vendedores" })).toHaveAttribute(
       "tabindex",
       "0",
     );
+  });
+
+  it("T141: Reverificar in each row's status cell; a pending row shows Reverificando…", () => {
+    const [ready, pending] = rows(ROW, {
+      ...ROW,
+      id: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      reverificacao_pendente: true,
+    });
+    const readyCell = within(ready as HTMLElement).getAllByRole("cell")[4];
+    expect(
+      within(readyCell as HTMLElement).getByRole("button", {
+        name: "Reverificar",
+      }),
+    ).toBeEnabled();
+    const pendingCell = within(pending as HTMLElement).getAllByRole("cell")[4];
+    expect(pendingCell).toHaveTextContent("Reverificando…");
+    expect(within(pendingCell as HTMLElement).queryByRole("button")).toBeNull();
+  });
+
+  it("T141: the allowance used up disables every Reverificar, described by the plan note", () => {
+    renderTable({ rows: [ROW], exhausted: { describedBy: "sem-saldo" } });
+    const button = screen.getByRole("button", { name: "Reverificar" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-describedby", "sem-saldo");
   });
 });

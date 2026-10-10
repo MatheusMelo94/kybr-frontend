@@ -977,6 +977,23 @@ describe("QA fixture gaps (M5 test plan G1–G11)", () => {
     ).toBe(404);
   });
 
+  it("G10: /plan writes a copy: the preset's other accounts keep their plan (T141)", async () => {
+    const a = "plano-copia-a@exemplo.test";
+    const b = "plano-copia-b@exemplo.test";
+    for (const email of [a, b])
+      expect((await control("POST", "/accounts", { email })).status).toBe(201);
+    const before = await plano(await login(b));
+    expect(
+      (await control("POST", "/plan", { email: a, usadas: 5, limite: 5 }))
+        .status,
+    ).toBe(204);
+    expect(await plano(await login(a))).toMatchObject({
+      usadas: 5,
+      limite: 5,
+    });
+    expect(await plano(await login(b))).toEqual(before);
+  });
+
   it("G10: /__mock/panel/plan sets the plan; G11: a batch's start and duration are fixed", async () => {
     expect(
       (
