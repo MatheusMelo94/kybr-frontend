@@ -21,7 +21,7 @@ const badGateway = (): Response =>
 /**
  * The body of the resultado.csv / erros.csv GET handlers (D-B4, T86):
  * host -> id -> session (M4-13: the handler checks it itself) -> the
- * backend's CSV (text/csv only, 5 MB cap) -> parsed and escaped again
+ * backend's CSV (text/csv only, the shared 4 MiB cap, O-F5) -> parsed and escaped again
  * (P08, idempotent with the backend; Security C9) -> an attachment. A
  * malformed file is refused whole: 502, never a partial body. Nothing here
  * logs the body or its CNPJs (P16).

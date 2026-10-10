@@ -892,7 +892,7 @@ describe("QA fixture gaps (M5 test plan G1–G11)", () => {
     expect(
       (await (await call("GET", `/v1/batches/${id}/result.csv`, token)).text())
         .length,
-    ).toBe(5 * 1024 * 1024 + 1);
+    ).toBe(4 * 1024 * 1024 + 1);
     await fault("errors.csv", "csv-aspas");
     expect(
       await (await call("GET", `/v1/batches/${id}/errors.csv`, token)).text(),

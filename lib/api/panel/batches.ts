@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ApiResult } from "@/lib/api/client";
 import { AppError } from "@/lib/api/errors";
 import { panelRequest, panelStreamRequest } from "@/lib/api/panel/client";
+import { CSV_MAX_BYTES } from "@/lib/api/panel/csv-limits";
 import { sessionToken } from "@/lib/api/panel/session";
 import { apiPaths } from "@/lib/api/path";
 import {
@@ -25,9 +26,6 @@ import type { BatchLinha, BatchRowStatus } from "@/lib/panel-api-values";
 // and answers a result: the page or action decides (notFound, the session
 // path, error.tsx). Callers have already passed requireSession() (ADR-0011
 // Addendum 1); without a session token nothing is sent.
-
-/** D-B4: the downloads' size cap (the handlers answer 502 past it, T86). */
-export const CSV_MAX_BYTES = 5 * 1024 * 1024;
 
 const noBody = z.unknown().transform(() => undefined);
 
@@ -191,7 +189,8 @@ function capped(
 /**
  * D-B4: the backend's CSV as a stream for the download handlers (T86), which
  * re-escape it. Anything but text/csv is refused (INVALID_RESPONSE), and the
- * body is capped at 5 MB (UNAVAILABLE: declared up front, or as it streams).
+ * body is capped at the shared CSV_MAX_BYTES, 4 MiB (O-F5; UNAVAILABLE:
+ * declared up front, or as it streams). The handlers answer 502 past it.
  */
 export async function streamBatchCsv(
   id: string,

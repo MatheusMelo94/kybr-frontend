@@ -318,7 +318,8 @@ function csvFault(fault: BatchFault | undefined): Response | undefined {
     });
   switch (fault?.kind) {
     case "csv-grande":
-      return reply("x".repeat(5 * 1024 * 1024 + 1));
+      // One byte over the shared 4 MiB cap (O-F5), under M5's old 5 MB.
+      return reply("x".repeat(4 * 1024 * 1024 + 1));
     case "csv-html":
       return reply("<html><body>erro</body></html>", "text/html");
     case "csv-aspas":

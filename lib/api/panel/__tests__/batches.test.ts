@@ -30,6 +30,7 @@ import {
   startBatch,
   streamBatchCsv,
 } from "@/lib/api/panel/batches";
+import { CSV_MAX_BYTES } from "@/lib/api/panel/csv-limits";
 
 const KEY = "0b7f3c1e-2a4d-4e5f-8a6b-9c0d1e2f3a4b";
 const ACTION_KEY = "2d9b5e3a-4c6f-4a71-8c8d-1e2f3a4b5c6d";
@@ -50,7 +51,10 @@ afterEach(() => {
 
 /** The headers and init of the last call the data function made. */
 function lastRequest(): { headers: Headers; init: RequestInit; url: string } {
-  const [input, init] = fetchSpy.mock.calls.at(-1) as [URL | string, RequestInit];
+  const [input, init] = fetchSpy.mock.calls.at(-1) as [
+    URL | string,
+    RequestInit,
+  ];
   return { url: String(input), init, headers: new Headers(init.headers) };
 }
 
@@ -90,13 +94,20 @@ describe("startBatch (D-B1)", () => {
   });
 
   it("PB13: a tampered body comes back as its code", async () => {
-    const many = Array.from({ length: 5001 }, () => ({ cnpj: TUDO_OK[0]?.cnpj ?? "" }));
+    const many = Array.from({ length: 5001 }, () => ({
+      cnpj: TUDO_OK[0]?.cnpj ?? "",
+    }));
     const result = await startBatch(many, KEY);
-    expect(result).toMatchObject({ ok: false, error: { code: "MUITAS_LINHAS" } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "MUITAS_LINHAS" },
+    });
   });
 
   it("a bare 402 still reads as SEM_SALDO", async () => {
-    server.use(http.post("*/v1/batches", () => new HttpResponse(null, { status: 402 })));
+    server.use(
+      http.post("*/v1/batches", () => new HttpResponse(null, { status: 402 })),
+    );
     const result = await startBatch(TUDO_OK, KEY);
     expect(result).toMatchObject({ ok: false, error: { code: "SEM_SALDO" } });
   });
@@ -104,14 +115,20 @@ describe("startBatch (D-B1)", () => {
   it("no session → SESSAO_EXPIRADA, with no call", async () => {
     state.token = undefined;
     const result = await startBatch(TUDO_OK, KEY);
-    expect(result).toMatchObject({ ok: false, error: { code: "SESSAO_EXPIRADA" } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "SESSAO_EXPIRADA" },
+    });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("a revoked session (401) → SESSAO_EXPIRADA", async () => {
     panelStore().sessions.clear();
     const result = await startBatch(TUDO_OK, KEY);
-    expect(result).toMatchObject({ ok: false, error: { code: "SESSAO_EXPIRADA" } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "SESSAO_EXPIRADA" },
+    });
   });
 });
 
@@ -119,7 +136,10 @@ describe("getBatch (D-B2)", () => {
   it("returns the parsed batch", async () => {
     const id = await started();
     const result = await getBatch(id);
-    expect(result).toMatchObject({ ok: true, data: { id, estado: "processando" } });
+    expect(result).toMatchObject({
+      ok: true,
+      data: { id, estado: "processando" },
+    });
     expect(lastRequest().headers.get("x-kybr-poll")).toBeNull();
   });
 
@@ -140,7 +160,12 @@ describe("getBatch (D-B2)", () => {
         error: { code: "LOTE_NAO_ENCONTRADO", status: 404 },
       });
 
-    server.use(http.get("*/v1/batches/:id", () => new HttpResponse(null, { status: 404 })));
+    server.use(
+      http.get(
+        "*/v1/batches/:id",
+        () => new HttpResponse(null, { status: 404 }),
+      ),
+    );
     expect(await getBatch(foreign)).toMatchObject({
       ok: false,
       error: { code: "LOTE_NAO_ENCONTRADO" },
@@ -186,10 +211,16 @@ describe("sendToQueue, monitorBatch, resumeBatch (D-B5, D-B7)", () => {
     for (let i = 0; i < 4; i++) await getBatch(id);
 
     const queued = await sendToQueue(id, ACTION_KEY);
-    expect(queued).toMatchObject({ ok: true, data: { criados: expect.any(Number) } });
+    expect(queued).toMatchObject({
+      ok: true,
+      data: { criados: expect.any(Number) },
+    });
     expect(lastRequest().headers.get("idempotency-key")).toBe(ACTION_KEY);
 
-    const monitored = await monitorBatch(id, "3eac6f4b-5d7a-4b82-9d9e-2f3a4b5c6d7e");
+    const monitored = await monitorBatch(
+      id,
+      "3eac6f4b-5d7a-4b82-9d9e-2f3a4b5c6d7e",
+    );
     expect(monitored).toMatchObject({ ok: true, data: { monitorados: 181 } });
 
     expect(await resumeBatch(id)).toMatchObject({ ok: true });
@@ -214,12 +245,46 @@ describe("streamBatchCsv (D-B4)", () => {
   });
 
   it("refuses a response that isn't text/csv", async () => {
-    server.use(http.get("*/v1/batches/:id/:file", () => HttpResponse.json({ x: 1 })));
+    server.use(
+      http.get("*/v1/batches/:id/:file", () => HttpResponse.json({ x: 1 })),
+    );
     const result = await streamBatchCsv(await started(), "result");
-    expect(result).toMatchObject({ ok: false, error: { code: "INVALID_RESPONSE" } });
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "INVALID_RESPONSE" },
+    });
   });
 
-  it("caps the body at 5 MB: a declared length over it → UNAVAILABLE", async () => {
+  /** A text/csv reply whose body streams `total` bytes in 1 MiB chunks. */
+  function csvOf(total: number, declare = false) {
+    const chunk = new Uint8Array(1024 * 1024).fill(0x61);
+    return () =>
+      new HttpResponse(
+        new ReadableStream({
+          start(controller) {
+            let left = total;
+            while (left > 0) {
+              const size = Math.min(left, chunk.byteLength);
+              controller.enqueue(chunk.subarray(0, size));
+              left -= size;
+            }
+            controller.close();
+          },
+        }),
+        {
+          headers: {
+            "content-type": "text/csv; charset=utf-8",
+            ...(declare ? { "content-length": String(total) } : {}),
+          },
+        },
+      );
+  }
+
+  it("O-F5: the shared cap is 4 MiB, under Vercel's 4.5 MB response limit", () => {
+    expect(CSV_MAX_BYTES).toBe(4 * 1024 * 1024);
+  });
+
+  it("O-F5: a declared length of 4 MiB + 1 byte → UNAVAILABLE", async () => {
     server.use(
       http.get(
         "*/v1/batches/:id/:file",
@@ -227,7 +292,7 @@ describe("streamBatchCsv (D-B4)", () => {
           new HttpResponse("x", {
             headers: {
               "content-type": "text/csv; charset=utf-8",
-              "content-length": String(5 * 1024 * 1024 + 1),
+              "content-length": String(CSV_MAX_BYTES + 1),
             },
           }),
       ),
@@ -236,28 +301,26 @@ describe("streamBatchCsv (D-B4)", () => {
     expect(result).toMatchObject({ ok: false, error: { code: "UNAVAILABLE" } });
   });
 
-  it("caps the body at 5 MB: a stream that grows past it errors with UNAVAILABLE", async () => {
-    const chunk = new Uint8Array(1024 * 1024).fill(0x61);
-    server.use(
-      http.get(
-        "*/v1/batches/:id/:file",
-        () =>
-          new HttpResponse(
-            new ReadableStream({
-              start(controller) {
-                for (let i = 0; i < 6; i++) controller.enqueue(chunk);
-                controller.close();
-              },
-            }),
-            { headers: { "content-type": "text/csv; charset=utf-8" } },
-          ),
-      ),
-    );
+  it("O-F5: a stream of 4 MiB + 1 byte errors with UNAVAILABLE", async () => {
+    server.use(http.get("*/v1/batches/:id/:file", csvOf(4 * 1024 * 1024 + 1)));
     const result = await streamBatchCsv(await started(), "result");
     if (!result.ok) throw result.error;
     await expect(new Response(result.data.body).text()).rejects.toMatchObject({
       code: "UNAVAILABLE",
     });
+  });
+
+  it("O-F5: exactly 4 MiB passes, declared or streamed", async () => {
+    const id = await started();
+    for (const declare of [true, false]) {
+      server.use(
+        http.get("*/v1/batches/:id/:file", csvOf(4 * 1024 * 1024, declare)),
+      );
+      const result = await streamBatchCsv(id, "result");
+      if (!result.ok) throw result.error;
+      const bytes = await new Response(result.data.body).arrayBuffer();
+      expect(bytes.byteLength).toBe(4 * 1024 * 1024);
+    }
   });
 
   it("PB10 and 401 map like the JSON calls", async () => {

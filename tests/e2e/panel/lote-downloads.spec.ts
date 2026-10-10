@@ -158,6 +158,32 @@ test.describe("Lote: CSV downloads @feature-ops-panel @panel-lote", () => {
     await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
   });
 
+  test("O-F5: a backend CSV over the 4 MiB cap → 502 → export.error; a retry downloads", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("lote-csv-grande", testInfo);
+    await createAccount(request, email, "pago");
+    const id = await createBatch(request, email, "ac16", { finish: true });
+    await logIn(page, email);
+    await page.goto(`/lote/${id}`);
+
+    await fault(request, email, "errors.csv", "csv-grande");
+    const failed = await page.request.get(`${PANEL_URL}/lote/${id}/erros.csv`);
+    expect(failed.status()).toBe(502);
+    expect(await failed.body()).toHaveLength(0);
+
+    await fault(request, email, "result.csv", "csv-grande");
+    const button = page.getByRole("button", { name: "Baixar resultado (CSV)" });
+    await button.click();
+    await expect(page.locator("main").getByRole("alert")).toHaveText(
+      "Não conseguimos gerar o arquivo. Tente de novo.",
+    );
+    await expect(button).toBeEnabled();
+    const { name } = await download(page, "Baixar resultado (CSV)");
+    expect(name).toMatch(FILENAME);
+  });
+
   test("the session ended: the download goes to /entrar?motivo=sessao", async ({
     page,
     request,
