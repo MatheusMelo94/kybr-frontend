@@ -3,6 +3,10 @@ import { createServer as createHttpServer } from "node:http";
 import { createServer } from "@mswjs/http-middleware";
 
 import {
+  panelAlertControlHandlers,
+  panelAlertHandlers,
+} from "./handlers/panel-alerts.ts";
+import {
   panelAuthHandlers,
   panelControlHandlers,
 } from "./handlers/panel-auth.ts";
@@ -41,7 +45,9 @@ const app = createServer(
   ...panelWorkspaceHandlers,
   ...panelBatchHandlers,
   ...panelCaseControlHandlers,
+  ...panelAlertControlHandlers,
   ...panelCaseHandlers,
+  ...panelAlertHandlers,
   ...panelDocumentHandlers,
 );
 
@@ -60,6 +66,6 @@ createHttpServer((request, response) => {
   app(request, response);
 }).listen(port, host, () => {
   console.log(
-    `Kybr mock API (Pre-Contract: link D1–D6, panel D-A1–D-A5, D-W1–D-W3, D-B1–D-B7, D-C1–D-C6) on http://${host}:${port}`,
+    `Kybr mock API (Pre-Contract: link D1–D6, panel D-A1–D-A5, D-W1–D-W3, D-B1–D-B7, D-C1–D-C6, D-M1–D-M2) on http://${host}:${port}`,
   );
 });

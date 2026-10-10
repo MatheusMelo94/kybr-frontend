@@ -1267,3 +1267,315 @@ export const JPEG_BYTES = Uint8Array.from(
     "base64",
   ),
 );
+
+// --- Alerts (M7, D-M1–D-M3 + C-M7-1–5, PM1–PM9) -----------------------------
+
+/** M7's seeded accounts (PM1, PM3–PM5); per-test accounts use the alerts seed. */
+export const ALERT_EMAILS = {
+  alertas: "alertas@exemplo.test",
+  semmonitor: "semmonitor@exemplo.test",
+  semvarredura: "semvarredura@exemplo.test",
+  semalertas: "semalertas@exemplo.test",
+} as const;
+
+/** One D-M1 alert as the mock stores it. `case_decisao` is read from the case. */
+export type AlertRecord = {
+  id: string;
+  email: string;
+  tipo: string;
+  severidade: string;
+  seller: { id: string; razao_social: string | null; cnpj: string };
+  dados: Record<string, string>;
+  detectado_em: number;
+  case_id?: string;
+  pedido_aberto?: boolean;
+};
+
+/** D-M2 as the mock stores it (times in ms). */
+export type MonitoringRecord = {
+  ativo: boolean;
+  monitorados: number;
+  ultima_varredura?: number;
+  proxima_varredura?: number;
+};
+
+/** QA G1 / G4 / G6 / G8: the per-account presets of /__mock/panel/alerts/seed. */
+export const ALERT_PRESETS = [
+  "pm1",
+  "vazio",
+  "semvarredura",
+  "semalertas",
+  "um-critico",
+  "sessenta",
+  "hostil",
+  "invalido-tipo",
+  "invalido-dados",
+  "invalido-case",
+] as const;
+export type AlertPreset = (typeof ALERT_PRESETS)[number];
+
+/** C-M7-1: each type's severity and display-ready dados, as the sweep emits them. */
+export const ALERT_DEFAULTS: Record<
+  string,
+  { severidade: string; dados: Record<string, string> }
+> = {
+  SITUACAO_IRREGULAR: { severidade: "critico", dados: { situacao: "inapta" } },
+  IE_SUSPENSA: {
+    severidade: "critico",
+    dados: { estado_ie: "suspensa", uf: "SP" },
+  },
+  RESPONSAVEL_SAIU_QSA: {
+    severidade: "atencao",
+    dados: { responsavel: "Pessoa Exemplo Souza" },
+  },
+  QSA_MUDOU: { severidade: "info", dados: {} },
+  CNAE_MUDOU: {
+    severidade: "atencao",
+    dados: { cnae: "47.89-0-99 Comércio varejista de outros produtos" },
+  },
+  REGIME_MUDOU: {
+    severidade: "info",
+    dados: { de: "MEI", para: "Simples Nacional" },
+  },
+  WEBHOOK_FALHOU: { severidade: "atencao", dados: {} },
+};
+
+const SWEEP_UTC_HOUR = 9; // Monday 06:00 in America/Sao_Paulo (UTC−3), G3
+
+/** The next Monday-06:00 sweep strictly after `now` (São Paulo, no DST). */
+export function nextSweep(now: number): number {
+  const at = new Date(now);
+  at.setUTCHours(SWEEP_UTC_HOUR, 0, 0, 0);
+  const days = (8 - at.getUTCDay()) % 7;
+  let next = at.getTime() + days * DAY;
+  if (next <= now) next += 7 * DAY;
+  return next;
+}
+
+/** The monitoring status of a monitored, swept account (PM2). */
+export function sweptMonitoring(now: number, monitorados = 12) {
+  const proxima = nextSweep(now);
+  return {
+    ativo: true,
+    monitorados,
+    ultima_varredura: proxima - 7 * DAY,
+    proxima_varredura: proxima,
+  } satisfies MonitoringRecord;
+}
+
+/** A critical alert's case (D-M3): a monitoramento case for `seller`. */
+export function alertCase(
+  email: string,
+  input: {
+    n: number;
+    now: number;
+    cnpj?: string;
+    razao_social?: string | null;
+    decidido?: "bloquear";
+  },
+): CaseRecord {
+  const record = caseFor(input.decidido ? "decidido-bloquear" : "alerta", {
+    email,
+    n: input.n,
+    now: input.now,
+  });
+  record.origem = "monitoramento";
+  record.mudanca ??= {
+    tipo: "SITUACAO_CADASTRAL",
+    campo: "Situação na Receita",
+    de: "ATIVA",
+    para: "INAPTA",
+    detectado_em: input.now,
+  };
+  if (input.cnpj !== undefined) {
+    record.cnpj = input.cnpj;
+    record.seller.cnpj = input.cnpj;
+  }
+  if (input.razao_social !== undefined) {
+    record.razao_social = input.razao_social;
+    record.seller.razao_social = input.razao_social;
+  }
+  return record;
+}
+
+function alertFor(
+  email: string,
+  tipo: string,
+  input: {
+    n: number;
+    detectado_em: number;
+    seller?: AlertRecord["seller"];
+    dados?: Record<string, string>;
+    severidade?: string;
+  },
+): AlertRecord {
+  const defaults = ALERT_DEFAULTS[tipo] ?? { severidade: "info", dados: {} };
+  const cnpj = caseCnpj(input.n);
+  return {
+    id: crypto.randomUUID(),
+    email,
+    tipo,
+    severidade: input.severidade ?? defaults.severidade,
+    seller: input.seller ?? {
+      id: crypto.randomUUID(),
+      razao_social: `Empresa Exemplo ${input.n} Ltda`,
+      cnpj,
+    },
+    dados: { ...(input.dados ?? defaults.dados) },
+    detectado_em: input.detectado_em,
+  };
+}
+
+/** A critical alert with its case (open, or decided bloquear). */
+function criticalWithCase(
+  email: string,
+  tipo: string,
+  input: {
+    n: number;
+    now: number;
+    detectado_em: number;
+    decidido?: "bloquear";
+  },
+): { alert: AlertRecord; kase: CaseRecord } {
+  const kase = alertCase(email, input);
+  const alert = alertFor(email, tipo, {
+    n: input.n,
+    detectado_em: input.detectado_em,
+    seller: { ...kase.seller },
+  });
+  alert.case_id = kase.id;
+  return { alert, kase };
+}
+
+/**
+ * An account's alerts, the cases its critical ones opened, and its D-M2
+ * status, for a preset (newest first; `now` is the account's clock, QA G3).
+ */
+export function alertsForPreset(
+  preset: AlertPreset,
+  email: string,
+  now: number,
+): {
+  alerts: AlertRecord[];
+  cases: CaseRecord[];
+  monitoring: MonitoringRecord;
+} {
+  const swept = sweptMonitoring(now);
+  const at = (hoursAgo: number) => now - hoursAgo * HOUR;
+  switch (preset) {
+    case "vazio":
+      return {
+        alerts: [],
+        cases: [],
+        monitoring: { ativo: false, monitorados: 0 },
+      };
+    case "semvarredura":
+      return {
+        alerts: [],
+        cases: [],
+        monitoring: {
+          ativo: true,
+          monitorados: 5,
+          proxima_varredura: nextSweep(now),
+        },
+      };
+    case "semalertas":
+      return { alerts: [], cases: [], monitoring: sweptMonitoring(now, 5) };
+    case "um-critico": {
+      const { alert, kase } = criticalWithCase(email, "SITUACAO_IRREGULAR", {
+        n: 701,
+        now,
+        detectado_em: at(1),
+      });
+      return { alerts: [alert], cases: [kase], monitoring: swept };
+    }
+    case "sessenta":
+      return {
+        alerts: Array.from({ length: 60 }, (_, i) =>
+          alertFor(email, "QSA_MUDOU", { n: 800 + i, detectado_em: at(i + 1) }),
+        ),
+        cases: [],
+        monitoring: swept,
+      };
+    case "hostil":
+      return {
+        alerts: [
+          alertFor(email, "RESPONSAVEL_SAIU_QSA", {
+            n: 720,
+            detectado_em: at(1),
+            dados: {
+              responsavel:
+                `<img src=x onerror=alert(1)>${"Ç".repeat(120)}`.slice(0, 120),
+            },
+          }),
+          alertFor(email, "CNAE_MUDOU", {
+            n: 721,
+            detectado_em: at(2),
+            dados: { cnae: `<b>47.89</b> ${"x".repeat(200)}`.slice(0, 200) },
+            seller: {
+              id: crypto.randomUUID(),
+              razao_social: null,
+              cnpj: caseCnpj(721),
+            },
+          }),
+        ],
+        cases: [],
+        monitoring: swept,
+      };
+    case "invalido-tipo":
+    case "invalido-dados":
+    case "invalido-case": {
+      const alert = alertFor(email, "QSA_MUDOU", {
+        n: 730,
+        detectado_em: at(1),
+      });
+      if (preset === "invalido-tipo") alert.tipo = "NOVO_TIPO";
+      if (preset === "invalido-dados") alert.tipo = "SITUACAO_IRREGULAR";
+      if (preset === "invalido-case") {
+        alert.severidade = "critico";
+        alert.case_id = "../fila";
+      }
+      return { alerts: [alert], cases: [], monitoring: swept };
+    }
+    case "pm1": {
+      const open = criticalWithCase(email, "SITUACAO_IRREGULAR", {
+        n: 711,
+        now,
+        detectado_em: at(2),
+      });
+      const blocked = criticalWithCase(email, "IE_SUSPENSA", {
+        n: 712,
+        now,
+        detectado_em: at(26),
+        decidido: "bloquear",
+      });
+      const responsavel = alertFor(email, "RESPONSAVEL_SAIU_QSA", {
+        n: 713,
+        detectado_em: at(50),
+      });
+      responsavel.pedido_aberto = true;
+      const qsa = alertFor(email, "QSA_MUDOU", {
+        n: 714,
+        detectado_em: at(74),
+        seller: {
+          id: crypto.randomUUID(),
+          razao_social: null,
+          cnpj: caseCnpj(714),
+        },
+      });
+      return {
+        alerts: [
+          open.alert,
+          blocked.alert,
+          responsavel,
+          qsa,
+          alertFor(email, "CNAE_MUDOU", { n: 715, detectado_em: at(98) }),
+          alertFor(email, "REGIME_MUDOU", { n: 716, detectado_em: at(122) }),
+          alertFor(email, "WEBHOOK_FALHOU", { n: 717, detectado_em: at(146) }),
+        ],
+        cases: [open.kase, blocked.kase],
+        monitoring: swept,
+      };
+    }
+  }
+}

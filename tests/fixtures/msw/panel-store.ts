@@ -1,4 +1,10 @@
 import {
+  ALERT_EMAILS,
+  ALERT_PRESETS,
+  alertsForPreset,
+  type AlertPreset,
+  type AlertRecord,
+  type MonitoringRecord,
   CASE_PRESETS,
   casesForPreset,
   foreignCase,
@@ -188,7 +194,20 @@ export type Scenario =
   // M5 batches (PB8, PB9, PB12; PB11 counts in pollFailures)
   | "csv-sem-escape"
   | "historico-falha"
-  | "queda-de-rede-lote";
+  | "queda-de-rede-lote"
+  // M7 (PM7): per account only (QA G2)
+  | "alertas-falha"
+  | "monitoramento-falha";
+
+/** QA G2: the alert endpoints a per-account fault can target. */
+export type AlertEndpoint = "alerts" | "monitoring";
+export const ALERT_FAULT_KINDS = ["delay", "500", "503", "drop"] as const;
+export type AlertFault = {
+  kind: (typeof ALERT_FAULT_KINDS)[number];
+  ms?: number;
+  /** How many requests it applies to (unlimited when missing). */
+  times?: number;
+};
 
 type Store = {
   accounts: Map<string, Account>;
@@ -197,7 +216,15 @@ type Store = {
   loginFailures: Map<string, number>;
   tickets: Map<string, Ticket>;
   resetTokens: Map<string, { email: string; expiresAt: number; used: boolean }>;
-  outbox: Map<string, { codigo?: string; link?: string }>;
+  outbox: Map<
+    string,
+    {
+      codigo?: string;
+      link?: string;
+      /** D-M3: the last mail.alert.* (subject and CTA link). */
+      alerta?: { assunto: string; link: string };
+    }
+  >;
   /** A-X7: the first sign-up answer per Idempotency-Key, with its body. */
   idempotency: Map<
     string,
@@ -234,6 +261,10 @@ type Store = {
   docSigs: Map<string, { email: string; caseId: string; docId: string }>;
   /** QA G11 lista-atrasada: the decided case the list still shows, n more reads. */
   lagging: Map<string, { snapshot: CaseRecord; reads: number }>;
+  /** M7: alerts by id, and each account's D-M2 status (set → the count is derived). */
+  alerts: Map<string, AlertRecord>;
+  monitoring: Map<string, MonitoringRecord>;
+  alertFaults: Map<string, AlertFault>;
 };
 
 const SEEDED: Record<
@@ -379,6 +410,28 @@ function createStore(): Store {
   }
   const now = Date.now();
   const cases = new Map<string, CaseRecord>();
+  // M7 (PM1, PM3–PM5): the Monitoramento's accounts, from the renata preset.
+  const alerts = new Map<string, AlertRecord>();
+  const monitoring = new Map<string, MonitoringRecord>();
+  for (const [email, preset] of [
+    [ALERT_EMAILS.alertas, "pm1"],
+    [ALERT_EMAILS.semmonitor, "vazio"],
+    [ALERT_EMAILS.semvarredura, "semvarredura"],
+    [ALERT_EMAILS.semalertas, "semalertas"],
+  ] as const) {
+    const account = accountFor(
+      "renata",
+      email,
+      "Alerta Exemplo",
+      "Plataforma Monitorada",
+    );
+    zeroFilaCounts(account);
+    accounts.set(email, account);
+    const seeded = alertsForPreset(preset, email, now);
+    for (const alert of seeded.alerts) alerts.set(alert.id, alert);
+    for (const record of seeded.cases) cases.set(record.id, record);
+    monitoring.set(email, seeded.monitoring);
+  }
   for (const record of [
     ...casesForPreset("pc1", PANEL_EMAILS.fila, now),
     ...casesForPreset("um", PANEL_EMAILS.semwebhook, now),
@@ -407,6 +460,9 @@ function createStore(): Store {
     caseClocks: new Map(),
     docSigs: new Map(),
     lagging: new Map(),
+    alerts,
+    monitoring,
+    alertFaults: new Map(),
   };
 }
 
@@ -807,4 +863,94 @@ export function docForSig(
   sig: string,
 ): { email: string; caseId: string; docId: string } | undefined {
   return store.docSigs.get(sig);
+}
+
+// --- Alerts (M7) --------------------------------------------------------------
+
+export function isAlertPreset(value: unknown): value is AlertPreset {
+  return (ALERT_PRESETS as readonly unknown[]).includes(value);
+}
+
+/**
+ * QA G1: replaces an account's alerts, their cases and its D-M2 status with a
+ * preset (creating the account from the renata preset if needed), at the
+ * account's clock (QA G3). Its Fila and alert counts then come from the store.
+ */
+export function seedAlerts(email: string, preset: AlertPreset): void {
+  const normalized = email.toLowerCase();
+  const account =
+    store.accounts.get(normalized) ?? createAccount({ email: normalized });
+  zeroFilaCounts(account);
+  for (const alert of alertsOf(normalized)) {
+    store.alerts.delete(alert.id);
+    if (alert.case_id !== undefined) store.cases.delete(alert.case_id);
+  }
+  const seeded = alertsForPreset(preset, normalized, caseNow(normalized));
+  for (const alert of seeded.alerts) store.alerts.set(alert.id, alert);
+  for (const record of seeded.cases) store.cases.set(record.id, record);
+  store.monitoring.set(normalized, seeded.monitoring);
+}
+
+/** The account's alerts, newest first, ties by id (C-M7-5). */
+export function alertsOf(email: string): AlertRecord[] {
+  return [...store.alerts.values()]
+    .filter((alert) => alert.email === email)
+    .sort(
+      (a, b) =>
+        b.detectado_em - a.detectado_em ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+}
+
+export function addAlert(alert: AlertRecord): void {
+  store.alerts.set(alert.id, alert);
+}
+
+/** The D-M2 status, or undefined for an account M7 never seeded. */
+export function monitoringOf(email: string): MonitoringRecord | undefined {
+  return store.monitoring.get(email);
+}
+
+export function setMonitoring(email: string, record: MonitoringRecord): void {
+  store.monitoring.set(email, record);
+}
+
+/**
+ * C-M7-4 / QA G7: critical alerts whose case is undecided, or undefined for
+ * an account M7 never seeded (its static count stands).
+ */
+export function alertCount(email: string): number | undefined {
+  if (!store.monitoring.has(email)) return undefined;
+  return alertsOf(email).filter(
+    (alert) =>
+      alert.severidade === "critico" &&
+      alert.case_id !== undefined &&
+      store.cases.get(alert.case_id)?.estado !== "decidido",
+  ).length;
+}
+
+/** QA G2: sets (or, with undefined, clears) a per-account alert fault. */
+export function setAlertFault(
+  email: string,
+  endpoint: AlertEndpoint,
+  fault: AlertFault | undefined,
+): void {
+  const key = `${email.toLowerCase()}|${endpoint}`;
+  if (fault === undefined) store.alertFaults.delete(key);
+  else store.alertFaults.set(key, fault);
+}
+
+/** The fault for this request, if any (one fewer left when it's counted). */
+export function takeAlertFault(
+  email: string,
+  endpoint: AlertEndpoint,
+): AlertFault | undefined {
+  const key = `${email}|${endpoint}`;
+  const fault = store.alertFaults.get(key);
+  if (fault === undefined) return undefined;
+  if (fault.times !== undefined) {
+    if (fault.times <= 1) store.alertFaults.delete(key);
+    else store.alertFaults.set(key, { ...fault, times: fault.times - 1 });
+  }
+  return fault;
 }
