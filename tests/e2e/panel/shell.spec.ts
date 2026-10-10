@@ -63,8 +63,8 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     const nav = page.getByRole("navigation", { name: "Navegação do painel" });
     // The build's items in the spec's order: M8's Início, M4's Fila, M7's
     // Monitoramento (with the preset's undecided critical alert), M5's Lote,
-    // then M8's Vendedores (with contagens.vendedores).
-    await expect(nav.getByRole("link")).toHaveCount(5);
+    // then M8's Vendedores (with contagens.vendedores) and Regras.
+    await expect(nav.getByRole("link")).toHaveCount(6);
     await expect(nav.getByRole("link").nth(0)).toHaveAccessibleName("Início");
     await expect(nav.getByRole("link").nth(2)).toHaveAccessibleName(
       "Monitoramento 1 alerta crítico sem decisão",

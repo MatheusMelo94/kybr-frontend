@@ -85,7 +85,8 @@ export async function seed(
     | "historico-falha"
     | "csv-sem-escape"
     | "queda-de-rede-lote"
-    | "lote-poll-falha",
+    | "lote-poll-falha"
+    | "regras-falha",
   email: string,
   extra: { n?: number } = {},
 ): Promise<void> {

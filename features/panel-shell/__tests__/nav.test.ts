@@ -23,13 +23,14 @@ describe("nav registry (spec § Screens & Surfaces, O-15)", () => {
     expect(firstThree).toContain("monitor");
   });
 
-  it("shows only the screens this build ships, with no placeholders: M8 adds Início first and Vendedores 5th, in the spec's order", () => {
+  it("shows only the screens this build ships, with no placeholders: M8 adds Início first, Vendedores 5th and Regras 6th, in the spec's order", () => {
     expect(navItemsInBuild()).toEqual([
       { key: "inicio", href: "/", label: "Início" },
       { key: "fila", href: "/fila", label: "Fila de revisão" },
       { key: "monitor", href: "/monitoramento", label: "Monitoramento" },
       { key: "lote", href: "/lote", label: "Verificar em lote" },
       { key: "vendedores", href: "/vendedores", label: "Vendedores" },
+      { key: "regras", href: "/regras", label: "Regras" },
     ]);
   });
 });
