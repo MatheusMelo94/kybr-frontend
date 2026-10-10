@@ -49,7 +49,9 @@ export default async function SellersPage({
         </p>
       </div>
       <div className="flex min-w-0 flex-wrap items-end gap-4">
-        <SearchForm search={search} />
+        {/* P8-001: a soft navigation keeps the leaf mounted and defaultValue
+            only applies on mount, so a new q remounts the box. */}
+        <SearchForm key={search.q ?? ""} search={search} />
         <StatusFilter search={search} />
       </div>
       <Suspense fallback={<SellersSkeleton />}>

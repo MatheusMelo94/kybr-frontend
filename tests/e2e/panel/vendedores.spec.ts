@@ -5,6 +5,7 @@ import {
   logIn,
   uniqueEmail,
 } from "../fixtures/panel-mock.ts";
+import { SETTLE } from "../fixtures/fila-timing.ts";
 import {
   seedSellers,
   sellerNeedles,
@@ -134,7 +135,7 @@ test.describe("Vendedores @feature-ops-panel @panel-operacao @panel-vendedores",
     await page.waitForURL(/\/vendedores\?q=/);
     await expect(bodyRows(page)).toHaveCount(1);
     await expect(bodyRows(page)).toContainText("Vendedor Exemplo 42 Ltda");
-    expect(await page.title()).toBe("Vendedores · Kybr");
+    await expect(page).toHaveTitle("Vendedores · Kybr");
 
     await page.goto("/vendedores?pagina=2&q=exemplo");
     await page
@@ -200,6 +201,52 @@ test.describe("Vendedores @feature-ops-panel @panel-operacao @panel-vendedores",
 });
 
 test.describe("Vendedores on a phone @feature-ops-panel @panel-operacao @panel-vendedores @panel-phone", () => {
+  test("P8-001: the search box follows the URL after Limpar busca, a page link and a filter", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("vendedores-caixa", testInfo);
+    await seedSellers(request, email);
+    await logIn(page, email, undefined, "/entrar?volta=%2Fvendedores");
+    await expect(bodyRows(page)).toHaveCount(50);
+    const search = page.getByRole("searchbox", {
+      name: "Buscar por nome ou CNPJ",
+    });
+
+    await search.fill("ninguem-com-este-nome");
+    await search.press("Enter");
+    const clear = page
+      .locator("#conteudo")
+      .getByRole("link", { name: "Limpar busca" });
+    await expect(clear).toBeVisible(SETTLE);
+    await clear.click();
+    await page.waitForURL(/\/vendedores$/);
+    await expect(bodyRows(page)).toHaveCount(50, SETTLE);
+    await expect(search).toHaveValue("");
+
+    await search.fill("exemplo");
+    await search.press("Enter");
+    await page.waitForURL(/\/vendedores\?q=exemplo$/);
+    await page
+      .locator("#conteudo")
+      .getByRole("navigation", { name: "Páginas de vendedores" })
+      .getByRole("link", { name: "2", exact: true })
+      .click();
+    await page.waitForURL(/pagina=2/);
+    await expect(search).toHaveValue("exemplo");
+
+    await page
+      .getByRole("combobox", { name: "Status" })
+      .selectOption("bloqueado");
+    await page.waitForURL(/status=bloqueado&q=exemplo$/);
+    await expect(search).toHaveValue("exemplo");
+    await search.fill("");
+    await search.press("Enter");
+    await page.waitForURL(/\/vendedores\?status=bloqueado$/);
+    await expect(search).toHaveValue("");
+    expect(await horizontalOverflow(page)).toBe(0);
+  });
+
   test("the table scrolls inside its card; the page never scrolls sideways", async ({
     page,
     request,
