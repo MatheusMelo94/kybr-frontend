@@ -33,7 +33,7 @@ import type { SellerStatus } from "@/lib/panel-api-values";
 /** The body comes back raw: it's parsed here, so a failure logs shape only (F11). */
 const raw = z.unknown();
 
-type CsvStream = ApiResult<{
+export type CsvStream = ApiResult<{
   body: ReadableStream<Uint8Array>;
   contentType: string;
 }>;

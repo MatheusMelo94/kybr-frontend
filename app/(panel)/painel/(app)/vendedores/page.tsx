@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense, type JSX } from "react";
 
+import { defaultAuditRange } from "@/features/panel-sellers/audit-range";
+import { ExportButtons } from "@/features/panel-sellers/components/export-buttons";
 import { SearchForm } from "@/features/panel-sellers/components/search-form";
 import { SellersEmpty } from "@/features/panel-sellers/components/sellers-empty";
 import { SellersPager } from "@/features/panel-sellers/components/sellers-pager";
@@ -82,6 +84,11 @@ async function SellersBody({
         exhausted={exhausted ? { describedBy: EXHAUSTED_ID } : undefined}
       />
       <SellersPager search={search} paginas={page.paginas} />
+      <ExportButtons
+        search={{ status: search.status, q: search.q }}
+        total={page.total}
+        auditRange={defaultAuditRange(new Date())}
+      />
     </div>
   );
 }
