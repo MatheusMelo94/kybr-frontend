@@ -57,6 +57,7 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
   const [server, setServer] = useState(() => toDraft(policy));
   const [draft, setDraft] = useState<Draft>(server);
   const [checked, setChecked] = useState(false);
+  const [daysChecked, setDaysChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<"error" | "conflict" | null>(null);
   const { show } = useToast();
@@ -81,6 +82,7 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
     event.preventDefault();
     if (busy) return;
     if (invalidDias(draft)) {
+      setDaysChecked(true);
       days.current?.focus();
       return;
     }
@@ -135,6 +137,11 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
             descricaoCategoria={categoria.descricao}
             onAcao={(acao) => updateRule(regra.chave, { acao })}
             onDias={(dias) => updateRule(regra.chave, { dias })}
+            daysError={
+              daysChecked && invalidDias(draft)
+                ? regrasCopy["regras.error.days"]
+                : undefined
+            }
             error={
               offenders.includes(regra.chave)
                 ? regrasCopy["regras.error.nodocs"]

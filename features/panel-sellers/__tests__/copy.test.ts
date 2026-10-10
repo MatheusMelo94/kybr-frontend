@@ -42,6 +42,11 @@ const SPEC_S10: Record<string, string> = {
     "Coloque o link no seu cadastro de vendedores ou verifique sua base em lote.",
   "sellers.empty.search": 'Nenhum vendedor encontrado para "{busca}".',
   "sellers.empty.search.cta": "Limpar busca",
+  "sellers.empty.filter": "Nenhum vendedor com esse status.",
+  "sellers.empty.filter.cta": "Mostrar todos",
+  "sellers.pager.label": "Páginas de vendedores",
+  "sellers.pager.next": "Próximos 50",
+  "sellers.pager.first": "Voltar ao início",
   "sellers.detail.open_case": "Abrir caso",
   "sellers.detail.history.h": "Verificações anteriores",
   "sellers.notfound.h": "Vendedor não encontrado",
@@ -72,5 +77,10 @@ describe("sellersCopy (T137, spec § Content & Copy › S10)", () => {
       "Não conseguimos gerar o arquivo. Tente de novo.",
     );
     expect(shellCopy["plan.exhausted"]).toBeTruthy();
+  });
+
+  it("AC 72 (T146): no string addresses the user with a gendered form", () => {
+    for (const text of Object.values(sellersCopy))
+      expect(text).not.toMatch(/bem-vind|obrigad|você mesm/i);
   });
 });

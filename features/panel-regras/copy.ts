@@ -36,6 +36,7 @@ export const regrasCopy = {
     "Não conseguimos salvar as regras. Suas mudanças continuam aqui. Tente de novo.",
   "regras.error.nodocs":
     'Ative pelo menos um documento para usar "Pedir documento".',
+  "regras.error.days": "Informe um número de dias entre 1 e 3650.",
   "regras.leave.h": "Sair sem salvar?",
   "regras.leave.body": "As mudanças nas regras vão se perder.",
   "regras.leave.confirm": "Sair sem salvar",

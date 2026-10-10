@@ -43,4 +43,9 @@ describe("settingsCopy (T128, spec § Content & Copy › S12)", () => {
     expect(onboardingCopy["onb.contact.email.label"]).toBeTruthy();
     expect(onboardingCopy["onb.contact.url.hint"]).toBe("Começa com https://");
   });
+
+  it("AC 72 (T146): no string addresses the user with a gendered form", () => {
+    for (const text of Object.values(settingsCopy))
+      expect(text).not.toMatch(/bem-vind|obrigad|você mesm/i);
+  });
 });

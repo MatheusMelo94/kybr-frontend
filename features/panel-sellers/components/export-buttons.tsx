@@ -85,6 +85,8 @@ export function ExportButtons({
           value={de}
           onChange={(event) => setDe(event.target.value)}
           tabularNums
+          // Shrinks at 360 px and 200 % text (a date input is wide).
+          className="min-w-0 flex-[1_1_10rem]"
         />
         <TextField
           type="date"
@@ -93,6 +95,7 @@ export function ExportButtons({
           value={ate}
           onChange={(event) => setAte(event.target.value)}
           tabularNums
+          className="min-w-0 flex-[1_1_10rem]"
         />
         <Button
           variant="secondary"

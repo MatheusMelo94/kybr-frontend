@@ -17,6 +17,8 @@ type Props = {
   onDias: (dias: string) => void;
   /** regras.error.nodocs on this rule. */
   error?: string | undefined;
+  /** regras.error.days on recente's days input. */
+  daysError?: string | undefined;
   selectRef?: Ref<HTMLSelectElement> | undefined;
   daysRef?: Ref<HTMLInputElement> | undefined;
 };
@@ -38,6 +40,7 @@ export function RuleRow({
   onAcao,
   onDias,
   error,
+  daysError,
   selectRef,
   daysRef,
 }: Props): JSX.Element {
@@ -57,6 +60,7 @@ export function RuleRow({
           inputMode="numeric"
           maxLength={4}
           value={regra.dias}
+          {...(daysError !== undefined && { error: daysError })}
           onChange={(event) => onDias(event.target.value.replace(/\D/g, ""))}
           tabularNums
           className="max-w-48"

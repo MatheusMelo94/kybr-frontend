@@ -214,7 +214,7 @@ describe("PolicyForm", () => {
       expect(toggle).toHaveAccessibleDescription(NODOCS);
   });
 
-  it("an invalid number of days blocks the save with focus on it", () => {
+  it("an invalid number of days: regras.error.days on the field, the save blocked with focus on it", () => {
     renderForm();
     const days = screen.getByRole("textbox", {
       name: "Prazo mínimo de abertura",
@@ -222,6 +222,11 @@ describe("PolicyForm", () => {
     fireEvent.change(days, { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar regras" }));
     expect(days).toHaveFocus();
+    expect(days).toHaveAttribute("aria-invalid", "true");
+    expect(days).toHaveAccessibleDescription(
+      "Informe um número de dias entre 1 e 3650.",
+    );
+    expect(savePolicyAction).not.toHaveBeenCalled();
   });
 });
 

@@ -156,4 +156,15 @@ describe("SellersTable", () => {
         .getAttribute("href"),
     ).toBe(`/vendedores/${ROW.id}`);
   });
+
+  it("T146 (AC 76): the CNPJ and the date use tabular figures", () => {
+    const [row] = rows(ROW);
+    const cells = within(row as HTMLElement).getAllByRole("cell");
+    expect(within(cells[0] as HTMLElement).getByText(ROW.cnpj)).toHaveClass(
+      "tabular-nums",
+    );
+    expect(cells[3]?.querySelector(".tabular-nums")).toHaveTextContent(
+      "04/10/2026",
+    );
+  });
 });

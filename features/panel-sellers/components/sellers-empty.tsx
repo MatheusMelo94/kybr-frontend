@@ -8,7 +8,6 @@ import {
   sellersHref,
   type SellersSearch,
 } from "@/features/panel-sellers/search-params";
-import { SELLER_STATUS_WORDS } from "@/features/panel-sellers/status-words";
 import { settingsCopy } from "@/features/panel-settings/copy";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import { fill } from "@/features/panel-shell/format";
@@ -16,9 +15,9 @@ import { fill } from "@/features/panel-shell/format";
 /**
  * Vendedores' empty states (AC 55). Nobody yet: sellers.empty.* + "Copiar
  * link de cadastro" (primary) + "Verificar em lote" (the Início CTAs' keys).
- * Nothing for the search or filter: sellers.empty.search + "Limpar busca",
- * which drops q (or, with no q, the filter). {busca} is the search, or the
- * filter's word when there is no search (a spec gap, flagged to UX).
+ * Nothing for the search: sellers.empty.search + "Limpar busca", which
+ * drops q and keeps the filter. Nothing for a filter alone:
+ * sellers.empty.filter + "Mostrar todos" (spec, 2026-10-10).
  */
 export function SellersEmpty({
   search,
@@ -52,19 +51,28 @@ export function SellersEmpty({
       </div>
     );
 
-  const busca =
-    search.q ??
-    (search.status !== undefined
-      ? SELLER_STATUS_WORDS[search.status].word
-      : "");
-  const cleared: SellersSearch =
-    search.q !== undefined
-      ? { pagina: 1, ...(search.status && { status: search.status }) }
-      : { pagina: 1 };
+  if (search.q === undefined)
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-body text-ink">
+          {sellersCopy["sellers.empty.filter"]}
+        </p>
+        <Link
+          href={sellersHref({ pagina: 1 })}
+          className={`${PANEL_LINK} self-start`}
+        >
+          {sellersCopy["sellers.empty.filter.cta"]}
+        </Link>
+      </div>
+    );
+  const cleared: SellersSearch = {
+    pagina: 1,
+    ...(search.status && { status: search.status }),
+  };
   return (
     <div className="flex flex-col gap-2">
       <p className="text-body break-words text-ink">
-        {fill(sellersCopy["sellers.empty.search"], { busca })}
+        {fill(sellersCopy["sellers.empty.search"], { busca: search.q })}
       </p>
       <Link href={sellersHref(cleared)} className={`${PANEL_LINK} self-start`}>
         {sellersCopy["sellers.empty.search.cta"]}

@@ -67,6 +67,18 @@ test.describe("Vendedores @feature-ops-panel @panel-operacao @panel-vendedores",
     await pages.nth(2).click();
     await page.waitForURL(/\/vendedores\?pagina=3$/);
     await expect(bodyRows(page)).toHaveCount(20);
+    // T146: the pager is a nav named sellers.pager.label.
+    const pager = page
+      .locator("#conteudo")
+      .getByRole("navigation", { name: "Páginas de vendedores" });
+    await expect(pager.getByRole("link", { name: "Próximos 50" })).toHaveCount(
+      0,
+    );
+    await pager.getByRole("link", { name: "Voltar ao início" }).click();
+    await page.waitForURL(/\/vendedores$/);
+    await expect(
+      pager.getByRole("link", { name: "Próximos 50" }),
+    ).toBeVisible();
   });
 
   test("O-F4: CNPJs and the CPF in MEI names are masked in the HTML; markup renders as text", async ({
@@ -156,12 +168,16 @@ test.describe("Vendedores @feature-ops-panel @panel-operacao @panel-vendedores",
 
     await seedSellers(request, email);
     await page.goto("/vendedores?q=ninguem-com-este-nome");
+    // A streamed duplicate can sit outside #conteudo for a moment (handoff).
     await expect(
-      page.getByText(
-        'Nenhum vendedor encontrado para "ninguem-com-este-nome".',
-      ),
+      page
+        .locator("#conteudo")
+        .getByText('Nenhum vendedor encontrado para "ninguem-com-este-nome".'),
     ).toBeVisible();
-    await page.getByRole("link", { name: "Limpar busca" }).click();
+    await page
+      .locator("#conteudo")
+      .getByRole("link", { name: "Limpar busca" })
+      .click();
     await page.waitForURL(/\/vendedores$/);
     await expect(bodyRows(page)).toHaveCount(50);
   });

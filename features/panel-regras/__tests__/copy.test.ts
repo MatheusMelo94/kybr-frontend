@@ -38,6 +38,7 @@ const SPEC_S11: Record<string, string> = {
     "Não conseguimos salvar as regras. Suas mudanças continuam aqui. Tente de novo.",
   "regras.error.nodocs":
     'Ative pelo menos um documento para usar "Pedir documento".',
+  "regras.error.days": "Informe um número de dias entre 1 e 3650.",
   "regras.leave.h": "Sair sem salvar?",
   "regras.leave.body": "As mudanças nas regras vão se perder.",
   "regras.leave.confirm": "Sair sem salvar",
@@ -56,5 +57,10 @@ describe("regrasCopy (T137, spec § Content & Copy › S11)", () => {
   it("has no TODO(copy) placeholder", () => {
     for (const value of Object.values(regrasCopy))
       expect(value).not.toContain("TODO");
+  });
+
+  it("AC 72 (T146): no string addresses the user with a gendered form", () => {
+    for (const text of Object.values(regrasCopy))
+      expect(text).not.toMatch(/bem-vind|obrigad|você mesm/i);
   });
 });

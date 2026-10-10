@@ -56,12 +56,18 @@ export function SellersTable({
               {/* T143: the name (or the CNPJ standing in for it) opens the detail. */}
               <Link
                 href={`/vendedores/${encodeURIComponent(row.id)}`}
-                className={cn(PANEL_LINK, "break-words")}
+                className={cn(
+                  PANEL_LINK,
+                  "break-words",
+                  row.razao_social === null && "tabular-nums",
+                )}
               >
                 {row.razao_social ?? row.cnpj}
               </Link>
               {row.razao_social !== null && (
-                <span className="block text-ink-muted">{row.cnpj}</span>
+                <span className="block text-ink-muted tabular-nums">
+                  {row.cnpj}
+                </span>
               )}
             </Td>
             <Td>{row.responsavel ?? sellersCopy["sellers.resp.none"]}</Td>
@@ -70,7 +76,11 @@ export function SellersTable({
                 ? filaCopy["fila.origin.link"]
                 : filaCopy["fila.origin.lote"]}
             </Td>
-            <Td>{formatDate(row.verificado_em)}</Td>
+            <Td>
+              <span className="tabular-nums">
+                {formatDate(row.verificado_em)}
+              </span>
+            </Td>
             <Td>
               <span className="inline-flex items-center gap-2 text-ink">
                 <StatusDot tone={SELLER_STATUS_WORDS[row.status].tone} />

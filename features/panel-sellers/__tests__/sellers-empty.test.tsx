@@ -49,7 +49,7 @@ describe("SellersEmpty", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("a filter alone: {busca} is the status word; Limpar busca clears the filter", () => {
+  it("a filter alone: sellers.empty.filter + Mostrar todos clears the filter (spec 2026-10-10)", () => {
     render(
       <SellersEmpty
         search={{ pagina: 1, status: "bloqueado" }}
@@ -57,9 +57,9 @@ describe("SellersEmpty", () => {
       />,
     );
     expect(
-      screen.getByText('Nenhum vendedor encontrado para "Bloqueado".'),
+      screen.getByText("Nenhum vendedor com esse status."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Limpar busca" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Mostrar todos" })).toHaveAttribute(
       "href",
       "/vendedores",
     );
