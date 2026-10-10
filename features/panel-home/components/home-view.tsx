@@ -8,6 +8,7 @@ import { FirstSteps } from "@/features/panel-home/components/first-steps";
 import { Greeting } from "@/features/panel-home/components/greeting";
 import { Kpis } from "@/features/panel-home/components/kpis";
 import { QueueCard } from "@/features/panel-home/components/queue-card";
+import { WeekCard } from "@/features/panel-home/components/week-card";
 import { homeCopy } from "@/features/panel-home/copy";
 import {
   pickHomeState,
@@ -87,6 +88,7 @@ export function HomeView({ me, dashboard, now }: Props): JSX.Element {
             <QueueCard fila={dashboard.fila} />
             <FeedCard alertas={dashboard.alertas} />
           </div>
+          <WeekCard semana={dashboard.semana} />
           {steps}
         </>
       )}

@@ -64,6 +64,11 @@ const ALERT = {
   dados: {},
 };
 
+const WEEK = Array.from({ length: 7 }, (_, i) => ({
+  dia: `2026-10-0${i + 1}`,
+  total: i,
+}));
+
 const FULL: Dashboard = {
   kpis: { verificados: 1240, auto: 1102, revisao: 96, bloqueados: 42 },
   fila: [CASE],
@@ -167,6 +172,21 @@ describe("HomeView", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("T134: Semana follows the queue and feed; a new workspace has none", () => {
+    const { unmount } = render(view({ ...FULL, semana: WEEK }));
+    expect(within(card("Semana")).getAllByRole("row")).toHaveLength(7);
+    unmount();
+    render(
+      view({
+        kpis: { verificados: 0, auto: 0, revisao: 0, bloqueados: 0 },
+        semana: WEEK,
+      }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Semana" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("T133: new workspace: Primeiros passos is the first card", () => {
     render(
       view({
@@ -223,7 +243,7 @@ describe("HomeView", () => {
   });
 
   it("PH3: missing KPIs show the card error in their place", () => {
-    render(view({ fila: [], alertas: [] }));
+    render(view({ fila: [], alertas: [], semana: WEEK }));
     expect(
       screen.queryByText("vendedores verificados"),
     ).not.toBeInTheDocument();

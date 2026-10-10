@@ -73,7 +73,7 @@ test.describe("Início @feature-ops-panel @panel-operacao", () => {
     await seedDashboard(request, email, "populado");
     await dashboardFault(request, email, {
       kind: "omit",
-      sem: ["fila", "alertas"],
+      sem: ["fila", "alertas", "semana"],
     });
     await logIn(page, email);
 
@@ -82,6 +82,11 @@ test.describe("Início @feature-ops-panel @panel-operacao", () => {
     await expect(
       page
         .getByRole("region", { name: "Mudanças na base" })
+        .getByText("Esta parte não carregou."),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("region", { name: "Semana" })
         .getByText("Esta parte não carregou."),
     ).toBeVisible();
     await expect(page.getByText("vendedores verificados")).toBeVisible();
@@ -122,6 +127,46 @@ test.describe("Início @feature-ops-panel @panel-operacao", () => {
     await expect(
       page.getByRole("status").filter({ hasText: "Link copiado" }),
     ).toBeVisible();
+  });
+
+  test("T134 (AC 54): Semana is seven static bars a screen reader skips for the hidden table @panel-phone", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("inicio-semana", testInfo);
+    await seedDashboard(request, email, "populado");
+    await logIn(page, email);
+
+    const week = page.getByRole("region", { name: "Semana" });
+    const table = week.getByRole("table", { name: "Verificações por dia." });
+    await expect(table.getByRole("row")).toHaveCount(7);
+    await expect(table.getByRole("rowheader").first()).toHaveText(
+      /^(domingo|segunda-feira|terça-feira|quarta-feira|quinta-feira|sexta-feira|sábado)$/,
+    );
+    const bars = week.locator("[data-week-bar]");
+    await expect(bars).toHaveCount(7);
+    await expect(week.locator("[data-week-bars]")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    // Static: no transition or animation on the bars.
+    const motion = await bars.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const style = getComputedStyle(node);
+        return `${style.transitionDuration}|${style.animationName}`;
+      }),
+    );
+    expect(new Set(motion)).toEqual(new Set(["0s|none"]));
+    // The tallest bar is full height; heights follow the counts.
+    const scales = await bars.evaluateAll((nodes) =>
+      nodes.map((node) => Number(node.style.getPropertyValue("--v"))),
+    );
+    expect(Math.max(...scales)).toBe(1);
+    // Reflow at 360: the bar row stays inside the card.
+    const overflow = await week.evaluate(
+      (node) => node.scrollWidth > node.clientWidth,
+    );
+    expect(overflow).toBe(false);
   });
 
   test("T133 (AC 53): Primeiros passos leads a new workspace; Ocultar hides it after ok and for good @panel-phone", async ({

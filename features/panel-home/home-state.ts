@@ -38,3 +38,31 @@ export function showFirstSteps(
     !(steps.lote && steps.link && steps.monitor)
   );
 }
+
+type Semana = NonNullable<Dashboard["semana"]>;
+
+export type WeekRow = {
+  dia: string;
+  /** pt-BR, e.g. "quarta-feira". */
+  weekday: string;
+  total: number;
+  /** 0..1 against the week's max (an all-zero week is all 0). */
+  ratio: number;
+};
+
+const weekdays = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "long",
+  timeZone: "UTC",
+});
+
+/** "Semana" (D3): each São Paulo day, its weekday and its bar height. */
+export function weekRows(semana: Semana): WeekRow[] {
+  const max = Math.max(0, ...semana.map((day) => day.total));
+  return semana.map(({ dia, total }) => ({
+    dia,
+    // A calendar day: noon UTC names the same day in any zone.
+    weekday: weekdays.format(new Date(`${dia}T12:00:00Z`)),
+    total,
+    ratio: max === 0 ? 0 : total / max,
+  }));
+}
