@@ -7,6 +7,19 @@ import { isLoopbackHostname } from "./safe-url";
 
 const httpUrl = z.url({ protocol: /^https?$/ });
 
+/** An http(s) origin spelled as just that: no userinfo, path (not even "/"), query or fragment. */
+function isBareOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      value.toLowerCase() === url.origin
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Client-IP headers whose value is a list that each proxy appends to (contract
  * X2, threat model F02). Every other header is a single value the hosting
@@ -25,6 +38,9 @@ const VERCEL_CLIENT_IP_HEADER = "x-vercel-forwarded-for";
 
 /** host[:port], lowercased (ADR-0008 rule 1): what a request's Host header holds. */
 export const HOST_PATTERN = /^[a-z0-9.-]+(:\d+)?$/;
+
+/** DOCUMENTS_DOMAIN_CHECKED_AT's format, the same as scripts/check-deploy-env.mjs. */
+const CHECKED_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 const host = z
   .string()
@@ -94,6 +110,33 @@ const serverEnvSchema = z
       .string()
       .regex(/^[\x21-\x7e]{1,32}$/, "Must be 1 to 32 printable characters")
       .optional(),
+    // The documents domain's origin (D-C6, F2): the only origin a signed
+    // document URL may sit on. A bare origin; never the panel's, the link's
+    // or under kybr.com.br. Unset, every document answers 404.
+    PANEL_DOCUMENTS_ORIGIN: z
+      .string()
+      .transform((value, ctx) => {
+        if (isBareOrigin(value)) return new URL(value).origin;
+        ctx.addIssue({
+          code: "custom",
+          message: "Must be an origin with no path, query or fragment",
+        });
+        return z.NEVER;
+      })
+      .optional(),
+    // How documents open (Q1): a 303 to the signed URL, or the panel streams
+    // them as attachments (F4). Unset: attachment in production, until the
+    // F3 check passes (T116).
+    PANEL_DOCUMENTS_MODE: z.enum(["redirect", "attachment"]).optional(),
+    // When the F3 check passed, as scripts/check-documents-domain.sh prints it.
+    // Deployed production needs it before PANEL_DOCUMENTS_MODE=redirect.
+    DOCUMENTS_DOMAIN_CHECKED_AT: z
+      .string()
+      .regex(CHECKED_AT, "Must be the UTC timestamp the F3 check prints")
+      .refine((value) => !Number.isNaN(Date.parse(value)), {
+        message: "Must be the UTC timestamp the F3 check prints",
+      })
+      .optional(),
     // Set to "1" by Vercel itself at build and run time.
     VERCEL: z.string().optional(),
     // Set by Vercel: the environment, and this deployment's own URLs (no scheme).
@@ -118,6 +161,32 @@ const serverEnvSchema = z
         path: ["PANEL_HOST"],
         message: "Must differ from LINK_HOST",
       });
+    }
+    if (env.PANEL_DOCUMENTS_ORIGIN !== undefined) {
+      const documents = new URL(env.PANEL_DOCUMENTS_ORIGIN);
+      const loopbackAllowed =
+        (env.NODE_ENV !== "production" ||
+          env.API_ALLOW_LOOPBACK_HTTP === "true") &&
+        isLoopbackHostname(documents.hostname);
+      // host:port, so the mock's localhost:4010 isn't the panel's localhost:3000 (Q1b).
+      const sameSite =
+        documents.host === env.PANEL_HOST ||
+        documents.host === env.LINK_HOST ||
+        documents.hostname === "kybr.com.br" ||
+        documents.hostname.endsWith(".kybr.com.br");
+      if (documents.protocol !== "https:" && !loopbackAllowed)
+        ctx.addIssue({
+          code: "custom",
+          path: ["PANEL_DOCUMENTS_ORIGIN"],
+          message: "Must be https: (loopback http: only for local builds)",
+        });
+      if (sameSite)
+        ctx.addIssue({
+          code: "custom",
+          path: ["PANEL_DOCUMENTS_ORIGIN"],
+          message:
+            "Must be a separate site from the panel, the link and kybr.com.br",
+        });
     }
     if (env.PANEL_HOST !== undefined) {
       for (const name of PANEL_REQUIRED) {
@@ -165,6 +234,32 @@ const serverEnvSchema = z
           code: "custom",
           path: [name],
           message: "Must be an https: URL in production",
+        });
+    }
+    // The F3 gate, mirroring scripts/check-deploy-env.mjs (M6C-07) for a
+    // deployed production server: a local production build runs with
+    // API_ALLOW_LOOPBACK_HTTP, and a Vercel Preview is staging.
+    const deployedProduction =
+      env.API_ALLOW_LOOPBACK_HTTP !== "true" && env.VERCEL_ENV !== "preview";
+    if (deployedProduction) {
+      if (
+        env.PANEL_HOST !== undefined &&
+        env.PANEL_DOCUMENTS_ORIGIN === undefined
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["PANEL_DOCUMENTS_ORIGIN"],
+          message: "Required when PANEL_HOST is set in production",
+        });
+      if (
+        env.PANEL_DOCUMENTS_MODE === "redirect" &&
+        env.DOCUMENTS_DOMAIN_CHECKED_AT === undefined
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["DOCUMENTS_DOMAIN_CHECKED_AT"],
+          message:
+            "Required for PANEL_DOCUMENTS_MODE=redirect in production (the F3 check: scripts/check-documents-domain.sh)",
         });
     }
     if (env.API_BFF_KEY === undefined) {

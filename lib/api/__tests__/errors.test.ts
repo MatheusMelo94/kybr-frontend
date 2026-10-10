@@ -44,3 +44,45 @@ describe("batch error codes (A-X2, M5)", () => {
     expect(error.disponiveis).toBeUndefined();
   });
 });
+
+describe("case error codes (A-X2, M6)", () => {
+  it.each([
+    [404, "CASO_NAO_ENCONTRADO"],
+    [409, "CASO_JA_DECIDIDO"],
+    [422, "MOTIVO_OBRIGATORIO"],
+    [422, "DOCUMENTO_NAO_HABILITADO"],
+  ] as const)("%s %s is recognized; message is never read", async (status, code) => {
+    const error = await appErrorFromResponse(
+      envelope(status, { code, message: "MSG-BACKEND-NAO-EXIBIR" }),
+    );
+    expect(error.code).toBe(code);
+    expect(JSON.stringify(error)).not.toContain("MSG-BACKEND-NAO-EXIBIR");
+    expect(error.message).not.toContain("MSG-BACKEND-NAO-EXIBIR");
+  });
+
+  it("409 CASO_JA_DECIDIDO keeps decidido_em and decisao (C-M6-7)", async () => {
+    const error = await appErrorFromResponse(
+      envelope(409, {
+        code: "CASO_JA_DECIDIDO",
+        message: "MSG-BACKEND-NAO-EXIBIR",
+        decidido_em: "2026-10-06T10:00:00-03:00",
+        decisao: { tipo: "bloquear", motivo_codigo: "MEI" },
+      }),
+    );
+    expect(error.decididoEm).toBe("2026-10-06T10:00:00-03:00");
+    expect(error.decisao).toEqual({ tipo: "bloquear", motivoCodigo: "MEI" });
+  });
+
+  it("a malformed decidido_em or decisao reads as missing", async () => {
+    const error = await appErrorFromResponse(
+      envelope(409, {
+        code: "CASO_JA_DECIDIDO",
+        decidido_em: "ontem",
+        decisao: { tipo: "arquivar" },
+      }),
+    );
+    expect(error.code).toBe("CASO_JA_DECIDIDO");
+    expect(error.decididoEm).toBeUndefined();
+    expect(error.decisao).toBeUndefined();
+  });
+});

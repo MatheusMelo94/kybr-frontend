@@ -85,8 +85,11 @@ describe("the panel's shape-only markers (T61, P16)", () => {
     panelStore().sessions.clear();
     state.token = id;
 
-    // requireSession() then redirects to /entrar (ADR-0011 note).
-    await expect(pollShellStatusAction()).rejects.toThrow("NEXT_REDIRECT");
+    // The poll returns SESSAO_EXPIRADA (ADR-0011 Addendum 2); the marker stays.
+    expect(await pollShellStatusAction()).toEqual({
+      ok: false,
+      code: "SESSAO_EXPIRADA",
+    });
 
     expect(markers()).toEqual([
       ["SESSION_REJECTED", { operation: "shell-status" }],

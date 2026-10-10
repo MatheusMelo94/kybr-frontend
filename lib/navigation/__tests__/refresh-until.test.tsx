@@ -1,0 +1,157 @@
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const router = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
+import {
+  useRefreshUntil,
+  useRefreshUntilReplaced,
+} from "@/lib/navigation/refresh-until";
+import {
+  EVERY_MS,
+  MAX_REFRESHES,
+  REFRESH_SETTLE_MS,
+} from "@/lib/navigation/refresh-timing";
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.clearAllMocks();
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe("useRefreshUntilReplaced", () => {
+  it("refreshes now, then every 2 s while still mounted, at most 5 times", () => {
+    const { result } = renderHook(() => useRefreshUntilReplaced());
+    act(() => result.current());
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(5);
+  });
+
+  it("R1 (T105): stops once the location moved on", () => {
+    window.history.replaceState(null, "", "/lote/abc");
+    const { result } = renderHook(() => useRefreshUntilReplaced());
+    act(() => result.current());
+    window.history.pushState(null, "", "/lote");
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops once the component is replaced (unmounted)", () => {
+    const { result, unmount } = renderHook(() => useRefreshUntilReplaced());
+    act(() => result.current());
+    unmount();
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("useRefreshUntil (the Fila's decided id / renderedAt, T90)", () => {
+  it("refreshes now and every 2 s while the predicate is false", () => {
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => false, giveUp));
+    act(() => result.current());
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(2_000));
+    expect(router.refresh).toHaveBeenCalledTimes(2);
+    act(() => vi.advanceTimersByTime(4_000));
+    expect(router.refresh).toHaveBeenCalledTimes(4);
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+
+  it("stops once the predicate holds, without a full navigation", () => {
+    let done = false;
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => done, giveUp));
+    act(() => result.current());
+    act(() => vi.advanceTimersByTime(2_000));
+    done = true;
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(2);
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+
+  it("after 5 refreshes that didn't take, loads the current URL fully, once", () => {
+    window.history.replaceState(null, "", "/fila?caso=abc");
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => false, giveUp));
+    act(() => result.current());
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(router.refresh).toHaveBeenCalledTimes(5);
+    expect(giveUp).toHaveBeenCalledTimes(1);
+    expect(giveUp).toHaveBeenCalledWith("/fila?caso=abc");
+  });
+
+  it("does nothing when the predicate already holds", () => {
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => true, giveUp));
+    act(() => result.current());
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).not.toHaveBeenCalled();
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+
+  it("reads the latest predicate on each tick", () => {
+    const giveUp = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ done }) => useRefreshUntil(() => done, giveUp),
+      {
+        initialProps: { done: false },
+      },
+    );
+    act(() => result.current());
+    rerender({ done: true });
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops when unmounted", () => {
+    const giveUp = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useRefreshUntil(() => false, giveUp),
+    );
+    act(() => result.current());
+    unmount();
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+
+  it("R1 (T105): after the location moved on, it stops: no refresh and no full load of another page", () => {
+    window.history.replaceState(null, "", "/fila/a");
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => false, giveUp));
+    act(() => result.current());
+    window.history.pushState(null, "", "/fila/b");
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+  it("offline mid-loop, a tick neither refreshes nor gives up: the loop ends (T111's reconnect re-reads)", () => {
+    window.history.replaceState(null, "", "/fila/a");
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    const giveUp = vi.fn();
+    const { result } = renderHook(() => useRefreshUntil(() => false, giveUp));
+    act(() => result.current());
+    act(() => vi.advanceTimersByTime(2_000));
+    online.mockReturnValue(false);
+    act(() => vi.advanceTimersByTime(60_000));
+    online.mockReturnValue(true);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(router.refresh).toHaveBeenCalledTimes(2);
+    expect(giveUp).not.toHaveBeenCalled();
+  });
+});
+
+describe("the workaround's timing (P6-005)", () => {
+  it("a refresh every 2 s, at most 5, and the specs' settle budget covers them all plus the full load (≥ 12 s)", () => {
+    expect(EVERY_MS).toBe(2_000);
+    expect(MAX_REFRESHES).toBe(5);
+    expect(REFRESH_SETTLE_MS).toBe(EVERY_MS * MAX_REFRESHES + 5_000);
+    expect(REFRESH_SETTLE_MS).toBeGreaterThanOrEqual(12_000);
+  });
+});

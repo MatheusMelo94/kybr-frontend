@@ -116,16 +116,16 @@ describe("sendToQueueAction (D-B5, AC 23)", () => {
     });
   });
 
-  it("off the panel host: 404; no session: /entrar", async () => {
+  it("off the panel host: 404; no session: SESSAO_EXPIRADA (ADR-0011 Addendum 2)", async () => {
     state.headers = new Headers({ host: "kybr.test" });
     await expect(
       sendToQueueAction({ batchId: id, idempotencyKey: KEY }),
     ).rejects.toThrow("NEXT_NOT_FOUND");
     state.headers = new Headers({ host: "app.kybr.test" });
     state.token = undefined;
-    await expect(
-      sendToQueueAction({ batchId: id, idempotencyKey: KEY }),
-    ).rejects.toThrow("NEXT_REDIRECT /entrar?motivo=sessao");
+    expect(
+      await sendToQueueAction({ batchId: id, idempotencyKey: KEY }),
+    ).toEqual({ ok: false, code: "SESSAO_EXPIRADA" });
   });
 });
 

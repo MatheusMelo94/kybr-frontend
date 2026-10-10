@@ -84,7 +84,13 @@ test.describe("plan states @feature-ops-panel @panel-lote @panel-phone", () => {
       // The Notice is the text's parent.
       const notice = banner.locator("xpath=..");
       await expect(notice).not.toHaveAttribute("role");
-      await expect(main.getByRole("status")).toHaveCount(0);
+      // Not inside a live region (T110's empty "casos novos" status region
+      // is present on /fila from first paint, by design; plan-m6 § 8).
+      await expect(
+        notice.locator(
+          "xpath=ancestor-or-self::*[@role='status' or @role='alert' or @aria-live]",
+        ),
+      ).toHaveCount(0);
       await expect(main.getByRole("alert")).toHaveCount(0);
       // DDR-0003: a warning left bar, ink text (never amber).
       const style = await notice.evaluate((el) => {

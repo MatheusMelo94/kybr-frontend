@@ -9,7 +9,7 @@ import {
   type OnboardingField,
 } from "@/features/panel-onboarding/validation";
 import { assertPanelHost } from "@/lib/api/panel/host";
-import { requireSession } from "@/lib/api/panel/session";
+import { requireSession, sessionExpiredResult } from "@/lib/api/panel/session";
 import { saveOnboarding } from "@/lib/api/panel/workspace";
 import { panelPath } from "@/lib/panel-paths";
 
@@ -36,9 +36,9 @@ function fieldsOf(input: unknown): OnboardingField[] {
 
 /**
  * D-W3: saves the seller contact and category (onboarding step 1), in
- * ADR-0011's order: host, zod, requireSession() (no session → /entrar),
- * then the API. A 401 after that comes back as SESSAO_EXPIRADA for the
- * client to send Renata to /entrar (ADR-0009 rule 7).
+ * ADR-0011's order: host, zod, requireSession(), then the API. No session
+ * (ADR-0011 Addendum 2) and a 401 after the check both come back as
+ * SESSAO_EXPIRADA for the client to send Renata to /entrar (ADR-0009 rule 7).
  */
 export async function saveOnboardingAction(
   input: unknown,
@@ -47,7 +47,12 @@ export async function saveOnboardingAction(
   const parsed = onboardingSchema.safeParse(input);
   if (!parsed.success)
     return { ok: false, code: "INVALID", fields: fieldsOf(input) };
-  await requireSession();
+  // ADR-0011 Addendum 2: no session is a result, before any API call.
+  try {
+    await requireSession({ onMissing: "result" });
+  } catch (error) {
+    return sessionExpiredResult(error);
+  }
 
   const result = await saveOnboarding(parsed.data);
   if (result.ok) {

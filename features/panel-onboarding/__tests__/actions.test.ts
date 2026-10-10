@@ -64,19 +64,21 @@ describe("saveOnboardingAction (D-W3)", () => {
     expect(revalidatePath).toHaveBeenCalledWith(panelPath("/"), "layout");
   });
 
-  it("without a session cookie: requireSession() redirects to /entrar, no API call", async () => {
+  it("without a session cookie: SESSAO_EXPIRADA as a result (ADR-0011 Addendum 2), no API call", async () => {
     state.token = undefined;
-    await expect(saveOnboardingAction(VALID)).rejects.toThrow(
-      "NEXT_REDIRECT /entrar?motivo=sessao",
-    );
+    expect(await saveOnboardingAction(VALID)).toEqual({
+      ok: false,
+      code: "SESSAO_EXPIRADA",
+    });
     expect(panelStore().calls).toEqual([]);
   });
 
-  it("a session /me rejects: the same redirect, and no PUT", async () => {
+  it("a session /me rejects: the same result, and no PUT", async () => {
     panelStore().sessions.clear();
-    await expect(saveOnboardingAction(VALID)).rejects.toThrow(
-      "NEXT_REDIRECT /entrar?motivo=sessao",
-    );
+    expect(await saveOnboardingAction(VALID)).toEqual({
+      ok: false,
+      code: "SESSAO_EXPIRADA",
+    });
     expect(panelStore().calls.map((call) => call.method)).toEqual(["GET"]);
   });
 

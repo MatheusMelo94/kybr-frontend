@@ -9,6 +9,11 @@
 #
 # Ports: APP_PORT (default 3000), MOCK_API_PORT (default 4010). Chrome: the
 # runner's, or CHROME_PATH. Set SKIP_BUILD=1 to reuse an existing .next/.
+#
+# The Fila is measured signed in (ADR-0010 § 1, T116): the script creates a
+# mock account, seeds its queue, and LHCI's puppeteerScript
+# (scripts/lighthouse-panel-login.cjs) logs in before each run, driving the
+# same Chrome through the puppeteer-core that @lhci/cli already ships.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -37,6 +42,12 @@ export LEGAL_TERMS_URL=https://example.invalid/termos
 export LEGAL_PRIVACY_URL=https://example.invalid/privacidade
 export LEGAL_TERMS_VERSION=lhci-1
 export TURNSTILE_SITE_KEY=1x00000000000000000000AA
+# The mock's documents origin, as in E2E (Q1: loopback http: is allowed only
+# with API_ALLOW_LOOPBACK_HTTP=true).
+export PANEL_DOCUMENTS_ORIGIN="$mock_url"
+# The Fila's account on the mock (synthetic, mock-only).
+export LHCI_PANEL_EMAIL=lhci-fila@exemplo.test
+export LHCI_PANEL_SENHA=senha-correta-123
 panel_url="http://127.0.0.1:${app_port}"
 export NEXT_TELEMETRY_DISABLED=1
 
@@ -80,6 +91,36 @@ pnpm lhci \
 
 # Desktop preset (lighthouserc.panel.json): the panel's desktop-first auth
 # pages, LCP <= 2.5 s blocking (ADR-0010).
-.github/deploy-tools/node_modules/.bin/lhci autorun --config=lighthouserc.panel.json \
+lhci=.github/deploy-tools/node_modules/.bin/lhci
+"$lhci" autorun --config=lighthouserc.panel.json \
   --collect.url="${panel_url}/entrar" \
   --collect.url="${panel_url}/cadastro"
+
+# The Fila, signed in (T116). An onboarded account with 25 open cases; the
+# first one seeded is the deep link's case.
+mock_post() {
+  # $1: control path, $2: JSON body; prints the response body
+  curl --silent --show-error --fail -X POST -H "content-type: application/json" \
+    --data "$2" "${mock_url}/__mock/panel$1"
+}
+mock_post /accounts "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"renata\",\"senha\":\"${LHCI_PANEL_SENHA}\"}" > /dev/null
+case_id=$(mock_post /cases/seed "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"vinte-e-cinco\"}" |
+  node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].id)')
+
+# puppeteer-core finds no browser of its own: hand it the runner's Chrome.
+chrome="${CHROME_PATH:-$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)}"
+[ -n "$chrome" ] || { echo "No Chrome found: set CHROME_PATH." >&2; exit 1; }
+# LHCI's healthcheck never sees --collect.chromePath; with a puppeteerScript it
+# asks puppeteer-core for a browser path, gets undefined and fails ("Chrome
+# installation not found"). CHROME_PATH is checked first, so export it.
+export CHROME_PATH="$chrome"
+
+# Mobile preset (lighthouserc.fila.json): the e-mail deep link's case,
+# warn > 2500 ms, fail > 3000 ms LCP (ADR-0007).
+"$lhci" autorun --config=lighthouserc.fila.json --collect.chromePath="$chrome" \
+  --collect.url="${panel_url}/fila/${case_id}"
+
+# Desktop preset (lighthouserc.fila-desktop.json): the queue, LCP <= 2.5 s
+# blocking (ADR-0010).
+"$lhci" autorun --config=lighthouserc.fila-desktop.json --collect.chromePath="$chrome" \
+  --collect.url="${panel_url}/fila"

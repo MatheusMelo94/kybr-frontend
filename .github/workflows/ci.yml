@@ -240,14 +240,17 @@ jobs:
 
   # ADR-0003/0007 lab budgets for the link and ADR-0010's for the panel
   # (lighthouserc.json: mobile, the link + /entrar; lighthouserc.panel.json:
-  # desktop, /entrar + /cadastro), blocking. Measured on a production build against the
-  # local mock API, as the E2E job runs it, because previews have no API
-  # until the backend exists (ADR-0005). No secret is involved.
+  # desktop, /entrar + /cadastro; lighthouserc.fila.json and
+  # lighthouserc.fila-desktop.json: the Fila signed in through the mock,
+  # /fila/{id} mobile and /fila desktop, T116), blocking. Measured on a
+  # production build against the local mock API, as the E2E job runs it,
+  # because previews have no API until the backend exists (ADR-0005). No
+  # secret is involved: the Fila's login is a mock-only account.
   lighthouse:
-    name: Lighthouse CI (link pages, panel auth pages)
+    name: Lighthouse CI (link pages, panel auth pages, Fila)
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -263,7 +266,8 @@ jobs:
           restore-keys: next-lhci-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       # Starts the mock API and `next start` on a fresh build, then runs the
-      # pinned @lhci/cli (.github/deploy-tools) with the runner's Chrome.
+      # pinned @lhci/cli (.github/deploy-tools) with the runner's Chrome (the
+      # Fila's login drives it through the puppeteer-core @lhci/cli ships).
       - name: Run Lighthouse CI
         run: sh scripts/lighthouse-local.sh
 

@@ -7,6 +7,28 @@ const compat = new FlatCompat({
   baseDirectory: dirname(fileURLToPath(import.meta.url)),
 });
 
+const XLSX = "Only features/panel-lote/parser/** may import xlsx (ADR-0012).";
+
+// T113 (Q2, the user's decision 2026-10-06; plan-m6 D12): the Fila's
+// collapse is a WAAPI FLIP. GSAP is not a dependency, anywhere.
+const NO_GSAP = "No GSAP: motion is CSS or WAAPI (plan-m6 D12, T113).";
+const GSAP_PATHS = [
+  { name: "gsap", message: NO_GSAP },
+  { name: "@gsap/react", message: NO_GSAP },
+];
+const GSAP_PATTERN = { group: ["gsap/*", "@gsap/*"], message: NO_GSAP };
+const GSAP_SYNTAX = [
+  {
+    selector: "ImportExpression[source.value=/^(@gsap\\/|gsap(\\/|$))/]",
+    message: NO_GSAP,
+  },
+  {
+    selector:
+      "ImportExpression > TemplateLiteral.source > TemplateElement:first-child[value.raw=/^(@gsap\\/|gsap(\\/|$))/]",
+    message: NO_GSAP,
+  },
+];
+
 const eslintConfig = [
   {
     ignores: [
@@ -32,26 +54,17 @@ const eslintConfig = [
   {
     files: ["**/*.{ts,tsx,js,mjs}"],
     // The fixture generator writes XLSX/XLS with SheetJS (Node only).
-    ignores: ["features/panel-lote/parser/**", "scripts/make-lote-fixtures.mjs"],
+    ignores: [
+      "features/panel-lote/parser/**",
+      "scripts/make-lote-fixtures.mjs",
+    ],
     rules: {
       "no-restricted-imports": [
         "error",
         {
-          paths: [
-            {
-              name: "xlsx",
-              message:
-                "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
-            },
-          ],
+          paths: [{ name: "xlsx", message: XLSX }, ...GSAP_PATHS],
           // Security M5C-02: the package's subpath exports too (xlsx.mjs, dist/*).
-          patterns: [
-            {
-              group: ["xlsx/*"],
-              message:
-                "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
-            },
-          ],
+          patterns: [{ group: ["xlsx/*"], message: XLSX }, GSAP_PATTERN],
         },
       ],
       // Security M5C-05: dynamic import("xlsx") / import("xlsx/…") too,
@@ -60,16 +73,27 @@ const eslintConfig = [
         "error",
         {
           selector: "ImportExpression[source.value=/^xlsx(\\/|$)/]",
-          message:
-            "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
+          message: XLSX,
         },
         {
           selector:
             "ImportExpression > TemplateLiteral.source > TemplateElement:first-child[value.raw=/^xlsx(\\/|$)/]",
-          message:
-            "Only features/panel-lote/parser/** may import xlsx (ADR-0012).",
+          message: XLSX,
         },
+        ...GSAP_SYNTAX,
       ],
+    },
+  },
+  // T113: the GSAP fence holds where the xlsx block doesn't apply too (a
+  // later block's rule replaces an earlier one's, so these files get it alone).
+  {
+    files: ["features/panel-lote/parser/**", "scripts/make-lote-fixtures.mjs"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { paths: GSAP_PATHS, patterns: [GSAP_PATTERN] },
+      ],
+      "no-restricted-syntax": ["error", ...GSAP_SYNTAX],
     },
   },
   // Security C8: nothing from a spreadsheet is logged (SheetJS errors can

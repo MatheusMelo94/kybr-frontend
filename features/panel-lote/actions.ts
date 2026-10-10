@@ -18,11 +18,12 @@ import {
 } from "@/lib/api/panel/batches";
 import type { Batch } from "@/lib/api/schemas/panel/batches";
 import { assertPanelHost } from "@/lib/api/panel/host";
-import { requireSession } from "@/lib/api/panel/session";
+import { requireSession, sessionExpiredResult } from "@/lib/api/panel/session";
 import { panelPath } from "@/lib/panel-paths";
 
 // Lote's Server Actions (plan M5; ADR-0011 order: host → zod .strict() →
-// requireSession() → API → a result union). Each is posted only from the
+// requireSession() → API → a result union). No session is a SESSAO_EXPIRADA
+// result, never a redirect (ADR-0011 Addendum 2, T118). Each is posted only from the
 // page that owns it (ADR-0008 Addendum 2). Nothing here logs the rows (P16).
 
 export type StartResult =
@@ -40,7 +41,12 @@ export async function startBatchAction(input: unknown): Promise<StartResult> {
   await assertPanelHost();
   const parsed = startBatchSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "INVALID" };
-  await requireSession();
+  // ADR-0011 Addendum 2: no session is a result, before any API call.
+  try {
+    await requireSession({ onMissing: "result" });
+  } catch (error) {
+    return sessionExpiredResult(error);
+  }
 
   const linhas = parsed.data.linhas.map(({ cnpj, responsavel, ext_id }) => ({
     cnpj,
@@ -85,7 +91,15 @@ export async function pollBatchAction(input: unknown): Promise<PollResult> {
   await assertPanelHost();
   const parsed = batchRefSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "NOT_FOUND" };
-  await requireSession({ pollTimeoutMs: POLL_TIMEOUT_MS });
+  // ADR-0011 Addendum 2: no session is a result, before any API call.
+  try {
+    await requireSession({
+      onMissing: "result",
+      pollTimeoutMs: POLL_TIMEOUT_MS,
+    });
+  } catch (error) {
+    return sessionExpiredResult(error);
+  }
 
   const result = await getBatch(parsed.data.batchId, {
     pollTimeoutMs: POLL_TIMEOUT_MS,
@@ -116,7 +130,12 @@ async function batchWrite<T>(
   await assertPanelHost();
   const parsed = batchWriteSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "FAILED" };
-  await requireSession();
+  // ADR-0011 Addendum 2: no session is a result, before any API call.
+  try {
+    await requireSession({ onMissing: "result" });
+  } catch (error) {
+    return sessionExpiredResult(error);
+  }
 
   const { batchId, idempotencyKey } = parsed.data;
   const result = await write(batchId, idempotencyKey);
@@ -162,7 +181,12 @@ export async function resumeBatchAction(input: unknown): Promise<ResumeResult> {
   await assertPanelHost();
   const parsed = batchRefSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "FAILED" };
-  await requireSession();
+  // ADR-0011 Addendum 2: no session is a result, before any API call.
+  try {
+    await requireSession({ onMissing: "result" });
+  } catch (error) {
+    return sessionExpiredResult(error);
+  }
 
   const { batchId } = parsed.data;
   const result = await resumeBatch(batchId);

@@ -78,6 +78,10 @@ export const PANEL_EMAILS = {
   limite: "limite@exemplo.test",
   ninguem: "ninguem@exemplo.test",
   outro: "outro@exemplo.test",
+  // M6 (PC1, PC3, PC4): the Fila's seeded accounts.
+  fila: "fila@exemplo.test",
+  filavazia: "filavazia@exemplo.test",
+  semwebhook: "semwebhook@exemplo.test",
 } as const;
 
 /** PA19: sign-ups on this domain get no trial (403 TESTE_INDISPONIVEL). */
@@ -123,6 +127,8 @@ export type Plano = {
 export type Contagens = {
   fila_abertos: number;
   fila_vencidos: number;
+  /** C-M6-3. The Fila counts add the account's cases in the store (QA G3). */
+  fila_aguardando?: number;
   alertas_criticos_abertos: number;
   vendedores: number;
   lote_em_andamento: boolean;
@@ -139,6 +145,8 @@ export type WorkspaceRecord = {
   webhook_configurado: boolean;
   plano?: Plano;
   contagens?: Contagens;
+  /** C-M6-4: the types Pedir documento offers (QA G10 sets them per account). */
+  documentos_habilitados?: DocumentoTipo[];
 };
 
 /** D-W2: the prototype's categories, with fixed ids. */
@@ -580,3 +588,682 @@ export function batchOutcomeFor(cnpj: string): BatchOutcome {
 
 /** PB1: a status read advances ceil(total / 4); the clock gives this duration. */
 export const BATCH_DURATION_MS = 41_000;
+
+// --- Cases (M6, contract-request.md D-C1–D-C6 + C-M6-1–C-M6-10, PC1–PC22) ----
+// The mock stands in for the backend, so these sets are its own (not the
+// frontend's lib/panel-api-values.ts): a drift between the two shows up as a
+// schema failure in the tests, as it would against the real API.
+
+export const DOCUMENTO_TIPOS = [
+  "CONTRATO_SOCIAL_OU_CCMEI",
+  "PROCURACAO",
+  "COMPROVANTE_ENDERECO",
+  "CARTAO_CNPJ",
+  "RESPONSAVEL",
+] as const;
+export type DocumentoTipo = (typeof DOCUMENTO_TIPOS)[number];
+
+/** C-M6-4's proposed default: every type but PROCURACAO. */
+export const DEFAULT_DOCUMENTOS: readonly DocumentoTipo[] = [
+  "CONTRATO_SOCIAL_OU_CCMEI",
+  "COMPROVANTE_ENDERECO",
+  "CARTAO_CNPJ",
+  "RESPONSAVEL",
+];
+
+export const MOTIVO_CODIGOS = [
+  "SITUACAO_IRREGULAR",
+  "RESPONSAVEL_NAO_SOCIO",
+  "EMPRESA_RECENTE",
+  "ATIVIDADE_FORA_DA_CATEGORIA",
+  "IE_NAO_ENCONTRADA",
+  "IE_SUSPENSA",
+  "MEI",
+  "GENERICO",
+] as const;
+export type MotivoCodigo = (typeof MOTIVO_CODIGOS)[number];
+
+export type CaseEstado = "aberto" | "aguardando_doc" | "decidido";
+export type CaseOrigem = "link" | "lote" | "monitoramento";
+export type CaseStatus = "ok" | "warn" | "bad";
+export type DecisaoTipo = "aprovar" | "manter" | "bloquear";
+
+/** QA G8: a document of FOREIGN_CASE_ID (outro@): any other workspace gets 404. */
+export const FOREIGN_DOC_ID = "8e2f6d3b-0c4a-4b7f-9d1e-2a3b4c5d6e7f";
+/** FOREIGN_CASE_ID's verification (its certificate is another workspace's). */
+export const FOREIGN_VERIFICATION_ID = "9f3a7e4c-1d5b-4c80-8e2f-3b4c5d6e7f80";
+
+/** D-C1: the default page size, and C-M6-2's cap. */
+export const CASE_PAGE_SIZE = 25;
+export const CASE_LIMIT_MAX = 200;
+/** C-M6-1: a `desde` older than this is 422. */
+export const DESDE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+/** C-M6-8 (proposed): a waiting case's sla_ate is the request's deadline. */
+export const DOC_REQUEST_DEADLINE_MS = 3 * 24 * 60 * 60_000;
+/** A reopened case (documents back) is due in a day. */
+export const REOPENED_SLA_MS = 24 * 60 * 60_000;
+
+const HOUR = 60 * 60_000;
+const DAY = 24 * HOUR;
+
+export type CaseKind =
+  | "link"
+  | "link-sem-email"
+  | "lote"
+  | "lote-sem-qsa"
+  | "alerta"
+  | "nodata"
+  | "decidido-aprovar"
+  | "decidido-manter"
+  | "decidido-bloquear"
+  | "decidido-bloquear-sem-nota"
+  | "decidido-com-documentos"
+  | "aguardando"
+  | "aguardando-sem-email"
+  | "aguardando-alerta"
+  | "hostil"
+  /** QA RF-01 / SV-09: a 200-char unbroken name and a 64-char ext_id. */
+  | "hostil-longo"
+  /** QA SV-09: an ext_id a spreadsheet would read as a formula. */
+  | "hostil-formula";
+
+export const CASE_KINDS: readonly CaseKind[] = [
+  "link",
+  "link-sem-email",
+  "lote",
+  "lote-sem-qsa",
+  "alerta",
+  "nodata",
+  "decidido-aprovar",
+  "decidido-manter",
+  "decidido-bloquear",
+  "decidido-bloquear-sem-nota",
+  "decidido-com-documentos",
+  "aguardando",
+  "aguardando-sem-email",
+  "aguardando-alerta",
+  "hostil",
+  "hostil-longo",
+  "hostil-formula",
+];
+
+export type CaseCheck = {
+  chave: "situacao" | "qsa" | "idade" | "cnae" | "ie" | "regime";
+  titulo: string;
+  descricao: string;
+  valor: string;
+  status: CaseStatus;
+};
+
+export type CaseEventRecord = {
+  tipo:
+    | "caso_criado"
+    | "documento_pedido"
+    | "documento_recebido"
+    | "decidido"
+    | "reverificado";
+  em: string;
+  dados?: Record<string, unknown>;
+};
+
+export type CaseDocRecord = {
+  id: string;
+  tipo: DocumentoTipo;
+  enviado_em: string;
+  /** What /__docs serves for it (QA G9: PDF, JPEG and PNG). */
+  formato: "pdf" | "jpeg" | "png";
+};
+
+/** One case in the mock (D-C2), with the mock's own bookkeeping. */
+export type CaseRecord = {
+  id: string;
+  /** The owner's e-mail: another account's read is the same 404 (A-X3). */
+  email: string;
+  /** The factory kind, for the controls' listing (never on the wire). */
+  kind: CaseKind;
+  estado: CaseEstado;
+  razao_social: string | null;
+  cnpj: string;
+  veredito: "aprovar" | "revisar" | "bloquear";
+  status: CaseStatus;
+  motivos: string[];
+  origem: CaseOrigem;
+  sla_ate: number;
+  criado_em: number;
+  /** C-M6-1: when it (re-)entered `aberto`, for `desde`. */
+  abertoEm: number;
+  seller: { id: string; razao_social: string | null; cnpj: string };
+  verification: {
+    id: string;
+    modo: "cache" | "tempo_real";
+    checagens: CaseCheck[];
+    criado_em: number;
+  };
+  consultado_em?: number;
+  mudanca?: {
+    tipo: string;
+    campo: string;
+    de: string;
+    para: string;
+    detectado_em: number;
+  };
+  responsavel_informado?: string;
+  ext_id?: string;
+  vendedor_tem_email: boolean;
+  variante?: "DADOS_NAO_ENCONTRADOS";
+  decisao?: {
+    tipo: DecisaoTipo;
+    em: number;
+    motivo_codigo?: MotivoCodigo;
+    nota_vendedor?: string;
+  };
+  /** CR-P9: the open request's seller token (no e-mail), and the revoked ones. */
+  linkToken?: string;
+  revokedTokens: string[];
+  eventos: CaseEventRecord[];
+  documentos: CaseDocRecord[];
+  /** QA G6: fields the contract doesn't have (F11: the schema must strip them). */
+  extra?: Record<string, unknown>;
+};
+
+/** A synthetic, check-digit-valid wire CNPJ for case n (some alphanumeric). */
+export function caseCnpj(n: number): string {
+  const digits = String(n).padStart(4, "0");
+  return cnpjWithRoot(
+    n % 3 === 0 ? `CASO${digits}0001` : `${digits}${digits}0001`,
+  );
+}
+
+const ISO = (ms: number): string => new Date(ms).toISOString();
+
+const CHECKS_OK: readonly CaseCheck[] = [
+  {
+    chave: "situacao",
+    titulo: "Situação na Receita",
+    descricao: "A empresa está ativa.",
+    valor: "ATIVA",
+    status: "ok",
+  },
+  {
+    chave: "qsa",
+    titulo: "Responsável no QSA",
+    descricao: "O responsável informado é sócio.",
+    valor: "Sócio-administrador",
+    status: "ok",
+  },
+  {
+    chave: "idade",
+    titulo: "Idade da empresa",
+    descricao: "Aberta há mais de 2 anos.",
+    valor: "6 anos",
+    status: "ok",
+  },
+  {
+    chave: "cnae",
+    titulo: "Atividade (CNAE)",
+    descricao: "Compatível com a categoria.",
+    valor: "4781-4/00",
+    status: "ok",
+  },
+  {
+    chave: "ie",
+    titulo: "Inscrição estadual",
+    descricao: "Ativa no estado da sede.",
+    valor: "Habilitada",
+    status: "ok",
+  },
+  {
+    chave: "regime",
+    titulo: "Regime tributário",
+    descricao: "Simples Nacional.",
+    valor: "Simples",
+    status: "ok",
+  },
+];
+
+function checks(
+  status: CaseStatus,
+  overrides: Partial<Record<CaseCheck["chave"], Partial<CaseCheck>>> = {},
+): CaseCheck[] {
+  return CHECKS_OK.map((check, i) => ({
+    ...check,
+    ...(i === 3 &&
+      status !== "ok" && {
+        status,
+        descricao: "Fora da categoria da plataforma.",
+        valor: "9602-5/01",
+      }),
+    ...overrides[check.chave],
+  }));
+}
+
+/**
+ * A case of `kind` for `email`, numbered n, at the account's `now`. Open
+ * cases are due `slaInMs` from now (negative: late). Synthetic data only.
+ */
+export function caseFor(
+  kind: CaseKind,
+  input: { email: string; n: number; now: number; slaInMs?: number },
+): CaseRecord {
+  const { email, n, now } = input;
+  const cnpj = caseCnpj(n);
+  const razao = `Empresa Exemplo ${n} Ltda`;
+  const criado = now - 2 * DAY + n * 60_000;
+  const status: CaseStatus = n % 4 === 0 ? "bad" : "warn";
+  const base: CaseRecord = {
+    id: crypto.randomUUID(),
+    email,
+    kind,
+    estado: "aberto",
+    razao_social: razao,
+    cnpj,
+    veredito: status === "bad" ? "bloquear" : "revisar",
+    status,
+    motivos:
+      status === "bad"
+        ? ["Situação inapta na Receita", "CNAE fora da categoria"]
+        : ["CNAE fora da categoria"],
+    origem: "link",
+    sla_ate: now + (input.slaInMs ?? 6 * HOUR),
+    criado_em: criado,
+    abertoEm: criado,
+    seller: { id: crypto.randomUUID(), razao_social: razao, cnpj },
+    verification: {
+      id: crypto.randomUUID(),
+      modo: n % 5 === 0 ? "cache" : "tempo_real",
+      checagens: checks(status),
+      criado_em: criado,
+    },
+    consultado_em: criado,
+    responsavel_informado: "Pessoa Exemplo",
+    ext_id: `vendedor-${n}`,
+    vendedor_tem_email: true,
+    revokedTokens: [],
+    eventos: [
+      { tipo: "caso_criado", em: ISO(criado), dados: { origem: "link" } },
+    ],
+    documentos: [],
+  };
+  const created = (origem: CaseOrigem): CaseEventRecord => ({
+    tipo: "caso_criado",
+    em: ISO(criado),
+    dados: { origem },
+  });
+  const requested = (at: number): CaseEventRecord => ({
+    tipo: "documento_pedido",
+    em: ISO(at),
+    dados: { tipos: ["CARTAO_CNPJ", "CONTRATO_SOCIAL_OU_CCMEI"] },
+  });
+  const decided = (
+    tipo: DecisaoTipo,
+    extra: Partial<NonNullable<CaseRecord["decisao"]>> = {},
+  ): Partial<CaseRecord> => ({
+    estado: "decidido",
+    decisao: { tipo, em: now - HOUR, ...extra },
+    eventos: [
+      ...base.eventos,
+      { tipo: "decidido", em: ISO(now - HOUR), dados: { decisao: tipo } },
+    ],
+  });
+  const alerta: Partial<CaseRecord> = {
+    origem: "monitoramento",
+    veredito: "revisar",
+    status: "bad",
+    motivos: ["Situação mudou para inapta"],
+    mudanca: {
+      tipo: "SITUACAO_CADASTRAL",
+      campo: "Situação na Receita",
+      de: "ATIVA",
+      para: "INAPTA",
+      detectado_em: now - DAY,
+    },
+    eventos: [created("monitoramento")],
+  };
+  const waiting = (semEmail: boolean): Partial<CaseRecord> => ({
+    estado: "aguardando_doc",
+    sla_ate: now - HOUR + DOC_REQUEST_DEADLINE_MS,
+    vendedor_tem_email: !semEmail,
+    ...(semEmail && { linkToken: randomToken(24) }),
+    eventos: [...base.eventos, requested(now - HOUR)],
+  });
+  const doc = (tipo: DocumentoTipo, formato: CaseDocRecord["formato"]) => ({
+    id: crypto.randomUUID(),
+    tipo,
+    enviado_em: ISO(now - 3 * HOUR),
+    formato,
+  });
+
+  const patch: Partial<CaseRecord> = (() => {
+    switch (kind) {
+      case "link":
+        return {};
+      case "link-sem-email":
+        return { vendedor_tem_email: false };
+      case "lote":
+        return {
+          origem: "lote",
+          vendedor_tem_email: false,
+          eventos: [created("lote")],
+        };
+      case "lote-sem-qsa":
+        // AC 30: no responsible person in the batch row (removed below).
+        return {
+          origem: "lote",
+          vendedor_tem_email: false,
+          verification: {
+            ...base.verification,
+            checagens: checks(status, {
+              qsa: {
+                status: "warn",
+                descricao: "Sem responsável para conferir.",
+                valor: "—",
+              },
+            }),
+          },
+          eventos: [created("lote")],
+        };
+      case "alerta":
+        return alerta;
+      case "nodata":
+        return {
+          razao_social: null,
+          seller: { ...base.seller, razao_social: null },
+          variante: "DADOS_NAO_ENCONTRADOS",
+          veredito: "revisar",
+          status: "warn",
+          motivos: ["CNPJ sem registro na Receita"],
+          verification: { ...base.verification, checagens: [] },
+        };
+      case "decidido-aprovar":
+        return decided("aprovar");
+      case "decidido-manter":
+        return {
+          ...alerta,
+          ...decided("manter"),
+          eventos: [
+            created("monitoramento"),
+            {
+              tipo: "decidido",
+              em: ISO(now - HOUR),
+              dados: { decisao: "manter" },
+            },
+          ],
+        };
+      case "decidido-bloquear":
+        return decided("bloquear", {
+          motivo_codigo: "ATIVIDADE_FORA_DA_CATEGORIA",
+          nota_vendedor: 'Atividade "fora" da categoria <b>de venda</b>.',
+        });
+      case "decidido-bloquear-sem-nota":
+        return decided("bloquear", { motivo_codigo: "SITUACAO_IRREGULAR" });
+      case "decidido-com-documentos":
+        return {
+          ...decided("aprovar"),
+          documentos: [doc("CARTAO_CNPJ", "pdf")],
+        };
+      case "aguardando":
+        return waiting(false);
+      case "aguardando-sem-email":
+        return waiting(true);
+      case "aguardando-alerta":
+        return {
+          ...alerta,
+          ...waiting(false),
+          eventos: [created("monitoramento"), requested(now - HOUR)],
+        };
+      case "hostil":
+        // QA G6: hostile and edge strings, and a field outside the contract.
+        return {
+          razao_social: HOSTILE_RAZAO,
+          seller: { ...base.seller, razao_social: HOSTILE_RAZAO },
+          motivos: [
+            "Motivo um",
+            "Motivo dois, com vírgula",
+            "Motivo três",
+            "Motivo quatro",
+            "Motivo cinco",
+            "Motivo seis",
+          ],
+          verification: {
+            ...base.verification,
+            checagens: checks("warn", {
+              situacao: {
+                titulo: "<b>Situação</b>",
+                descricao: "<script>alert(1)</script>",
+                valor: "<i>ATIVA</i>",
+              },
+            }),
+          },
+          mudanca: {
+            tipo: "SITUACAO_CADASTRAL",
+            campo: "Situação",
+            de: `<b>${"a".repeat(117)}</b>`.slice(0, 120),
+            para: `<img src=x>${"b".repeat(109)}`.slice(0, 120),
+            detectado_em: now - DAY,
+          },
+          ext_id: "<script>",
+          responsavel_informado: "x".repeat(200),
+          documentos: [
+            doc("CARTAO_CNPJ", "pdf"),
+            doc("RESPONSAVEL", "jpeg"),
+            doc("COMPROVANTE_ENDERECO", "png"),
+          ],
+          extra: { vendedor_email: "vendedor@exemplo.test" },
+        };
+      case "hostil-longo":
+        return {
+          razao_social: HOSTILE_CASE_STRINGS.longName,
+          seller: {
+            ...base.seller,
+            razao_social: HOSTILE_CASE_STRINGS.longName,
+          },
+          ext_id: HOSTILE_CASE_STRINGS.extIds[2],
+        };
+      case "hostil-formula":
+        return { ext_id: HOSTILE_CASE_STRINGS.extIds[1] };
+    }
+  })();
+  const record = { ...base, ...patch };
+  if (kind === "lote-sem-qsa") delete record.responsavel_informado;
+  return record;
+}
+
+/** QA G6: the other hostile ext_ids and the long unbroken name, for per-test cases. */
+export const HOSTILE_CASE_STRINGS = {
+  extIds: ["<script>", "=1+1", "x".repeat(64)],
+  longName: "A".repeat(200),
+} as const;
+
+/** QA G1: the presets a test seeds into its own account. */
+export const CASE_PRESETS = [
+  "pc1",
+  "vazia",
+  "um",
+  "dois",
+  "vinte-e-cinco",
+  "vinte-e-seis",
+  "duzentos-e-vinte",
+  "tres-tardios-de-trinta",
+  "cada-tipo",
+  "limites",
+  "hostil",
+] as const;
+export type CasePreset = (typeof CASE_PRESETS)[number];
+
+const OPEN_KINDS: readonly CaseKind[] = [
+  "link",
+  "lote",
+  "alerta",
+  "link-sem-email",
+  "lote-sem-qsa",
+];
+
+/** `count` open cases, `late` of them already past their SLA, oldest first. */
+function openCases(
+  email: string,
+  now: number,
+  count: number,
+  late: number,
+  from = 1,
+): CaseRecord[] {
+  return Array.from({ length: count }, (_, i) =>
+    caseFor(OPEN_KINDS[i % OPEN_KINDS.length] ?? "link", {
+      email,
+      n: from + i,
+      now,
+      slaInMs: i < late ? -(late - i) * 6 * HOUR : (i - late + 1) * 2 * HOUR,
+    }),
+  );
+}
+
+/** The cases a preset seeds for `email` at `now` (PC1 = "pc1"). */
+export function casesForPreset(
+  preset: CasePreset,
+  email: string,
+  now: number,
+): CaseRecord[] {
+  switch (preset) {
+    case "pc1": {
+      // 30 open (4 late, one DADOS_NAO_ENCONTRADOS) + 3 waiting + 2 decided.
+      const open = openCases(email, now, 30, 4);
+      open[7] = caseFor("nodata", { email, n: 8, now, slaInMs: 8 * HOUR });
+      return [
+        ...open,
+        caseFor("aguardando", { email, n: 31, now }),
+        caseFor("aguardando-sem-email", { email, n: 32, now }),
+        caseFor("aguardando-alerta", { email, n: 33, now }),
+        caseFor("decidido-aprovar", { email, n: 34, now }),
+        caseFor("decidido-bloquear", { email, n: 35, now }),
+      ];
+    }
+    case "vazia":
+      return [];
+    case "um":
+      return openCases(email, now, 1, 0);
+    case "dois":
+      return openCases(email, now, 2, 0);
+    case "vinte-e-cinco":
+      return openCases(email, now, 25, 0);
+    case "vinte-e-seis":
+      return openCases(email, now, 26, 0);
+    case "duzentos-e-vinte":
+      return openCases(email, now, 220, 0);
+    case "tres-tardios-de-trinta":
+      return openCases(email, now, 30, 3);
+    case "cada-tipo":
+      return CASE_KINDS.filter((kind) => !kind.startsWith("hostil")).map(
+        (kind, i) =>
+          caseFor(kind, { email, n: i + 1, now, slaInMs: (i + 1) * HOUR }),
+      );
+    case "limites": {
+      // QA G4: SLA boundaries ("41 s", "3 min", "6 h", late "2 dias") and
+      // dates around Brasília midnight, relative to the account's clock.
+      const at = (n: number, slaInMs: number, criado?: number) => {
+        const record = caseFor("link", { email, n, now, slaInMs });
+        if (criado !== undefined) {
+          record.criado_em = criado;
+          record.abertoEm = criado;
+          record.consultado_em = criado;
+          record.verification.criado_em = criado;
+          record.eventos = [
+            { tipo: "caso_criado", em: ISO(criado), dados: { origem: "link" } },
+          ];
+        }
+        return record;
+      };
+      const brasiliaMidnight = startOfBrasiliaDay(now);
+      return [
+        at(1, -2 * DAY),
+        at(2, 41_000),
+        at(3, 3 * 60_000),
+        at(4, 6 * HOUR),
+        // Yesterday 23:59 and today 00:30 in Brasília (−03:00).
+        at(5, 8 * HOUR, brasiliaMidnight - 60_000),
+        at(6, 9 * HOUR, brasiliaMidnight + 30 * 60_000),
+        // 23:30 −03:00 the day before yesterday: "há 2 dias".
+        at(7, 10 * HOUR, brasiliaMidnight - DAY - 30 * 60_000),
+      ];
+    }
+    case "hostil":
+      return [caseFor("hostil", { email, n: 1, now })];
+  }
+}
+
+/** 00:00 in Brasília (UTC−3, no DST) of the day `now` falls on. */
+export function startOfBrasiliaDay(now: number): number {
+  const offset = 3 * HOUR;
+  return Math.floor((now - offset) / DAY) * DAY + offset;
+}
+
+/** A batch row flagged warn/bad that Lote's to-queue turns into a case (QA G3). */
+export function caseFromBatchRow(input: {
+  email: string;
+  n: number;
+  now: number;
+  cnpj: string;
+  razao_social: string | null;
+  status: "warn" | "bad";
+  motivos: string[];
+  responsavel?: string | undefined;
+  ext_id?: string | undefined;
+}): CaseRecord {
+  const record = caseFor("lote", {
+    email: input.email,
+    n: input.n,
+    now: input.now,
+    slaInMs: DAY,
+  });
+  record.cnpj = input.cnpj;
+  record.razao_social = input.razao_social;
+  record.seller = {
+    ...record.seller,
+    cnpj: input.cnpj,
+    razao_social: input.razao_social,
+  };
+  record.status = input.status;
+  record.veredito = input.status === "bad" ? "bloquear" : "revisar";
+  record.motivos = input.motivos;
+  record.criado_em = input.now;
+  record.abertoEm = input.now;
+  record.eventos = [
+    { tipo: "caso_criado", em: ISO(input.now), dados: { origem: "lote" } },
+  ];
+  if (input.responsavel === undefined) delete record.responsavel_informado;
+  else record.responsavel_informado = input.responsavel;
+  if (input.ext_id === undefined) delete record.ext_id;
+  else record.ext_id = input.ext_id;
+  return record;
+}
+
+/** The foreign case (outro@), with one document: A-X3's 404 targets (QA G8). */
+export function foreignCase(now: number): CaseRecord {
+  const record = caseFor("link", { email: PANEL_EMAILS.outro, n: 900, now });
+  record.id = FOREIGN_CASE_ID;
+  record.verification.id = FOREIGN_VERIFICATION_ID;
+  record.documentos = [
+    {
+      id: FOREIGN_DOC_ID,
+      tipo: "CARTAO_CNPJ",
+      enviado_em: ISO(now - HOUR),
+      formato: "pdf",
+    },
+  ];
+  return record;
+}
+
+// Small, valid files for /__docs and the certificate (QA G9).
+export const PDF_BYTES = new TextEncoder().encode(
+  "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
+);
+export const PNG_BYTES = Uint8Array.from(
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  ),
+);
+export const JPEG_BYTES = Uint8Array.from(
+  Buffer.from(
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
+    "base64",
+  ),
+);

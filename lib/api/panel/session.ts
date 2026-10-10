@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
+import { AppError } from "@/lib/api/errors";
 import { readSessionToken } from "@/lib/api/panel/cookies";
 import { panelRequest } from "@/lib/api/panel/client";
 import { assertPanelHost } from "@/lib/api/panel/host";
@@ -28,22 +29,22 @@ export type { Me };
  */
 export const getSession = cache(
   async (pollTimeoutMs?: number): Promise<Me | null> => {
-  await assertPanelHost();
-  const token = await readSessionToken();
-  if (token === undefined) return null;
-  const result = await panelRequest({
-    operation: pollTimeoutMs === undefined ? "me" : "shell-status",
-    path: apiPaths.panel.me(),
-    schema: meSchema,
-    sessionToken: token,
-    ...(pollTimeoutMs !== undefined && {
-      headers: { "x-kybr-poll": "1" },
-      timeoutMs: pollTimeoutMs,
-    }),
-  });
-  if (result.ok) return result.data;
-  if (result.error.code === "SESSAO_EXPIRADA") return null;
-  throw result.error;
+    await assertPanelHost();
+    const token = await readSessionToken();
+    if (token === undefined) return null;
+    const result = await panelRequest({
+      operation: pollTimeoutMs === undefined ? "me" : "shell-status",
+      path: apiPaths.panel.me(),
+      schema: meSchema,
+      sessionToken: token,
+      ...(pollTimeoutMs !== undefined && {
+        headers: { "x-kybr-poll": "1" },
+        timeoutMs: pollTimeoutMs,
+      }),
+    });
+    if (result.ok) return result.data;
+    if (result.error.code === "SESSAO_EXPIRADA") return null;
+    throw result.error;
   },
 );
 
@@ -59,13 +60,34 @@ export async function sessionExpiredUrl(): Promise<string> {
 /**
  * The session check for pages, layouts and every session action (ADR-0011
  * note): the session, or a redirect to /entrar?motivo=sessao&volta=… (AC 7).
+ * With `onMissing: 'result'` (ADR-0011 Addendum 2: session Server Actions)
+ * the same full check runs (cookie, /me with the bearer, schema), and a
+ * missing or expired session throws AppError('SESSAO_EXPIRADA') instead, for
+ * the action to return through sessionExpiredResult(): navigations
+ * redirect, actions return. Other failures keep their own codes.
  */
 export async function requireSession(
-  options: { pollTimeoutMs?: number } = {},
+  options: { pollTimeoutMs?: number; onMissing?: "redirect" | "result" } = {},
 ): Promise<Me> {
   const me = await getSession(options.pollTimeoutMs);
-  if (me === null) redirect(await sessionExpiredUrl());
-  return me;
+  if (me !== null) return me;
+  if (options.onMissing === "result")
+    throw new AppError({ code: "SESSAO_EXPIRADA" });
+  redirect(await sessionExpiredUrl());
+}
+
+export type SessionExpiredResult = { ok: false; code: "SESSAO_EXPIRADA" };
+
+/**
+ * An action's catch for requireSession({ onMissing: 'result' }): only the
+ * typed AppError('SESSAO_EXPIRADA') becomes the result; anything else
+ * (notFound(), a redirect, another AppError, a bug) is rethrown as is
+ * (ADR-0011 Addendum 2, decision 7: no catch-all).
+ */
+export function sessionExpiredResult(error: unknown): SessionExpiredResult {
+  if (error instanceof AppError && error.code === "SESSAO_EXPIRADA")
+    return { ok: false, code: "SESSAO_EXPIRADA" };
+  throw error;
 }
 
 /**

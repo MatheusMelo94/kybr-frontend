@@ -191,3 +191,63 @@ describe("apiPaths.panel.batches (D-B1–D-B7)", () => {
     expect(() => b.rows(ID, { cursor: "x&status=ok" })).toThrow();
   });
 });
+
+describe("apiPaths.panel.cases (D-C1–D-C5, C-M6-1/2, C-M6-10)", () => {
+  const ID = "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b";
+  const DOC = "c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f";
+  const c = apiPaths.panel.cases;
+
+  it("builds every case path under /v1/", () => {
+    expect(c.get(ID)).toBe(`/v1/cases/${ID}`);
+    expect(c.decide(ID)).toBe(`/v1/cases/${ID}/decide`);
+    expect(c.requestDocuments(ID)).toBe(`/v1/cases/${ID}/request-documents`);
+    expect(c.documentUrl(ID, DOC)).toBe(
+      `/v1/cases/${ID}/documentos/${DOC}/url`,
+    );
+    expect(c.certificate(ID)).toBe(`/v1/verifications/${ID}/certificate`);
+  });
+
+  it("list: estado and limit, then the cursor when given", () => {
+    expect(c.list({ estado: "aberto", limit: 50 })).toBe(
+      "/v1/cases?estado=aberto&limit=50",
+    );
+    expect(
+      c.list({ estado: "aguardando_doc", limit: 25, cursor: "eyJvIjoyNX0" }),
+    ).toBe("/v1/cases?estado=aguardando_doc&limit=25&cursor=eyJvIjoyNX0");
+  });
+
+  it("newCount: estado=aberto with desde, encoded", () => {
+    expect(c.newCount("2026-10-06T10:00:00.123-03:00")).toBe(
+      "/v1/cases?estado=aberto&desde=2026-10-06T10%3A00%3A00.123-03%3A00",
+    );
+  });
+
+  it.each(["../x", "short", "a b c d e f g h i j", "%2e%2e%2fxxxxxxxxxxx", ""])(
+    "throws before a request for case or document id %j",
+    (id) => {
+      expect(() => c.get(id)).toThrow(/Refused API path segment/);
+      expect(() => c.decide(id)).toThrow(/Refused API path segment/);
+      expect(() => c.requestDocuments(id)).toThrow(/Refused API path segment/);
+      expect(() => c.documentUrl(ID, id)).toThrow(/Refused API path segment/);
+      expect(() => c.documentUrl(id, DOC)).toThrow(/Refused API path segment/);
+      expect(() => c.certificate(id)).toThrow(/Refused API path segment/);
+    },
+  );
+
+  it.each([
+    ["an unknown estado", { estado: "decidido" as never, limit: 25 }],
+    ["limit 0", { estado: "aberto" as const, limit: 0 }],
+    ["limit 201", { estado: "aberto" as const, limit: 201 }],
+    ["a fractional limit", { estado: "aberto" as const, limit: 25.5 }],
+    ["a cursor with a query", { estado: "aberto" as const, limit: 25, cursor: "x&estado=decidido" }],
+  ])("list throws for %s", (_, query) => {
+    expect(() => c.list(query)).toThrow(/Refused API query/);
+  });
+
+  it.each(["ontem", "2026-10-06", "2026-10-06T10:00:00", "2026-13-40T99:00:00Z", ""])(
+    "newCount throws for desde %j",
+    (desde) => {
+      expect(() => c.newCount(desde)).toThrow(/Refused API query/);
+    },
+  );
+});

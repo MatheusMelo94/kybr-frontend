@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { DECISAO_TIPOS, MOTIVO_CODIGOS } from "@/lib/panel-api-values";
+
 /** Stable codes from the X1 error envelope (seller-link contract-request.md D7; ops-panel A-X2). */
 export const API_ERROR_CODES = [
   "LINK_NAO_ENCONTRADO",
@@ -36,6 +38,10 @@ export const API_ERROR_CODES = [
   "MUITAS_LINHAS",
   "SEM_CNPJ_VALIDO",
   "LOTE_EM_ANDAMENTO",
+  // Cases (A-X2, M6)
+  "CASO_JA_DECIDIDO",
+  "MOTIVO_OBRIGATORIO",
+  "DOCUMENTO_NAO_HABILITADO",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
@@ -65,6 +71,14 @@ type AppErrorInit = {
   signupTicket?: string | undefined;
   reenviarEm?: string | undefined;
   disponiveis?: number | undefined;
+  decididoEm?: string | undefined;
+  decisao?: DecisaoAnterior | undefined;
+};
+
+/** D-C3/D-C4 409 CASO_JA_DECIDIDO: the decision already on the case (C-M6-7). */
+export type DecisaoAnterior = {
+  tipo: (typeof DECISAO_TIPOS)[number];
+  motivoCodigo?: (typeof MOTIVO_CODIGOS)[number] | undefined;
 };
 
 /**
@@ -84,6 +98,10 @@ export class AppError extends Error {
   readonly reenviarEm: string | undefined;
   /** D-B1 / D-B7 402 SEM_SALDO: the checks still available (the over-allowance state). */
   readonly disponiveis: number | undefined;
+  /** D-C3 / D-C4 409 CASO_JA_DECIDIDO: when the case was decided (ISO 8601). */
+  readonly decididoEm: string | undefined;
+  /** D-C3 / D-C4 409 CASO_JA_DECIDIDO: the decision it already has. */
+  readonly decisao: DecisaoAnterior | undefined;
 
   constructor({
     code,
@@ -94,6 +112,8 @@ export class AppError extends Error {
     signupTicket,
     reenviarEm,
     disponiveis,
+    decididoEm,
+    decisao,
   }: AppErrorInit) {
     super(`Kybr API error: ${code}`);
     this.code = code;
@@ -104,6 +124,8 @@ export class AppError extends Error {
     this.signupTicket = signupTicket;
     this.reenviarEm = reenviarEm;
     this.disponiveis = disponiveis;
+    this.decididoEm = decididoEm;
+    this.decisao = decisao;
   }
 }
 
@@ -120,6 +142,15 @@ const errorEnvelopeSchema = z.object({
   reenviar_em: z.string().max(64).optional().catch(undefined),
   // D-B1 / D-B7: 402 SEM_SALDO carries the remaining checks.
   disponiveis: z.number().int().nonnegative().optional().catch(undefined),
+  // D-C3 / D-C4: 409 CASO_JA_DECIDIDO carries the existing decision (C-M6-7).
+  decidido_em: z.iso.datetime({ offset: true }).optional().catch(undefined),
+  decisao: z
+    .object({
+      tipo: z.enum(DECISAO_TIPOS),
+      motivo_codigo: z.enum(MOTIVO_CODIGOS).optional(),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 function isApiErrorCode(code: string | undefined): code is ApiErrorCode {
@@ -151,5 +182,13 @@ export async function appErrorFromResponse(
     signupTicket: envelope.success ? envelope.data.signup_ticket : undefined,
     reenviarEm: envelope.success ? envelope.data.reenviar_em : undefined,
     disponiveis: envelope.success ? envelope.data.disponiveis : undefined,
+    decididoEm: envelope.success ? envelope.data.decidido_em : undefined,
+    decisao:
+      envelope.success && envelope.data.decisao
+        ? {
+            tipo: envelope.data.decisao.tipo,
+            motivoCodigo: envelope.data.decisao.motivo_codigo,
+          }
+        : undefined,
   });
 }

@@ -24,11 +24,17 @@ export const TOAST_MS = 5_000;
 export const TOAST_EXIT_MS = 150;
 const MAX_TOASTS = 3;
 
-type Toast = { id: number; message: string; leaving: boolean };
+type Toast = {
+  id: number;
+  message: string;
+  /** A second, muted line (the Fila's toast.audit). */
+  detail?: string | undefined;
+  leaving: boolean;
+};
 
-const ToastContext = createContext<{ show: (message: string) => void } | null>(
-  null,
-);
+type Show = (message: string, detail?: string) => void;
+
+const ToastContext = createContext<{ show: Show } | null>(null);
 
 type ItemProps = {
   toast: Toast;
@@ -66,6 +72,12 @@ function ToastItem({ toast, closeLabel, onDismiss }: ItemProps): JSX.Element {
     >
       <p className="min-w-0 flex-1 self-center py-1 break-words">
         {toast.message}
+        {toast.detail !== undefined && (
+          <>
+            {" "}
+            <span className="block text-ink-muted">{toast.detail}</span>
+          </>
+        )}
       </p>
       <button
         type="button"
@@ -116,7 +128,7 @@ export function ToastProvider({ closeLabel, children }: Props): JSX.Element {
     );
   }, []);
 
-  const show = useCallback((message: string) => {
+  const show = useCallback<Show>((message, detail) => {
     const id = ++nextId.current;
     setToasts((list) => {
       const active = list.filter((toast) => !toast.leaving);
@@ -128,7 +140,7 @@ export function ToastProvider({ closeLabel, children }: Props): JSX.Element {
         ...list.map((toast) =>
           outgoing.has(toast.id) ? { ...toast, leaving: true } : toast,
         ),
-        { id, message, leaving: false },
+        { id, message, detail, leaving: false },
       ];
     });
   }, []);
@@ -169,7 +181,7 @@ export function ToastProvider({ closeLabel, children }: Props): JSX.Element {
   );
 }
 
-export function useToast(): { show: (message: string) => void } {
+export function useToast(): { show: Show } {
   const value = useContext(ToastContext);
   if (value === null) throw new Error("useToast outside ToastProvider");
   return value;

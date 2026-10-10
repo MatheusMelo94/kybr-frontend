@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { PagerLink } from "@/features/panel-lote/components/pager-link";
+import { SoftLink } from "@/components/panel/soft-link";
 import { loteCopy } from "@/features/panel-lote/copy";
 import { isPanelCursor, type BatchRowStatus } from "@/lib/panel-api-values";
 
@@ -28,7 +28,7 @@ function href(base: string, query: Record<string, string | undefined>): string {
  * Forward-only paging (contract C2, plan D3): "Próximos 25" with the next
  * cursor, "Voltar ao início" once a cursor is set. Built with URLSearchParams
  * from a checked cursor (Security C11); the full list is in the CSV. Each
- * is a PagerLink (no prefetch: the rows are per request; the soft navigation
+ * is a SoftLink (no prefetch: the rows are per request; the soft navigation
  * has a fallback, see soft-navigate.ts).
  */
 export function TablePager({
@@ -45,14 +45,14 @@ export function TablePager({
       className="flex flex-wrap gap-4"
     >
       {cursor !== undefined && (
-        <PagerLink href={href(base, { status })} className={LINK}>
+        <SoftLink href={href(base, { status })} className={LINK}>
           {loteCopy["lote.table.first"]}
-        </PagerLink>
+        </SoftLink>
       )}
       {forward && (
-        <PagerLink href={href(base, { status, cursor: next })} className={LINK}>
+        <SoftLink href={href(base, { status, cursor: next })} className={LINK}>
           {loteCopy["lote.table.next"]}
-        </PagerLink>
+        </SoftLink>
       )}
     </nav>
   );

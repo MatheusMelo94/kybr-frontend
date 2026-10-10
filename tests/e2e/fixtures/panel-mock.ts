@@ -40,6 +40,10 @@ export type MockCall = {
   rows?: number;
   idempotencyKey?: string;
   poll?: boolean;
+  /** QA G5: a request-documents call's types (never the note or a link). */
+  tipos?: string[];
+  /** F7: the page a Server Action was posted from (x-kybr-panel-path). */
+  pagePath?: string;
 };
 
 /** The mock's request log for one e-mail. */

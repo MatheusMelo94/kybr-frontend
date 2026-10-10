@@ -296,3 +296,40 @@ describe("middleware: Server Action body size (Security C1)", () => {
     expect(middleware(request).status).not.toBe(413);
   });
 });
+
+describe("middleware: the Fila's file routes keep the sandbox CSP (F4, F12)", () => {
+  const cookie = { cookie: "__Host-kybr_session=v" };
+
+  it.each([
+    "/fila/caso_0000000000000001/documentos/3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b",
+    "/fila/caso_0000000000000001/comprovante",
+  ])("%s gets sandbox; default-src 'none', no nonce", (path) => {
+    const response = middleware(request(path, { headers: cookie }));
+    expect(response.headers.get("content-security-policy")).toBe(
+      "sandbox; default-src 'none'",
+    );
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+  });
+
+  it.each([
+    "/fila/caso_0000000000000001",
+    "/fila/caso_0000000000000001/documentos",
+    "/fila/caso_0000000000000001/documentos/a/b",
+    "/fila/caso_0000000000000001/comprovante/x",
+  ])("%s keeps the page policy", (path) => {
+    const response = middleware(request(path, { headers: cookie }));
+    expect(response.headers.get("content-security-policy")).toContain(
+      "script-src",
+    );
+  });
+
+  it("the link host never gets it", () => {
+    const response = middleware(
+      request("/fila/caso_0000000000000001/comprovante", { host: "kybr.test" }),
+    );
+    expect(response.headers.get("content-security-policy")).not.toBe(
+      "sandbox; default-src 'none'",
+    );
+  });
+});

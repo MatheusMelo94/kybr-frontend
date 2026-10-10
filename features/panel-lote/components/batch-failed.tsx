@@ -14,7 +14,7 @@ import { CONTRATAR_LINK } from "@/features/panel-shell/components/plan-block";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
 import { fill, formatNumber } from "@/features/panel-shell/format";
 import { useShellStatus } from "@/features/panel-shell/shell-status-context";
-import { useRefreshUntilReplaced } from "@/features/panel-lote/use-refresh-until-replaced";
+import { useRefreshUntilReplaced } from "@/lib/navigation/refresh-until";
 import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
 import type { Batch } from "@/lib/api/schemas/panel/batches";
 

@@ -5,13 +5,17 @@ import {
   BATCH_SETS,
   HOSTILE_EXT_IDS,
   batchOutcomeFor,
+  caseFromBatchRow,
   maskedCnpj,
   type BatchLinha,
   type BatchRowStatus,
 } from "../../factories/panel.ts";
 import { isValidCnpj } from "../../factories/seller-link.ts";
 import {
+  addCase,
   batchesOf,
+  caseNow,
+  casesOf,
   finishBatchAt,
   newBatch,
   ownBatch,
@@ -359,8 +363,27 @@ function batchAction(action: "to-queue" | "monitor"): RequestHandler {
         if (batch.criados === undefined) {
           batch.criados = tally.warn + tally.bad;
           batch.enviado_para_fila = true;
-          const contagens = account.workspace.contagens;
-          if (contagens) contagens.fila_abertos += batch.criados;
+          // QA G3: each flagged row becomes a real lote case (the Fila
+          // counts derive from them).
+          const now = caseNow(account.email);
+          const flagged = processedRows(batch).filter(
+            (row) => row.status === "warn" || row.status === "bad",
+          );
+          let n = casesOf(account.email).length;
+          for (const row of flagged)
+            addCase(
+              caseFromBatchRow({
+                email: account.email,
+                n: ++n,
+                now,
+                cnpj: row.cnpj,
+                razao_social: row.razao_social ?? null,
+                status: row.status as "warn" | "bad",
+                motivos: row.motivos,
+                responsavel: row.responsavel,
+                ext_id: row.ext_id,
+              }),
+            );
         }
         reply = { criados: batch.criados };
       } else {

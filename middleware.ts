@@ -51,6 +51,14 @@ function isShared(pathname: string): boolean {
   );
 }
 
+/**
+ * The Fila's file route handlers (a seller's document, F4; the proof, F12):
+ * their bytes are user content or a PDF, never a page, so they get the
+ * sandbox policy the handlers set instead of the page policy.
+ */
+const PANEL_FILE_PATH = /^\/fila\/[^/]+\/(?:documentos\/[^/]+|comprovante)$/;
+const FILE_POLICY = "sandbox; default-src 'none'";
+
 function isLinkPath(pathname: string): boolean {
   return pathname === "/v" || pathname.startsWith("/v/");
 }
@@ -199,7 +207,10 @@ export function middleware(request: NextRequest): NextResponse {
     url.pathname = target;
     response = NextResponse.rewrite(url, init);
   }
-  response.headers.set("content-security-policy", policy);
+  response.headers.set(
+    "content-security-policy",
+    panel && PANEL_FILE_PATH.test(pathname) ? FILE_POLICY : policy,
+  );
   // The endpoint for the policy's report-to (absolute, as the Reporting API
   // needs). The link's stays as it was on main; the panel's is its own origin.
   const reportOrigin = panel
@@ -214,7 +225,12 @@ export function middleware(request: NextRequest): NextResponse {
     // pages never leak their path in a Referer (P04).
     response.headers.set("cache-control", "private, no-store");
     response.headers.set("x-robots-tag", "noindex, nofollow");
-    if (pathname === "/senha" || pathname.startsWith("/senha/"))
+    // The documents' 303 must not carry a Referer to the signed URL (F1, F3).
+    if (
+      pathname === "/senha" ||
+      pathname.startsWith("/senha/") ||
+      PANEL_FILE_PATH.test(pathname)
+    )
       response.headers.set("referrer-policy", "no-referrer");
   }
   return response;

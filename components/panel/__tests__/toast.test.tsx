@@ -138,6 +138,31 @@ describe("ToastProvider (T76, spec § Motion Intent)", () => {
     // Computed transitions under both motion settings: primitives.spec.
   });
 
+  it("an optional second line (toast.audit, T105) in the same toast, muted", () => {
+    function Two() {
+      const toast = useToast();
+      return (
+        <button
+          type="button"
+          onClick={() => toast.show("Aprovado: Empresa", "Registrado.")}
+        >
+          dois
+        </button>
+      );
+    }
+    render(
+      <ToastProvider closeLabel="Fechar">
+        <Two />
+      </ToastProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "dois" }));
+    const region = screen.getByRole("status");
+    expect(region).toHaveTextContent("Aprovado: Empresa Registrado.");
+    const detail = screen.getByText("Registrado.");
+    expect(detail.closest("p")).toHaveTextContent("Aprovado: Empresa");
+    expect(detail).toHaveClass("block", "text-ink-muted");
+  });
+
   it("useToast outside the provider throws", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(() => render(<Trigger message="x" />)).toThrow(/ToastProvider/);
