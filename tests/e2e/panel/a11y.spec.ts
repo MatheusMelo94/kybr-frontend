@@ -145,8 +145,8 @@ test.describe("M4 cross-cutting: AC 67, 69, 72, 74 @feature-ops-panel @panel-acc
     await createAccount(request, renata);
     await page.context().clearCookies();
     await logIn(page, renata);
-    await expect(page).toHaveURL(/\/fila$/);
-    await crossCutting(page, "/fila (shell)");
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/$/);
+    await crossCutting(page, "/ (Início shell)");
 
     await page.goto("/nao-existe");
     await crossCutting(page, "not-found");

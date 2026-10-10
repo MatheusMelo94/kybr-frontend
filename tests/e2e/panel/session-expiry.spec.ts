@@ -58,6 +58,8 @@ test.describe("session expiry mid-task @feature-ops-panel @panel-access", () => 
     const email = uniqueEmail("poller", testInfo);
     await createAccount(request, email);
     await logIn(page, email);
+    // M8 D1: login lands on Início; this test is about the Fila.
+    await page.goto("/fila");
     await expect(page).toHaveURL(/\/fila$/);
     await expect(
       page.getByRole("navigation", { name: "Navegação do painel" }).first(),

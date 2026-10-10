@@ -87,10 +87,11 @@ describe("loginAction (D-A4, ADR-0009)", () => {
   });
 
   it("goes straight to the home screen, not to / and a second hop (P4-009)", async () => {
-    expect(PANEL_HOME).toBe("/fila");
+    // M8 D1 (T131): the home is Início, /.
+    expect(PANEL_HOME).toBe("/");
     expect(
       await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD }),
-    ).toEqual({ ok: true, next: "/fila" });
+    ).toEqual({ ok: true, next: "/" });
   });
 
   it("drops a pending sign-up cookie on success only (M4-01)", async () => {

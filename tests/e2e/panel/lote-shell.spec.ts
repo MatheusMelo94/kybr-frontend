@@ -32,6 +32,7 @@ test.describe("Lote: routes and history @feature-ops-panel @panel-lote", () => {
       .locator("aside")
       .getByRole("navigation", { name: "Navegação do painel" });
     await expect(nav.getByRole("link")).toHaveText([
+      "Início",
       /^Fila de revisão/,
       /^Monitoramento/,
       "Verificar em lote",

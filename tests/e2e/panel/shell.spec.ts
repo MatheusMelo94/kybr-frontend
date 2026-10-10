@@ -55,13 +55,14 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     expect(navBelow).toBe(true);
 
     const nav = page.getByRole("navigation", { name: "Navegação do painel" });
-    // The build's items in the spec's order: M4's Fila, M7's Monitoramento
-    // (with the preset's undecided critical alert), then M5's Lote.
-    await expect(nav.getByRole("link")).toHaveCount(3);
-    await expect(nav.getByRole("link").nth(1)).toHaveAccessibleName(
+    // The build's items in the spec's order: M8's Início, M4's Fila, M7's
+    // Monitoramento (with the preset's undecided critical alert), then M5's Lote.
+    await expect(nav.getByRole("link")).toHaveCount(4);
+    await expect(nav.getByRole("link").nth(0)).toHaveAccessibleName("Início");
+    await expect(nav.getByRole("link").nth(2)).toHaveAccessibleName(
       "Monitoramento 1 alerta crítico sem decisão",
     );
-    await expect(nav.getByRole("link").nth(2)).toHaveAccessibleName(
+    await expect(nav.getByRole("link").nth(3)).toHaveAccessibleName(
       "Verificar em lote",
     );
     await expect(

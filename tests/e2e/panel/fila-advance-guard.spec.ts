@@ -71,6 +71,7 @@ test.describe("Fila: the advance guard (QA-M6-004) @feature-ops-panel @panel-fil
           times: 100,
         });
       await logIn(page, email);
+      await page.goto("/fila"); // M8 D1: login lands on Início
       await page.waitForURL(/\/fila(\/[0-9a-f-]{36})?$/);
       for (const [i, gap] of gaps.entries()) {
         const [target] = await openCases(request, email);
@@ -105,6 +106,7 @@ test.describe("Fila: the advance guard (QA-M6-004) @feature-ops-panel @panel-fil
     await seedCases(request, email, "vinte-e-cinco");
     const [first, second, third] = await openCases(request, email);
     await logIn(page, email);
+    await page.goto("/fila"); // M8 D1: login lands on Início
     await page.waitForURL(/\/fila(\/[0-9a-f-]{36})?$/);
     await page.goto(`/fila/${first?.id}`);
     await page.getByRole("button", APPROVE).click();

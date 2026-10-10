@@ -13,15 +13,19 @@ import {
 test.use({ viewport: { width: 1280, height: 800 } });
 
 test.describe("home, Fila stub, not-found, error @feature-ops-panel @panel-access", () => {
-  test("/ redirects to /fila: the stub (fila.h1 + fila.lead), the Fila item current", async ({
+  test("/ is Início (M8 D1); /fila: fila.h1 + fila.lead, the Fila item current", async ({
     page,
     request,
   }, testInfo) => {
     const email = uniqueEmail("fila", testInfo);
     await createAccount(request, email);
     await logIn(page, email);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/$/);
+    await expect(
+      page.locator("aside").getByRole("link", { name: "Início" }),
+    ).toHaveAttribute("aria-current", "page");
 
-    await expect(page).toHaveURL(/\/fila$/);
+    await page.goto("/fila");
     await expect(
       page.getByRole("heading", { level: 1, name: "Fila de revisão" }),
     ).toBeVisible();

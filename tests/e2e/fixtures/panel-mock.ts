@@ -224,7 +224,7 @@ export async function logIn(
   await page.getByLabel("Senha").fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL(
-    (url) => !url.pathname.startsWith("/entrar") && url.pathname !== "/",
+    (url) => !url.pathname.startsWith("/entrar"),
   );
   // Any heading: an error boundary's is an h2.
   await page.getByRole("heading").first().waitFor();

@@ -25,7 +25,7 @@ describe("OnboardingStep2Banner (J1.5, AC 4 Lote half)", () => {
     ).toBeVisible();
     expect(screen.getByRole("link", { name: "Fazer depois" })).toHaveAttribute(
       "href",
-      "/fila",
+      "/",
     );
   });
 

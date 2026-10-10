@@ -77,6 +77,7 @@ test.describe("plan states @feature-ops-panel @panel-lote @panel-phone", () => {
       const email = uniqueEmail(`banner-${preset}`, testInfo);
       await createAccount(request, email, preset);
       await logIn(page, email);
+      await page.goto("/fila"); // M8 D1: login lands on Início
 
       const main = page.locator("main");
       const banner = main.getByText(text);

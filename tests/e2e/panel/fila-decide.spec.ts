@@ -63,6 +63,7 @@ test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", (
     await seedCases(request, email, "dois");
     const [first, second] = await openCases(request, email);
     await logIn(page, email);
+    await page.goto("/fila"); // M8 D1: login lands on Início
     // QA-M6-002: logIn lands on /fila, whose auto-select (and its prefetch)
     // is still in flight; a goto now aborts it and Next's browser-navigation
     // fallback aborts the goto (NS_BINDING_ABORTED in Firefox). Let it land.
