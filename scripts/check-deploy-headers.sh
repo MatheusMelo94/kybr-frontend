@@ -214,8 +214,10 @@ if [ -n "${PANEL_URL:-}" ]; then
   # T116: well-formed ids get past the id check, so the session check
   # answers. %{redirect_url} is curl's absolute parse of Location (never
   # followed); the format has no space because fetch_url word-splits $1.
+  # T147: M8's two exports and the seller's proof, the same way.
   probe=00000000-0000-4000-8000-000000000000
-  for path in "/fila/${probe}/comprovante" "/fila/${probe}/documentos/${probe}"; do
+  for path in "/fila/${probe}/comprovante" "/fila/${probe}/documentos/${probe}" \
+    /vendedores/exportar.csv /vendedores/auditoria.csv "/vendedores/${probe}/comprovante"; do
     echo "Smoke: an anonymous GET of ${panel}${path} goes to /entrar"
     answer=$(fetch_url "--output /dev/null --write-out %{http_code}|%{redirect_url}" "${panel}${path}")
     answer_status=${answer%%|*}
