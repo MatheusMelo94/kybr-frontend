@@ -89,7 +89,9 @@ test.describe("Monitoramento route and shell (T122) @feature-ops-panel @panel-al
       page.getByRole("heading", { level: 1, name: "Monitoramento" }),
     ).toBeVisible();
     await expect(
-      page.getByText(/^Ativo\. Próxima varredura: segunda-feira, 06:00$/),
+      page
+        .locator("main")
+        .getByText(/^Ativo\. Próxima varredura: segunda-feira, 06:00$/),
     ).toBeVisible();
     const card = page.getByRole("region", { name: "Onde avisamos" });
     await expect(

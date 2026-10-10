@@ -7,6 +7,8 @@ import { getMonitoring, listAlerts } from "@/lib/api/panel/alerts";
 import { sessionExpiredUrl } from "@/lib/api/panel/session";
 import type { AlertList, Monitoring } from "@/lib/api/schemas/panel/alerts";
 
+import { pickMonState, type MonState } from "@/features/panel-alertas/state";
+
 // The Monitoramento page's reads: D-M1 and D-M2 in parallel, once per render
 // (no poll, plan-m7 Q1). An ended session → /entrar (a navigation: ADR-0011
 // Addendum 2 rule 5). A failed D-M1 throws to error.tsx; a failed D-M2 with
@@ -18,6 +20,7 @@ export type MonData = {
   alerts: AlertList;
   /** undefined: D-M2 failed but alerts loaded (G4). */
   monitoring: Monitoring | undefined;
+  state: Exclude<MonState, { kind: "error" }>;
 };
 
 const expired = (result: PromiseSettledResult<unknown>): boolean =>
@@ -33,8 +36,12 @@ export async function loadMonitoramento(): Promise<MonData> {
   if (expired(alerts) || expired(monitoring))
     redirect(await sessionExpiredUrl());
   if (alerts.status === "rejected") throw alerts.reason;
-  if (monitoring.status === "fulfilled")
-    return { alerts: alerts.value, monitoring: monitoring.value };
-  if (alerts.value.length === 0) throw monitoring.reason;
-  return { alerts: alerts.value, monitoring: undefined };
+  const status =
+    monitoring.status === "fulfilled" ? monitoring.value : undefined;
+  const state = pickMonState(status, alerts.value);
+  if (state.kind === "error")
+    throw monitoring.status === "rejected"
+      ? monitoring.reason
+      : new AppError({ code: "UNAVAILABLE" });
+  return { alerts: alerts.value, monitoring: status, state };
 }

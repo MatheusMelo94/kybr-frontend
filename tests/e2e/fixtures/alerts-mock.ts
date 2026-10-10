@@ -81,3 +81,16 @@ export async function alertMail(
     (await response.json()) as { alerta?: { assunto: string; link: string } }
   ).alerta;
 }
+
+/** QA G3: fixes the account's clock (the case clock) before seeding; null frees it. */
+export async function setAlertClock(
+  request: APIRequestContext,
+  email: string,
+  now: string | null,
+): Promise<void> {
+  const response = await request.post(`${CONTROLS}/case-clock`, {
+    data: { email, now },
+  });
+  if (response.status() !== 204)
+    throw new Error(`setAlertClock: ${response.status()}`);
+}

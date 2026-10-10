@@ -62,7 +62,7 @@ test.describe("Monitoramento alert list (T123) @feature-ops-panel @panel-alertas
     await expect(rows.nth(3).getByText("Informativo")).toBeVisible();
     await expect(rows.nth(2).getByText("Com pedido aberto")).toBeVisible();
     await expect(
-      page.getByText("Com pedido aberto", { exact: true }),
+      page.locator("main").getByText("Com pedido aberto", { exact: true }),
     ).toHaveCount(1);
 
     const openCase = seeded.find(

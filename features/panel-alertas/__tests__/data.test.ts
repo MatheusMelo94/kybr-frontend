@@ -36,12 +36,22 @@ beforeEach(() => {
 });
 
 describe("loadMonitoramento (plan-m7 § 3)", () => {
+  it("no alerts: the empty state picked from D-M2 (AC 49)", async () => {
+    api.listAlerts.mockResolvedValue([]);
+    api.getMonitoring.mockResolvedValue(MON);
+    expect((await loadMonitoramento()).state).toEqual({
+      kind: "nosweep",
+      data: MON.proxima_varredura,
+    });
+  });
+
   it("both reads succeed", async () => {
     api.listAlerts.mockResolvedValue([ALERT]);
     api.getMonitoring.mockResolvedValue(MON);
     await expect(loadMonitoramento()).resolves.toEqual({
       alerts: [ALERT],
       monitoring: MON,
+      state: { kind: "success" },
     });
   });
 
@@ -51,6 +61,7 @@ describe("loadMonitoramento (plan-m7 § 3)", () => {
     await expect(loadMonitoramento()).resolves.toEqual({
       alerts: [ALERT],
       monitoring: undefined,
+      state: { kind: "success" },
     });
   });
 
