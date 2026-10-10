@@ -42,6 +42,9 @@ export const API_ERROR_CODES = [
   "CASO_JA_DECIDIDO",
   "MOTIVO_OBRIGATORIO",
   "DOCUMENTO_NAO_HABILITADO",
+  // Account (C-M8-7, M8): a wrong current password is a 403, never a 401,
+  // so the session survives (Security O-F1).
+  "SENHA_ATUAL_INCORRETA",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

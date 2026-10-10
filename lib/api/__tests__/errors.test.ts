@@ -86,3 +86,24 @@ describe("case error codes (A-X2, M6)", () => {
     expect(error.decisao).toBeUndefined();
   });
 });
+
+describe("password change error codes (C-M8-7, Security O-F1)", () => {
+  it("403 SENHA_ATUAL_INCORRETA is recognized and is not a session error", async () => {
+    const error = await appErrorFromResponse(
+      envelope(403, {
+        code: "SENHA_ATUAL_INCORRETA",
+        message: "MSG-BACKEND-NAO-EXIBIR",
+      }),
+    );
+    expect(error.code).toBe("SENHA_ATUAL_INCORRETA");
+    expect(error.status).toBe(403);
+    expect(JSON.stringify(error)).not.toContain("MSG-BACKEND-NAO-EXIBIR");
+  });
+
+  it("422 SENHA_FRACA is still recognized", async () => {
+    const error = await appErrorFromResponse(
+      envelope(422, { code: "SENHA_FRACA", message: "MSG-BACKEND-NAO-EXIBIR" }),
+    );
+    expect(error.code).toBe("SENHA_FRACA");
+  });
+});

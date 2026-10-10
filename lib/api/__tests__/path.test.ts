@@ -251,3 +251,11 @@ describe("apiPaths.panel.cases (D-C1–D-C5, C-M6-1/2, C-M6-10)", () => {
     },
   );
 });
+
+describe("apiPaths.panel M8a (D-H1, D-H2, D-A6)", () => {
+  it("builds the dashboard, first-steps and password paths under /v1/", () => {
+    expect(apiPaths.panel.dashboard()).toBe("/v1/dashboard");
+    expect(apiPaths.panel.firstSteps()).toBe("/v1/dashboard/primeiros-passos");
+    expect(apiPaths.panel.password()).toBe("/v1/auth/password");
+  });
+});

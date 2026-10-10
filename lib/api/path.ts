@@ -196,5 +196,11 @@ export const apiPaths = {
     alerts: (): string => "/v1/alerts?limit=50",
     /** D-M2 (C-M7-2) */
     monitoring: (): string => "/v1/monitoring",
+    /** D-H1 (C-M8-1) */
+    dashboard: (): string => "/v1/dashboard",
+    /** D-H2 (C-M8-1) */
+    firstSteps: (): string => "/v1/dashboard/primeiros-passos",
+    /** D-A6 (C-M8-7) */
+    password: (): string => "/v1/auth/password",
   },
 };
