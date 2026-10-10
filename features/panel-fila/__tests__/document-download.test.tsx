@@ -62,7 +62,7 @@ describe("DocumentList in attachment mode (Q19, F4)", () => {
   it("fetches the panel's document route without following redirects, saves the blob under the server-built name and revokes it", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout"] });
     fetchMock.mockResolvedValue(
-      new Response(new Blob(["%PDF-"]), {
+      new Response(new TextEncoder().encode("%PDF-"), {
         status: 200,
         headers: { "Content-Type": "application/pdf" },
       }),

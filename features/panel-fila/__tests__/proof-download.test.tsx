@@ -49,7 +49,7 @@ describe("ProofDownload (AC 42, G14, F12)", () => {
       now: new Date("2026-10-06T02:30:00Z"),
     });
     fetchMock.mockResolvedValue(
-      new Response(new Blob(["%PDF-"]), {
+      new Response(new TextEncoder().encode("%PDF-"), {
         status: 200,
         headers: { "Content-Type": "application/pdf" },
       }),
