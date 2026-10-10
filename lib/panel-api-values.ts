@@ -184,3 +184,69 @@ export type AlertTipo = (typeof ALERT_TIPOS)[number];
 /** D-M1 severities, most severe first. */
 export const ALERT_SEVERIDADES = ["critico", "atencao", "info"] as const;
 export type AlertSeveridade = (typeof ALERT_SEVERIDADES)[number];
+
+// M8 sellers and policies (C-M8-2–C-M8-6). Like the others: an unknown
+// value fails the parse, and the copy is keyed by these.
+
+/** D-S1 `status` (and the Vendedores filter). */
+export const SELLER_STATUSES = [
+  "aprovado",
+  "revisao",
+  "bloqueado",
+  "mudou",
+] as const;
+export type SellerStatus = (typeof SELLER_STATUSES)[number];
+
+export function isSellerStatus(value: string): value is SellerStatus {
+  return (SELLER_STATUSES as readonly string[]).includes(value);
+}
+
+/** D-S1 `origem`: a seller arrives through the link or a batch only. */
+export const SELLER_ORIGENS = ["link", "lote"] as const;
+export type SellerOrigem = (typeof SELLER_ORIGENS)[number];
+
+/** D-R1 rule keys, in the screen's order (`regras.rule.<chave>`). */
+export const POLICY_CHAVES = [
+  "situacao",
+  "recente",
+  "qsa",
+  "cnae",
+  "ie",
+  "mei",
+  "ok",
+] as const;
+export type PolicyChave = (typeof POLICY_CHAVES)[number];
+
+/** D-R1 actions (`regras.action.<acao>`). */
+export const POLICY_ACOES = [
+  "auto",
+  "approve",
+  "approve_limit",
+  "review",
+  "request",
+  "block",
+] as const;
+export type PolicyAcao = (typeof POLICY_ACOES)[number];
+
+/** D-R1 `recente.dias` bounds (C-M8-6). */
+export const POLICY_DIAS_MIN = 1;
+export const POLICY_DIAS_MAX = 3650;
+
+/** D-W2 category ids (and D-R1's `{categoria}` path segment). */
+export const CATEGORY_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** D-S1 / D-S4 `q`: at most 100 characters (C-M8-2). */
+export const SELLER_QUERY_MAX = 100;
+
+/** A real calendar day as YYYY-MM-DD (D-S5's `de` / `ate`). */
+export function isCalendarDay(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return false;
+  const [, y, m, d] = match.map(Number) as [number, number, number, number];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return (
+    date.getUTCFullYear() === y &&
+    date.getUTCMonth() === m - 1 &&
+    date.getUTCDate() === d
+  );
+}

@@ -3,12 +3,17 @@ import "server-only";
 import { SLUG_PATTERN, TOKEN_PATTERN } from "@/lib/link-values";
 import {
   CASE_TAB_ESTADOS,
+  CATEGORY_ID_PATTERN,
+  SELLER_QUERY_MAX,
   isBatchId,
   isBatchRowStatus,
   isPanelCursor,
+  isCalendarDay,
   isPanelId,
+  isSellerStatus,
   type BatchRowStatus,
   type CaseTabEstado,
+  type SellerStatus,
 } from "@/lib/panel-api-values";
 
 // The only place Kybr API paths and queries are built (threat model F01). Every
@@ -47,6 +52,48 @@ const slugSegment = (slug: string): string =>
 /** A validated, encoded panel id for an API path (M5+ builders use it). */
 export function panelIdSegment(id: string): string {
   return segment("panel id", id, isPanelId);
+}
+
+/** D-S1 / D-S4's filter: the status and `q` (≤ 100 characters), each checked. */
+function sellerFilterQuery(
+  query: URLSearchParams,
+  filter: { status?: SellerStatus | undefined; q?: string | undefined },
+): URLSearchParams {
+  if (filter.status !== undefined) {
+    if (!isSellerStatus(filter.status))
+      throw new Error("Refused API query: invalid status");
+    query.set("status", filter.status);
+  }
+  if (filter.q !== undefined && filter.q !== "") {
+    if (filter.q.length > SELLER_QUERY_MAX)
+      throw new Error("Refused API query: invalid q");
+    query.set("q", filter.q);
+  }
+  return query;
+}
+
+/** D-S1's query: 50 per page (C-M8-2), the page, then the filter. */
+function sellerListQuery(filter: {
+  pagina: number;
+  status?: SellerStatus | undefined;
+  q?: string | undefined;
+}): string {
+  if (!Number.isInteger(filter.pagina) || filter.pagina < 1)
+    throw new Error("Refused API query: invalid pagina");
+  const query = new URLSearchParams({
+    limite: "50",
+    pagina: String(filter.pagina),
+  });
+  return sellerFilterQuery(query, filter).toString();
+}
+
+/** D-S5's range: two real calendar days. */
+function auditQuery(range: { de: string; ate: string }): string {
+  if (!isCalendarDay(range.de))
+    throw new Error("Refused API query: invalid de");
+  if (!isCalendarDay(range.ate))
+    throw new Error("Refused API query: invalid ate");
+  return new URLSearchParams({ de: range.de, ate: range.ate }).toString();
 }
 
 /** D-B3's query: 25 rows, then the status filter and the cursor, each checked. */
@@ -202,5 +249,35 @@ export const apiPaths = {
     firstSteps: (): string => "/v1/dashboard/primeiros-passos",
     /** D-A6 (C-M8-7) */
     password: (): string => "/v1/auth/password",
+    /** M8 sellers (D-S1–D-S4); every id and query value is checked first. */
+    sellers: {
+      /** D-S1 (C-M8-2) */
+      list: (filter: {
+        pagina: number;
+        status?: SellerStatus | undefined;
+        q?: string | undefined;
+      }): string => `/v1/sellers?${sellerListQuery(filter)}`,
+      /** D-S2 (C-M8-3) */
+      get: (id: string): string => `/v1/sellers/${panelIdSegment(id)}`,
+      /** D-S3 (C-M8-4) */
+      reverify: (id: string): string =>
+        `/v1/sellers/${panelIdSegment(id)}/reverify`,
+      /** D-S4 (C-M8-5): the current filter and search. */
+      export: (filter: {
+        status?: SellerStatus | undefined;
+        q?: string | undefined;
+      }): string => {
+        const query = sellerFilterQuery(new URLSearchParams(), filter);
+        return query.size === 0
+          ? "/v1/sellers/export"
+          : `/v1/sellers/export?${query.toString()}`;
+      },
+    },
+    /** D-S5 (C-M8-5) */
+    auditCsv: (range: { de: string; ate: string }): string =>
+      `/v1/reports/audit.csv?${auditQuery(range)}`,
+    /** D-R1 (C-M8-6): the workspace's one category in v1. */
+    policy: (categoria: string): string =>
+      `/v1/policies/${segment("category", categoria, CATEGORY_ID_PATTERN)}`,
   },
 };

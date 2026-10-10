@@ -259,3 +259,67 @@ describe("apiPaths.panel M8a (D-H1, D-H2, D-A6)", () => {
     expect(apiPaths.panel.password()).toBe("/v1/auth/password");
   });
 });
+
+describe("apiPaths.panel M8b (D-S1–D-S5, D-R1)", () => {
+  const ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+
+  it("builds the seller list query: 50 per page, the status and q when set", () => {
+    expect(apiPaths.panel.sellers.list({ pagina: 1 })).toBe(
+      "/v1/sellers?limite=50&pagina=1",
+    );
+    expect(
+      apiPaths.panel.sellers.list({ pagina: 2, status: "mudou", q: "Ação & cia" }),
+    ).toBe("/v1/sellers?limite=50&pagina=2&status=mudou&q=A%C3%A7%C3%A3o+%26+cia");
+  });
+
+  it("refuses a bad status, pagina or a q over 100 characters", () => {
+    expect(() =>
+      apiPaths.panel.sellers.list({ pagina: 1, status: "x" as "mudou" }),
+    ).toThrow(/status/);
+    expect(() => apiPaths.panel.sellers.list({ pagina: 0 })).toThrow(/pagina/);
+    expect(() => apiPaths.panel.sellers.list({ pagina: 1.5 })).toThrow(/pagina/);
+    expect(() =>
+      apiPaths.panel.sellers.list({ pagina: 1, q: "x".repeat(101) }),
+    ).toThrow(/q/);
+    expect(apiPaths.panel.sellers.list({ pagina: 1, q: "x".repeat(100) })).toContain(
+      "q=",
+    );
+  });
+
+  it("builds the detail and reverify paths only for a panel id", () => {
+    expect(apiPaths.panel.sellers.get(ID)).toBe(`/v1/sellers/${ID}`);
+    expect(apiPaths.panel.sellers.reverify(ID)).toBe(
+      `/v1/sellers/${ID}/reverify`,
+    );
+    expect(() => apiPaths.panel.sellers.get("../x")).toThrow();
+    expect(() => apiPaths.panel.sellers.reverify("curto")).toThrow();
+  });
+
+  it("builds the sellers export (D-S4) with q and status", () => {
+    expect(apiPaths.panel.sellers.export({})).toBe("/v1/sellers/export");
+    expect(apiPaths.panel.sellers.export({ status: "bloqueado", q: "exemplo" })).toBe(
+      "/v1/sellers/export?status=bloqueado&q=exemplo",
+    );
+    expect(() =>
+      apiPaths.panel.sellers.export({ q: "x".repeat(101) }),
+    ).toThrow(/q/);
+  });
+
+  it("builds the audit export (D-S5) from two calendar days", () => {
+    expect(apiPaths.panel.auditCsv({ de: "2026-07-10", ate: "2026-10-10" })).toBe(
+      "/v1/reports/audit.csv?de=2026-07-10&ate=2026-10-10",
+    );
+    expect(() =>
+      apiPaths.panel.auditCsv({ de: "10/07/2026", ate: "2026-10-10" }),
+    ).toThrow(/de/);
+    expect(() =>
+      apiPaths.panel.auditCsv({ de: "2026-07-10", ate: "2026-13-01" }),
+    ).toThrow(/ate/);
+  });
+
+  it("builds the policy path (D-R1) for a category id only", () => {
+    expect(apiPaths.panel.policy("eletronicos")).toBe("/v1/policies/eletronicos");
+    expect(() => apiPaths.panel.policy("../me")).toThrow();
+    expect(() => apiPaths.panel.policy("")).toThrow();
+  });
+});

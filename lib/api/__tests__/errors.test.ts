@@ -107,3 +107,19 @@ describe("password change error codes (C-M8-7, Security O-F1)", () => {
     expect(error.code).toBe("SENHA_FRACA");
   });
 });
+
+describe("seller and policy error codes (C-M8-3, C-M8-4, C-M8-6)", () => {
+  it.each([
+    [409, "REVERIFICACAO_EM_ANDAMENTO"],
+    [409, "POLITICA_DESATUALIZADA"],
+    [422, "SEM_DOCUMENTO_HABILITADO"],
+    [404, "SELLER_NAO_ENCONTRADO"],
+  ])("%i %s is recognized", async (status, code) => {
+    const error = await appErrorFromResponse(
+      envelope(status, { code, message: "MSG-BACKEND-NAO-EXIBIR" }),
+    );
+    expect(error.code).toBe(code);
+    expect(error.status).toBe(status);
+    expect(JSON.stringify(error)).not.toContain("MSG-BACKEND-NAO-EXIBIR");
+  });
+});
