@@ -23,8 +23,8 @@ export function NewCasesNotice({ aba }: Props): JSX.Element {
   return (
     <div role="status" aria-live="polite">
       {visible && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface py-2 pr-2 pl-4 transition-opacity duration-(--duration-base) ease-out-quart motion-reduce:transition-none starting:opacity-0">
-          <p className="text-secondary text-ink">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface py-2 pr-2 pl-4 transition-opacity duration-(--duration-base) ease-out-quart motion-reduce:transition-none starting:opacity-0">
+          <p className="min-w-0 flex-1 text-secondary text-ink">
             {novos === 1
               ? filaCopy["fila.new.one"]
               : fill(filaCopy["fila.new.other"], { n: novos })}
