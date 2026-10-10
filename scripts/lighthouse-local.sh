@@ -115,10 +115,14 @@ chrome="${CHROME_PATH:-$(command -v google-chrome || command -v google-chrome-st
 # installation not found"). CHROME_PATH is checked first, so export it.
 export CHROME_PATH="$chrome"
 
-# Mobile preset (lighthouserc.fila.json): the e-mail deep link's case,
-# warn > 2500 ms, fail > 3000 ms LCP (ADR-0007).
+# Monitoramento (T127): the same account gets 60 alerts (the list shows 50).
+mock_post /alerts/seed "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"sessenta\"}" > /dev/null
+
+# Mobile preset (lighthouserc.fila.json): the e-mail deep link's case and
+# /monitoramento (T127), warn > 2500 ms, fail > 3000 ms LCP (ADR-0007).
 "$lhci" autorun --config=lighthouserc.fila.json --collect.chromePath="$chrome" \
-  --collect.url="${panel_url}/fila/${case_id}"
+  --collect.url="${panel_url}/fila/${case_id}" \
+  --collect.url="${panel_url}/monitoramento"
 
 # Desktop preset (lighthouserc.fila-desktop.json): the queue, LCP <= 2.5 s
 # blocking (ADR-0010).
