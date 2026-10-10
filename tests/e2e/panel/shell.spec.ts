@@ -34,7 +34,13 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     expect((await symbol.boundingBox())?.width).toBe(32);
     await expect(sidebar.getByText("Kybr", { exact: true })).toHaveCount(0);
     await expect(sidebar.getByText("Loja Exemplo")).toBeVisible();
-    await expect(sidebar.getByText("1.240 vendedores")).toHaveCount(0);
+    // ws.sellers.* left the sidebar top (the Vendedores nav item's count
+    // reads it now, M8).
+    await expect(
+      symbol
+        .locator("xpath=ancestor::div[parent::aside]")
+        .getByText("1.240 vendedores"),
+    ).toHaveCount(0);
     // B-005: a hairline in --color-line separates the top block from the nav.
     const [border, line, navBelow] = await symbol.evaluate((element) => {
       const block = element.closest("aside > div") as HTMLElement;
@@ -56,14 +62,18 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
 
     const nav = page.getByRole("navigation", { name: "Navegação do painel" });
     // The build's items in the spec's order: M8's Início, M4's Fila, M7's
-    // Monitoramento (with the preset's undecided critical alert), then M5's Lote.
-    await expect(nav.getByRole("link")).toHaveCount(4);
+    // Monitoramento (with the preset's undecided critical alert), M5's Lote,
+    // then M8's Vendedores (with contagens.vendedores).
+    await expect(nav.getByRole("link")).toHaveCount(5);
     await expect(nav.getByRole("link").nth(0)).toHaveAccessibleName("Início");
     await expect(nav.getByRole("link").nth(2)).toHaveAccessibleName(
       "Monitoramento 1 alerta crítico sem decisão",
     );
     await expect(nav.getByRole("link").nth(3)).toHaveAccessibleName(
       "Verificar em lote",
+    );
+    await expect(nav.getByRole("link").nth(4)).toHaveAccessibleName(
+      "Vendedores 1.240 vendedores",
     );
     await expect(
       nav.getByRole("link", {

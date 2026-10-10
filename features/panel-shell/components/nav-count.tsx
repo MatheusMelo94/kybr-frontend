@@ -85,6 +85,35 @@ export function NavCount({
  * neutral pill, the number aria-hidden and the link's accessible name
  * carrying nav.monitor.count_sr.*. Zero hides it.
  */
+/** A plain count: the number aria-hidden, the spoken text sr-only; zero hides it. */
+function PlainCount({
+  count,
+  spoken,
+  testId,
+  active,
+}: {
+  count: number;
+  spoken: (n: string) => string;
+  testId: string;
+  active: boolean;
+}): JSX.Element | null {
+  if (count <= 0) return null;
+  const n = formatNumber(count);
+  return (
+    <>
+      <VisuallyHidden>{spoken(n)}</VisuallyHidden>
+      <span
+        data-testid={testId}
+        aria-hidden="true"
+        className={navCountClassName(active)}
+      >
+        {n}
+      </span>
+    </>
+  );
+}
+
+/** Monitoramento's count (S5): the undecided critical alerts. */
 export function MonitorCount({
   alertas,
   active = false,
@@ -92,20 +121,32 @@ export function MonitorCount({
   alertas: number;
   active?: boolean;
 }): JSX.Element | null {
-  if (alertas <= 0) return null;
-  const n = formatNumber(alertas);
   return (
-    <>
-      <VisuallyHidden>
-        {fill(plural(shellCopy, "nav.monitor.count_sr", alertas), { n })}
-      </VisuallyHidden>
-      <span
-        data-testid="nav-count-monitor"
-        aria-hidden="true"
-        className={navCountClassName(active)}
-      >
-        {n}
-      </span>
-    </>
+    <PlainCount
+      count={alertas}
+      spoken={(n) =>
+        fill(plural(shellCopy, "nav.monitor.count_sr", alertas), { n })
+      }
+      testId="nav-count-monitor"
+      active={active}
+    />
+  );
+}
+
+/** Vendedores' count (spec AC 9, plan-m8 § 2): contagens.vendedores, as ws.sellers.*. */
+export function SellersCount({
+  vendedores,
+  active = false,
+}: {
+  vendedores: number;
+  active?: boolean;
+}): JSX.Element | null {
+  return (
+    <PlainCount
+      count={vendedores}
+      spoken={(n) => fill(plural(shellCopy, "ws.sellers", vendedores), { n })}
+      testId="nav-count-vendedores"
+      active={active}
+    />
   );
 }

@@ -30,7 +30,9 @@ test.describe("Início @feature-ops-panel @panel-operacao", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: GREETING }),
     ).toBeVisible();
-    await expect(page.getByText("1.240", { exact: true })).toBeVisible();
+    await expect(
+      page.locator("#conteudo").getByText("1.240", { exact: true }),
+    ).toBeVisible();
 
     const queue = page.getByRole("region", { name: "Precisa da sua atenção" });
     await expect(queue.getByRole("listitem")).toHaveCount(4);

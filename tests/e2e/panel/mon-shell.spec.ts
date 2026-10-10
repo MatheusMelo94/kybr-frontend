@@ -78,6 +78,7 @@ test.describe("Monitoramento route and shell (T122) @feature-ops-panel @panel-al
       "Fila de revisão",
       "Monitoramento",
       "Verificar em lote",
+      "Vendedores",
     ]);
     await nav
       .getByRole("link", {

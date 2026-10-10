@@ -23,7 +23,7 @@ export const NAV_ITEMS: readonly Entry[] = [
     key: "vendedores",
     href: "/vendedores",
     label: shellCopy["nav.vendedores"],
-    shipped: false,
+    shipped: true,
   },
   {
     key: "regras",
