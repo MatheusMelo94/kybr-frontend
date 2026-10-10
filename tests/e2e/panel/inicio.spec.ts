@@ -164,11 +164,26 @@ test.describe("Início @feature-ops-panel @panel-operacao", () => {
       nodes.map((node) => Number(node.style.getPropertyValue("--v"))),
     );
     expect(Math.max(...scales)).toBe(1);
-    // Reflow at 360: the bar row stays inside the card.
-    const overflow = await week.evaluate(
-      (node) => node.scrollWidth > node.clientWidth,
+    // P8-008 (DDR-0003): the short weekday and the count show under each bar.
+    const labels = week.locator("[data-week-label]");
+    await expect(labels).toHaveCount(7);
+    await expect(labels.first()).toBeVisible();
+    await expect(labels.first()).toHaveText(
+      /^(dom|seg|ter|qua|qui|sex|sáb)\.$/,
     );
-    expect(overflow).toBe(false);
+    await expect(week.locator("[data-week-count]").first()).toHaveText(
+      /^\d{1,3}(\.\d{3})*$/,
+    );
+    // Reflow at this width and at 200 % text: the bar row stays inside the card.
+    for (const size of ["", "200%"]) {
+      await page.evaluate((value) => {
+        document.documentElement.style.fontSize = value;
+      }, size);
+      const overflow = await week.evaluate(
+        (node) => node.scrollWidth > node.clientWidth,
+      );
+      expect(overflow, `Semana at ${size || "100%"}`).toBe(false);
+    }
   });
 
   test("T133 (AC 53): Primeiros passos leads a new workspace; Ocultar hides it after ok and for good @panel-phone", async ({

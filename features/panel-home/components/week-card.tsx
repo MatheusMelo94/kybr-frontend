@@ -40,22 +40,38 @@ export function WeekCard({ semana }: Props): JSX.Element {
 function WeekChart({ rows }: { rows: WeekRow[] }): JSX.Element {
   return (
     <>
-      <div data-week-bars aria-hidden="true" className="flex h-24 gap-2">
+      {/* P8-008 (DDR-0003): the weekday and the count show as text under
+          each bar; the whole block stays aria-hidden behind the table. */}
+      <div data-week-bars aria-hidden="true" className="flex gap-2">
         {rows.map((row) => (
           <div
             key={row.dia}
-            className="h-full min-w-0 flex-1 rounded-sm bg-line-soft"
+            className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center"
           >
-            <div
-              data-week-bar
-              className="h-full origin-bottom rounded-sm bg-ink-muted"
-              style={
-                {
-                  "--v": String(row.ratio),
-                  transform: "scaleY(var(--v))",
-                } as CSSProperties
-              }
-            />
+            <div className="h-24 w-full rounded-sm bg-line-soft">
+              <div
+                data-week-bar
+                className="h-full origin-bottom rounded-sm bg-ink-muted"
+                style={
+                  {
+                    "--v": String(row.ratio),
+                    transform: "scaleY(var(--v))",
+                  } as CSSProperties
+                }
+              />
+            </div>
+            <span
+              data-week-label
+              className="w-full text-secondary break-words text-ink-muted"
+            >
+              {row.weekdayShort}
+            </span>
+            <span
+              data-week-count
+              className="w-full text-secondary font-strong break-words text-ink tabular-nums"
+            >
+              {formatNumber(row.total)}
+            </span>
           </div>
         ))}
       </div>

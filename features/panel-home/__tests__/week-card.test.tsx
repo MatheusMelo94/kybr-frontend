@@ -57,6 +57,21 @@ describe("WeekCard (T134)", () => {
     expect(bars[0]?.style.transform).toBe("scaleY(var(--v))");
   });
 
+  it("P8-008 (DDR-0003): each bar shows its short weekday and its count as text", () => {
+    const { container } = render(<WeekCard semana={SEMANA} />);
+    const chart = container.querySelector("[data-week-bars]") as HTMLElement;
+    expect(
+      [...chart.querySelectorAll("[data-week-label]")].map(
+        (label) => label.textContent,
+      ),
+    ).toEqual(["dom.", "seg.", "ter.", "qua.", "qui.", "sex.", "sáb."]);
+    expect(
+      [...chart.querySelectorAll("[data-week-count]")].map(
+        (count) => count.textContent,
+      ),
+    ).toEqual(["0", "10", "5", "1.240", "20", "40", "620"]);
+  });
+
   it("a screen reader gets the table: seven rows, weekday and tabular count", () => {
     render(<WeekCard semana={SEMANA} />);
     const card = screen.getByRole("region", { name: "Semana" });
