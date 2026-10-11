@@ -31,9 +31,30 @@ async function reflows(page: Page, label: string): Promise<void> {
         document.documentElement.scrollWidth -
         document.documentElement.clientWidth,
     );
+    // On failure, name the elements that stick out (WebKit runs in CI only).
+    const culprits =
+      overflow > 0
+        ? await page.evaluate(() => {
+            const limit = document.documentElement.clientWidth;
+            return [...document.querySelectorAll("body *")]
+              .filter((el) => el.getBoundingClientRect().right > limit + 0.5)
+              .filter(
+                (el) =>
+                  ![...el.children].some(
+                    (child) =>
+                      child.getBoundingClientRect().right > limit + 0.5,
+                  ),
+              )
+              .slice(0, 5)
+              .map((el) => {
+                const r = el.getBoundingClientRect();
+                return `<${el.tagName.toLowerCase()} class="${(el.getAttribute("class") ?? "").slice(0, 80)}"> w=${Math.round(r.width)} right=${Math.round(r.right)} "${(el.textContent ?? "").trim().slice(0, 40)}"`;
+              });
+          })
+        : [];
     expect(
       overflow,
-      `${label}: AC 74 at ${width}px, ${scale}`,
+      `${label}: AC 74 at ${width}px, ${scale}\n${culprits.join("\n")}`,
     ).toBeLessThanOrEqual(0);
   }
   await page.evaluate(() => {

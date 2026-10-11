@@ -126,7 +126,7 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
 
   return (
     <form noValidate onSubmit={submit} className="flex min-w-0 flex-col gap-6">
-      <p className="text-lead font-lead text-ink-muted">
+      <p className="text-lead font-lead break-words text-ink-muted">
         {fill(regrasCopy["regras.lead"], { categoria: categoria.nome })}
       </p>
       {/* P8-004: locked while a save is in flight, so no edit is replaced

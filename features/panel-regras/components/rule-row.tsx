@@ -63,7 +63,7 @@ export function RuleRow({
           {...(daysError !== undefined && { error: daysError })}
           onChange={(event) => onDias(event.target.value.replace(/\D/g, ""))}
           tabularNums
-          className="max-w-48"
+          className="max-w-48 min-w-0"
         />
       )}
       <Select
