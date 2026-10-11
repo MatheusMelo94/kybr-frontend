@@ -15,10 +15,20 @@ import {
   type Account,
 } from "../panel-store.ts";
 import { apiError, incoming, networkDrop, ok } from "./panel-common.ts";
+import { homeAuthed } from "./panel-home.ts";
 
-// Pre-Contract handlers for D-W1–D-W3 (ops-panel contract-request.md, M4).
+// Pre-Contract handlers for D-W1–D-W3 (ops-panel contract-request.md, M4)
+// and D-W4 + the D-W3 name (C-M8-8, M8a).
 
 const PLAIN_EMAIL = /^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/;
+const NAME_MAX = 80; // D-W3 nome and D-W4 (C-M8-8)
+
+/** A trimmed 1..80 name, or undefined. */
+function nameFrom(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const nome = value.trim();
+  return nome.length >= 1 && nome.length <= NAME_MAX ? nome : undefined;
+}
 
 function workspaceView(account: Account): Record<string, unknown> {
   const { plano, ...workspace } = account.workspace;
@@ -108,11 +118,11 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
     return ok([...CATEGORIES]);
   }),
   http.put("*/v1/workspace", async ({ request }) => {
-    const { body, token, refused, call } = await incoming(request);
-    if (refused) return refused;
-    const account = sessionAccount(token);
-    if (!account) return apiError(401, "SESSAO_EXPIRADA");
-    call.email = account.email;
+    // QA G2 (M8a): the per-account fault comes first (the partial save).
+    const auth = await homeAuthed(request, "workspace-put");
+    if ("reply" in auth) return auth.reply;
+    const { account } = auth;
+    const { body } = auth.incoming;
     // QA G3: the save fails (500), drops, or is refused with a field.
     if (scenarioApplies("workspace-falha", account.email))
       return apiError(500, "ERRO_INTERNO");
@@ -122,6 +132,12 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
         field: "contato_vendedor.valor",
       });
     const workspace = account.workspace;
+    if (body.nome !== undefined) {
+      const nome = nameFrom(body.nome);
+      if (nome === undefined)
+        return apiError(422, "VALOR_INVALIDO", { field: "nome" });
+      workspace.nome = nome;
+    }
     if (body.contato_vendedor !== undefined) {
       const contato = contatoFrom(body.contato_vendedor);
       if (!contato)
@@ -138,5 +154,20 @@ export const panelWorkspaceHandlers: RequestHandler[] = [
     if (workspace.contato_vendedor && workspace.categoria)
       workspace.onboarding_concluido = true;
     return ok(workspaceView(account));
+  }),
+  // D-W4 (C-M8-8): { nome } only → the D-W1 object.
+  http.put("*/v1/me", async ({ request }) => {
+    const auth = await homeAuthed(request, "me-put");
+    if ("reply" in auth) return auth.reply;
+    const { body } = auth.incoming;
+    const nome = nameFrom(body.nome);
+    if (Object.keys(body).length !== 1 || nome === undefined)
+      return apiError(422, "VALOR_INVALIDO", { field: "nome" });
+    auth.account.nome = nome;
+    return ok({
+      nome: auth.account.nome,
+      email: auth.account.email,
+      workspace: workspaceView(auth.account),
+    });
   }),
 ];

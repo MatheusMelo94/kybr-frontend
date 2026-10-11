@@ -14,7 +14,6 @@ export function panelPath(externalPath: string): string {
 
 /**
  * The panel's home screen, where a login without a safe volta and a signed-in
- * visit to /entrar or /cadastro land: the Fila until M8's Início (spec S9 MVP
- * note). "/" redirects here too; going straight saves a hop (P4-009).
+ * visit to /entrar or /cadastro land: Início, since M8 (spec S9; plan-m8 D1).
  */
-export const PANEL_HOME = "/fila";
+export const PANEL_HOME = "/";

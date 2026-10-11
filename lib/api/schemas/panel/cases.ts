@@ -131,6 +131,24 @@ const decisaoSchema = z.object({
   nota_vendedor: nota.optional(),
 });
 
+/** D-C2's verification; the seller detail (D-S2, C-M8-3) reuses it. */
+export const verificationSchema = z.object({
+  id: panelId,
+  modo: z.enum(["cache", "tempo_real"]),
+  checagens: z
+    .array(
+      z.object({
+        chave: z.enum(CHECK_CHAVES),
+        titulo: text(200),
+        descricao: text(1000),
+        valor: text(500),
+        status: z.enum(CASE_STATUSES),
+      }),
+    )
+    .max(CHECK_CHAVES.length),
+  criado_em: isoDateTime,
+});
+
 /** D-C2 (+ C-M6-5, C-M6-6). */
 export const caseSchema = caseSummarySchema
   .extend({
@@ -139,22 +157,7 @@ export const caseSchema = caseSummarySchema
       razao_social: text(300).nullable(),
       cnpj,
     }),
-    verification: z.object({
-      id: panelId,
-      modo: z.enum(["cache", "tempo_real"]),
-      checagens: z
-        .array(
-          z.object({
-            chave: z.enum(CHECK_CHAVES),
-            titulo: text(200),
-            descricao: text(1000),
-            valor: text(500),
-            status: z.enum(CASE_STATUSES),
-          }),
-        )
-        .max(CHECK_CHAVES.length),
-      criado_em: isoDateTime,
-    }),
+    verification: verificationSchema,
     estado: z.enum(CASE_ESTADOS),
     consultado_em: isoDateTime.optional(),
     mudanca: z
@@ -175,11 +178,7 @@ export const caseSchema = caseSummarySchema
     // Either may fail alone (D-C2): a malformed list reads as missing, and
     // the detail shows fila.detail.partial instead of failing the case.
     eventos: z.array(caseEventSchema).max(200).optional().catch(undefined),
-    documentos: z
-      .array(caseDocumentSchema)
-      .max(50)
-      .optional()
-      .catch(undefined),
+    documentos: z.array(caseDocumentSchema).max(50).optional().catch(undefined),
   })
   .refine(
     (value) =>

@@ -17,18 +17,23 @@ import {
 } from "../../factories/panel.ts";
 import {
   ageSession,
+  clearPasswordFailures,
   createAccount,
   expireSession,
   issueResetToken,
   issueTicket,
   openSession,
   panelStore,
+  passwordLimited,
+  recordPasswordFailure,
   reissueCode,
   resetPanelMock,
   revokeSessionsOf,
+  rotateSessionsOf,
   scenarioApplies,
   seedPollFailures,
   seedScenario,
+  sendNotice,
   sessionAccount,
   unseedScenario,
   type Scenario,
@@ -42,6 +47,7 @@ import {
   str,
   turnstileProblem,
 } from "./panel-common.ts";
+import { homeAuthed } from "./panel-home.ts";
 
 // Pre-Contract handlers for D-A1–D-A5 (ops-panel contract-request.md, M4).
 // One set serves Vitest (server.ts) and the HTTP mock API (mock-api.ts).
@@ -243,7 +249,32 @@ const passwordResetConfirm = http.post(
   },
 );
 
+// D-A6 (C-M8-7, PH6). A wrong current password is a 403, never a 401: the
+// session survives (Security O-F1). 5 failures in 15 min, then 429. Success
+// rotates this session (keeping its absolute deadline), revokes every other
+// one and the pending reset tokens, and sends mail.password_changed.
+const changePassword = http.post("*/v1/auth/password", async ({ request }) => {
+  const auth = await homeAuthed(request, "password");
+  if ("reply" in auth) return auth.reply;
+  const { account } = auth;
+  const { body, token } = auth.incoming;
+  if (passwordLimited(account.email)) return apiError(429, "LIMITE_TENTATIVAS");
+  if (str(body.senha_atual) !== account.senha) {
+    recordPasswordFailure(account.email);
+    return apiError(403, "SENHA_ATUAL_INCORRETA");
+  }
+  const senha = str(body.senha_nova);
+  if (senha.length < 12 || senha.length > 128 || senha === WEAK_PASSWORD)
+    return apiError(422, "SENHA_FRACA", { field: "senha_nova" });
+  account.senha = senha;
+  clearPasswordFailures(account.email);
+  const sessao = rotateSessionsOf(token ?? "", account.email);
+  sendNotice(account.email, "mail.password_changed");
+  return ok({ sessao });
+});
+
 export const panelAuthHandlers: RequestHandler[] = [
+  changePassword,
   signup,
   confirm,
   resend,
@@ -270,6 +301,9 @@ const SCENARIOS: readonly Scenario[] = [
   "queda-de-rede-lote",
   "alertas-falha",
   "monitoramento-falha",
+  "vendedores-falha",
+  "regras-falha",
+  "csv-cpf-cru",
 ];
 
 function isPreset(value: unknown): value is Preset {
@@ -323,6 +357,9 @@ export const panelControlHandlers: RequestHandler[] = [
       "queda-de-rede-lote",
       "alertas-falha",
       "monitoramento-falha",
+      "vendedores-falha",
+      "regras-falha",
+      "csv-cpf-cru",
     ];
     if (
       accountOnly.includes(String(body.scenario)) &&

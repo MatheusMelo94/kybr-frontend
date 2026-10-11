@@ -38,6 +38,7 @@ import {
   type PublicLink,
   type UploadState,
 } from "../../factories/seller-link.ts";
+import { workspaceBySlug } from "../panel-store.ts";
 
 // Pre-Contract handlers for D1–D6 (contract-request.md). One set serves Vitest
 // (tests/fixtures/msw/server.ts) and the HTTP mock API (mock-api.ts).
@@ -431,7 +432,21 @@ function linkFor(slug: string): PublicLink | undefined {
   if (isSlugVariant(slug, SLUGS.unstable)) return PUBLIC_LINKS[SLUGS.unstable];
   if (isSlugVariant(slug, SLUGS.perTest)) return PUBLIC_LINKS[SLUGS.ok];
   if (isSlugVariant(slug, SLUGS.slow)) return PUBLIC_LINKS[SLUGS.ok];
-  return PUBLIC_LINKS[slug];
+  return PUBLIC_LINKS[slug] ?? panelWorkspaceLink(slug);
+}
+
+/**
+ * C-M8-9: a panel workspace's own link (M8a), so a Configurações save shows
+ * on D1 at once. Only an onboarded workspace has one.
+ */
+function panelWorkspaceLink(slug: string): PublicLink | undefined {
+  const workspace = workspaceBySlug(slug);
+  if (!workspace?.onboarding_concluido || !workspace.contato_vendedor)
+    return undefined;
+  return {
+    nome: workspace.nome,
+    contato_vendedor: { ...workspace.contato_vendedor },
+  };
 }
 
 function caseFor(slug: string, token: string): CaseRecord | undefined {

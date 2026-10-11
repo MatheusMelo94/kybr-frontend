@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import {
   useEffect,
   useId,
@@ -43,6 +44,15 @@ export function AccountMenu({
   className,
 }: Props): JSX.Element {
   const [open, setOpen] = useState(false);
+  // A menu item that navigates (Configurações) leaves the shell mounted:
+  // the new path closes the menu. Not on click, which would unmount Sair's
+  // form before it submits.
+  const pathname = usePathname();
+  const [openedOn, setOpenedOn] = useState(pathname);
+  if (pathname !== openedOn) {
+    setOpenedOn(pathname);
+    setOpen(false);
+  }
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);

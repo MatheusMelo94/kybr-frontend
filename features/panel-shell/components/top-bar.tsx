@@ -2,6 +2,7 @@ import type { JSX } from "react";
 
 import { LivePlanAccountMenu } from "@/features/panel-shell/components/live-plan-block";
 import { LogoutItem } from "@/features/panel-shell/components/logout-item";
+import { SettingsItem } from "@/features/panel-shell/components/settings-item";
 
 type Props = {
   workspaceNome: string;
@@ -17,6 +18,7 @@ export function TopBar({ workspaceNome, contratarHref }: Props): JSX.Element {
         {workspaceNome}
       </p>
       <LivePlanAccountMenu contratarHref={contratarHref}>
+        <SettingsItem />
         <LogoutItem />
       </LivePlanAccountMenu>
     </div>

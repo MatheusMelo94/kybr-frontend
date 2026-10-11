@@ -37,11 +37,16 @@ test.describe("plan states @feature-ops-panel @panel-lote @panel-phone", () => {
     await expect(menu).toHaveAccessibleDescription(
       "Plano Essencial 1.240 de 5.000 verificações neste ciclo Ciclo até 04/11/2026",
     );
-    await expect(menu.getByRole("menuitem")).toHaveText(["Sair"]);
+    await expect(menu.getByRole("menuitem")).toHaveText([
+      "Configurações",
+      "Sair",
+    ]);
     await expect(
       page.getByRole("banner").getByText("Plano Essencial"),
     ).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Sair" })).toBeFocused();
+    await expect(
+      page.getByRole("menuitem", { name: "Configurações" }),
+    ).toBeFocused();
 
     await expectNoAxeViolations(page);
     await page.setViewportSize({ width: 320, height: 700 });
@@ -63,7 +68,10 @@ test.describe("plan states @feature-ops-panel @panel-lote @panel-phone", () => {
       .click();
     const menu = page.getByRole("menu", { name: "Conta" });
     await expect(menu).not.toHaveAttribute("aria-describedby");
-    await expect(menu.getByRole("menuitem")).toHaveText(["Sair"]);
+    await expect(menu.getByRole("menuitem")).toHaveText([
+      "Configurações",
+      "Sair",
+    ]);
   });
 
   for (const [preset, text] of [
@@ -77,6 +85,7 @@ test.describe("plan states @feature-ops-panel @panel-lote @panel-phone", () => {
       const email = uniqueEmail(`banner-${preset}`, testInfo);
       await createAccount(request, email, preset);
       await logIn(page, email);
+      await page.goto("/fila"); // M8 D1: login lands on Início
 
       const main = page.locator("main");
       const banner = main.getByText(text);

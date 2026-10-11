@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ApiResult } from "@/lib/api/client";
 import { AppError } from "@/lib/api/errors";
 import { panelRequest, panelStreamRequest } from "@/lib/api/panel/client";
+import { cappedCsv } from "@/lib/api/panel/csv-limits";
 import { sessionToken } from "@/lib/api/panel/session";
 import { apiPaths } from "@/lib/api/path";
 import {
@@ -25,9 +26,6 @@ import type { BatchLinha, BatchRowStatus } from "@/lib/panel-api-values";
 // and answers a result: the page or action decides (notFound, the session
 // path, error.tsx). Callers have already passed requireSession() (ADR-0011
 // Addendum 1); without a session token nothing is sent.
-
-/** D-B4: the downloads' size cap (the handlers answer 502 past it, T86). */
-export const CSV_MAX_BYTES = 5 * 1024 * 1024;
 
 const noBody = z.unknown().transform(() => undefined);
 
@@ -170,28 +168,11 @@ export async function resumeBatch(id: string): Promise<ApiResult<undefined>> {
   });
 }
 
-/** Errors the stream with UNAVAILABLE once more than `max` bytes went through. */
-function capped(
-  body: ReadableStream<Uint8Array>,
-  max: number,
-): ReadableStream<Uint8Array> {
-  let seen = 0;
-  return body.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        seen += chunk.byteLength;
-        if (seen > max)
-          controller.error(new AppError({ code: "UNAVAILABLE", status: 502 }));
-        else controller.enqueue(chunk);
-      },
-    }),
-  );
-}
-
 /**
  * D-B4: the backend's CSV as a stream for the download handlers (T86), which
  * re-escape it. Anything but text/csv is refused (INVALID_RESPONSE), and the
- * body is capped at 5 MB (UNAVAILABLE: declared up front, or as it streams).
+ * body is capped at the shared CSV_MAX_BYTES, 4 MiB (O-F5; UNAVAILABLE:
+ * declared up front, or as it streams). The handlers answer 502 past it.
  */
 export async function streamBatchCsv(
   id: string,
@@ -211,24 +192,5 @@ export async function streamBatchCsv(
     forwardClientIp: true,
   });
   if (!result.ok) return { ok: false, error: batchError(result.error) };
-  const { response } = result;
-  const requestId = response.headers.get("x-request-id") ?? undefined;
-  const contentType = response.headers.get("content-type") ?? "";
-  const fail = (code: "INVALID_RESPONSE" | "UNAVAILABLE") => {
-    void response.body?.cancel();
-    return {
-      ok: false as const,
-      error: new AppError({ code, status: response.status, requestId }),
-    };
-  };
-  if (!/^text\/csv(?:;|$)/i.test(contentType) || response.body === null)
-    return fail("INVALID_RESPONSE");
-  const declared = Number(response.headers.get("content-length") ?? "0");
-  if (declared > CSV_MAX_BYTES) return fail("UNAVAILABLE");
-  return {
-    ok: true,
-    status: response.status,
-    requestId,
-    data: { body: capped(response.body, CSV_MAX_BYTES), contentType },
-  };
+  return cappedCsv(result.response);
 }

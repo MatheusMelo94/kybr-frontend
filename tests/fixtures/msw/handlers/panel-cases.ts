@@ -32,6 +32,7 @@ import {
   panelStore,
   recordCall,
   seedCases,
+  sellerCaseDecided,
   sessionAccount,
   setCaseClock,
   CASE_FAULT_KINDS,
@@ -74,7 +75,10 @@ const ISO = (ms: number): string => new Date(ms).toISOString();
 
 // --- Wire views ----------------------------------------------------------------
 
-function summaryView(record: CaseRecord, now: number): Record<string, unknown> {
+export function summaryView(
+  record: CaseRecord,
+  now: number,
+): Record<string, unknown> {
   return {
     id: record.id,
     razao_social: record.razao_social,
@@ -302,6 +306,8 @@ function decide(
 ): void {
   record.estado = "decidido";
   record.decisao = { ...decisao, em: now };
+  // O-21 (M8b): the seller's mudou clears with its case.
+  sellerCaseDecided(record.id, decisao.tipo);
   record.eventos.push({
     tipo: "decidido",
     em: ISO(now),
@@ -563,7 +569,16 @@ export const panelCaseHandlers: RequestHandler[] = [
       const record = casesOf(account.email).find(
         (candidate) => candidate.verification.id === String(params.id),
       );
-      if (!record || record.variante === "DADOS_NAO_ENCONTRADOS")
+      // T143: a seller's current verification (D-S2) has one too.
+      const ofSeller = [...panelStore().sellers.values()].some(
+        (seller) =>
+          seller.email === account.email &&
+          seller.verification.id === String(params.id),
+      );
+      if (
+        (!record && !ofSeller) ||
+        record?.variante === "DADOS_NAO_ENCONTRADOS"
+      )
         return apiError(404, "RECURSO_NAO_ENCONTRADO");
       if (fault?.kind === "html")
         return fileReply(

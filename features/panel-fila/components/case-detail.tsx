@@ -73,7 +73,7 @@ export function CaseDetail({
       {/* D7: no data means no proof. */}
       {view.variante !== "DADOS_NAO_ENCONTRADOS" && (
         <ProofDownload
-          caseId={view.id}
+          href={`/fila/${encodeURIComponent(view.id)}/comprovante`}
           {...(proofInBody === "below-lg" && { className: "lg:hidden" })}
         />
       )}

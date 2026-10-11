@@ -83,7 +83,8 @@ test.describe("the M6 journey at 1280, keyboard only (T117) @feature-ops-panel @
     const cases = await seedCases(request, email, "cada-tipo");
     const tab = page.getByRole("link", { name: /^Para decidir/ });
 
-    await keyboardLogIn(page, email, "/entrar");
+    // M8 D1: a plain login lands on Início; this journey starts on the Fila.
+    await keyboardLogIn(page, email, "/entrar?volta=%2Ffila");
     // Auto-select at lg: the oldest case opens.
     const link = byKind(cases, "link");
     await expect(page).toHaveURL(new RegExp(`/fila/${link.id}$`));

@@ -6,6 +6,7 @@ import { useEffect, useRef, type JSX } from "react";
 
 import {
   MonitorCount,
+  SellersCount,
   NavCount,
 } from "@/features/panel-shell/components/nav-count";
 import { shellCopy } from "@/features/panel-shell/copy/shell";
@@ -91,6 +92,12 @@ export function PanelNav({ items, variant = "sidebar" }: Props): JSX.Element {
                 {item.key === "monitor" && counts !== undefined && (
                   <MonitorCount
                     alertas={counts.alertas_criticos_abertos}
+                    active={active}
+                  />
+                )}
+                {item.key === "vendedores" && counts !== undefined && (
+                  <SellersCount
+                    vendedores={counts.vendedores}
                     active={active}
                   />
                 )}

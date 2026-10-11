@@ -6,6 +6,7 @@ import type { ApiResult } from "@/lib/api/client";
 import { panelRequest } from "@/lib/api/panel/client";
 import { sessionExpiredUrl, sessionToken } from "@/lib/api/panel/session";
 import { apiPaths } from "@/lib/api/path";
+import { ownNameResponseSchema } from "@/lib/api/schemas/panel/account";
 import {
   categoriesSchema,
   workspaceSchema,
@@ -49,6 +50,40 @@ export async function saveOnboarding(
     method: "PUT",
     body,
     schema: workspaceSchema,
+    ...(token !== undefined && { sessionToken: token }),
+  });
+}
+
+/**
+ * D-W3 from Configurações: the platform name and the seller contact (a body
+ * the action zod-parsed). A failure is a result, never a throw.
+ */
+export async function saveWorkspace(body: {
+  nome: string;
+  contato_vendedor: { tipo: "email" | "url"; valor: string };
+}): Promise<ApiResult<unknown>> {
+  const token = await sessionToken();
+  return panelRequest({
+    operation: "workspace-settings",
+    path: apiPaths.panel.workspace(),
+    method: "PUT",
+    body,
+    schema: workspaceSchema,
+    ...(token !== undefined && { sessionToken: token }),
+  });
+}
+
+/** D-W4 (C-M8-8): the user's own name. A failure is a result, never a throw. */
+export async function saveOwnName(body: {
+  nome: string;
+}): Promise<ApiResult<unknown>> {
+  const token = await sessionToken();
+  return panelRequest({
+    operation: "me-name",
+    path: apiPaths.panel.me(),
+    method: "PUT",
+    body,
+    schema: ownNameResponseSchema,
     ...(token !== undefined && { sessionToken: token }),
   });
 }

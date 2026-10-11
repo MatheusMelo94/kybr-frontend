@@ -86,3 +86,40 @@ describe("case error codes (A-X2, M6)", () => {
     expect(error.decisao).toBeUndefined();
   });
 });
+
+describe("password change error codes (C-M8-7, Security O-F1)", () => {
+  it("403 SENHA_ATUAL_INCORRETA is recognized and is not a session error", async () => {
+    const error = await appErrorFromResponse(
+      envelope(403, {
+        code: "SENHA_ATUAL_INCORRETA",
+        message: "MSG-BACKEND-NAO-EXIBIR",
+      }),
+    );
+    expect(error.code).toBe("SENHA_ATUAL_INCORRETA");
+    expect(error.status).toBe(403);
+    expect(JSON.stringify(error)).not.toContain("MSG-BACKEND-NAO-EXIBIR");
+  });
+
+  it("422 SENHA_FRACA is still recognized", async () => {
+    const error = await appErrorFromResponse(
+      envelope(422, { code: "SENHA_FRACA", message: "MSG-BACKEND-NAO-EXIBIR" }),
+    );
+    expect(error.code).toBe("SENHA_FRACA");
+  });
+});
+
+describe("seller and policy error codes (C-M8-3, C-M8-4, C-M8-6)", () => {
+  it.each([
+    [409, "REVERIFICACAO_EM_ANDAMENTO"],
+    [409, "POLITICA_DESATUALIZADA"],
+    [422, "SEM_DOCUMENTO_HABILITADO"],
+    [404, "SELLER_NAO_ENCONTRADO"],
+  ])("%i %s is recognized", async (status, code) => {
+    const error = await appErrorFromResponse(
+      envelope(status, { code, message: "MSG-BACKEND-NAO-EXIBIR" }),
+    );
+    expect(error.code).toBe(code);
+    expect(error.status).toBe(status);
+    expect(JSON.stringify(error)).not.toContain("MSG-BACKEND-NAO-EXIBIR");
+  });
+});

@@ -34,7 +34,13 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     expect((await symbol.boundingBox())?.width).toBe(32);
     await expect(sidebar.getByText("Kybr", { exact: true })).toHaveCount(0);
     await expect(sidebar.getByText("Loja Exemplo")).toBeVisible();
-    await expect(sidebar.getByText("1.240 vendedores")).toHaveCount(0);
+    // ws.sellers.* left the sidebar top (the Vendedores nav item's count
+    // reads it now, M8).
+    await expect(
+      symbol
+        .locator("xpath=ancestor::div[parent::aside]")
+        .getByText("1.240 vendedores"),
+    ).toHaveCount(0);
     // B-005: a hairline in --color-line separates the top block from the nav.
     const [border, line, navBelow] = await symbol.evaluate((element) => {
       const block = element.closest("aside > div") as HTMLElement;
@@ -55,14 +61,19 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     expect(navBelow).toBe(true);
 
     const nav = page.getByRole("navigation", { name: "Navegação do painel" });
-    // The build's items in the spec's order: M4's Fila, M7's Monitoramento
-    // (with the preset's undecided critical alert), then M5's Lote.
-    await expect(nav.getByRole("link")).toHaveCount(3);
-    await expect(nav.getByRole("link").nth(1)).toHaveAccessibleName(
+    // The build's items in the spec's order: M8's Início, M4's Fila, M7's
+    // Monitoramento (with the preset's undecided critical alert), M5's Lote,
+    // then M8's Vendedores (with contagens.vendedores) and Regras.
+    await expect(nav.getByRole("link")).toHaveCount(6);
+    await expect(nav.getByRole("link").nth(0)).toHaveAccessibleName("Início");
+    await expect(nav.getByRole("link").nth(2)).toHaveAccessibleName(
       "Monitoramento 1 alerta crítico sem decisão",
     );
-    await expect(nav.getByRole("link").nth(2)).toHaveAccessibleName(
+    await expect(nav.getByRole("link").nth(3)).toHaveAccessibleName(
       "Verificar em lote",
+    );
+    await expect(nav.getByRole("link").nth(4)).toHaveAccessibleName(
+      "Vendedores 1.240 vendedores",
     );
     await expect(
       nav.getByRole("link", {
@@ -129,7 +140,7 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     await expect(sidebar.getByText(/vendedores/)).toHaveCount(0);
   });
 
-  test("the account menu is a menu button: Enter opens on Sair, Esc closes and returns focus; no Configurações yet", async ({
+  test("the account menu is a menu button: Enter opens on Configurações (M8), then Sair; Esc closes and returns focus", async ({
     page,
     request,
   }, testInfo) => {
@@ -141,10 +152,11 @@ test.describe("shell at 1280 @feature-ops-panel @panel-access @panel-smoke", () 
     await button.focus();
     await page.keyboard.press("Enter");
     await expect(button).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("menuitem", { name: "Sair" })).toBeFocused();
     await expect(
       page.getByRole("menuitem", { name: "Configurações" }),
-    ).toHaveCount(0);
+    ).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Sair" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);
     await expect(button).toBeFocused();

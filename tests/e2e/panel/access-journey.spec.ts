@@ -97,6 +97,8 @@ test.describe("M4 access journey, keyboard only @feature-ops-panel @panel-access
       page,
       page.getByRole("button", { name: "Conta" }).locator("visible=true"),
     );
+    // Configurações comes first (M8, T135).
+    await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("menuitem", { name: "Sair" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/entrar\?motivo=saiu$/);
@@ -137,10 +139,10 @@ test.describe("M4 access journey, keyboard only @feature-ops-panel @panel-access
     await typeInto(page, page.getByLabel("E-mail"), email);
     await typeInto(page, page.getByLabel("Senha"), "outra-senha-segura-2");
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/fila$/);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/$/);
   });
 
-  test("an onboarded account logs in from the keyboard and lands on the Fila", async ({
+  test("an onboarded account logs in from the keyboard and lands on Início", async ({
     page,
     request,
   }, testInfo) => {
@@ -150,6 +152,6 @@ test.describe("M4 access journey, keyboard only @feature-ops-panel @panel-access
     await typeInto(page, page.getByLabel("E-mail"), email);
     await typeInto(page, page.getByLabel("Senha"), "senha-correta-123");
     await pressOn(page, page.getByRole("button", { name: "Entrar" }));
-    await expect(page).toHaveURL(/\/fila$/);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/$/);
   });
 });

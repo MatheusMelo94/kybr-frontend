@@ -55,7 +55,7 @@ test.describe("/cadastro @feature-ops-panel @panel-access @panel-phone", () => {
     await createAccount(request, email);
     await logIn(page, email);
     await page.goto("/cadastro");
-    await expect(page).toHaveURL(/\/fila$/);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/$/);
   });
 
   test("AC 1: four labeled fields, the terms with two new-tab links, Criar conta, Já tem conta; no horizontal scroll at 320; axe clean", async ({

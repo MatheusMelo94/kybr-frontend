@@ -87,10 +87,11 @@ describe("loginAction (D-A4, ADR-0009)", () => {
   });
 
   it("goes straight to the home screen, not to / and a second hop (P4-009)", async () => {
-    expect(PANEL_HOME).toBe("/fila");
+    // M8 D1 (T131): the home is Início, /.
+    expect(PANEL_HOME).toBe("/");
     expect(
       await login({ email: PANEL_EMAILS.renata, senha: PANEL_PASSWORD }),
-    ).toEqual({ ok: true, next: "/fila" });
+    ).toEqual({ ok: true, next: "/" });
   });
 
   it("drops a pending sign-up cookie on success only (M4-01)", async () => {
@@ -216,5 +217,28 @@ describe("loginAction (D-A4, ADR-0009)", () => {
       code: "CREDENCIAIS_INVALIDAS",
     });
     expect(panelStore().calls).toEqual([]);
+  });
+});
+
+describe("loginAction: the shared session schema (O-F3, T136)", () => {
+  it.each([
+    ["an expiry in the past", new Date(Date.now() - 1000).toISOString()],
+    [
+      "an expiry 8 days ahead",
+      new Date(Date.now() + 8 * 86_400_000).toISOString(),
+    ],
+    ["an expiry without an offset", "2026-10-11T10:00:00"],
+  ])("a 200 with %s sets no cookie", async (_, expira_em) => {
+    server.use(
+      http.post("*/v1/auth/login", () =>
+        HttpResponse.json({ sessao: { id: "s".repeat(32), expira_em } }),
+      ),
+    );
+    const result = await login({
+      email: PANEL_EMAILS.renata,
+      senha: PANEL_PASSWORD,
+    });
+    expect(result.ok).toBe(false);
+    expect(cookies.setSessionCookie).not.toHaveBeenCalled();
   });
 });

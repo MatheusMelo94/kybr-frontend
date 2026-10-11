@@ -1579,3 +1579,75 @@ export function alertsForPreset(
     }
   }
 }
+
+// --- Início (M8a) ------------------------------------------------------------
+
+/** PH2: the read-only new workspace (QA G1: tests seed their own accounts). */
+export const HOME_EMAILS = { nada: "nada@exemplo.test" } as const;
+
+/** QA G1: the dashboard presets a test seeds into its own account. */
+export const HOME_PRESETS = ["populado", "novo"] as const;
+export type HomePreset = (typeof HOME_PRESETS)[number];
+
+/** The D-H1 parts the mock stores; fila and alertas come from the store. */
+export type DashboardRecord = {
+  kpis: {
+    verificados: number;
+    auto: number;
+    revisao: number;
+    bloqueados: number;
+  };
+  /** Seven daily totals, oldest first, ending today (São Paulo). */
+  semana: number[];
+  primeiros_passos: {
+    lote: boolean;
+    link: boolean;
+    monitor: boolean;
+    oculto: boolean;
+  };
+};
+
+/** PH1 (and any account no preset touched): a busy workspace. */
+export function dashboardFor(preset: HomePreset | "padrao"): DashboardRecord {
+  switch (preset) {
+    case "novo":
+      return {
+        kpis: { verificados: 0, auto: 0, revisao: 0, bloqueados: 0 },
+        semana: [0, 0, 0, 0, 0, 0, 0],
+        primeiros_passos: {
+          lote: false,
+          link: false,
+          monitor: false,
+          oculto: false,
+        },
+      };
+    case "populado":
+      return {
+        kpis: { verificados: 1240, auto: 1102, revisao: 96, bloqueados: 42 },
+        semana: [38, 52, 0, 61, 47, 12, 70],
+        primeiros_passos: {
+          lote: true,
+          link: false,
+          monitor: true,
+          oculto: false,
+        },
+      };
+    case "padrao":
+      return {
+        ...dashboardFor("populado"),
+        primeiros_passos: {
+          lote: true,
+          link: true,
+          monitor: true,
+          oculto: false,
+        },
+      };
+  }
+}
+
+/** QA G4: MEI names with a CPF (formatted and bare) and a hostile name. */
+export const HOME_NAMES = {
+  meiFormatted: "Fulano 123.456.789-09 ME",
+  meiBare: "Beltrano 12345678909",
+  hostile: '<img src=x onerror="alert(1)"> Comércio Ltda',
+} as const;

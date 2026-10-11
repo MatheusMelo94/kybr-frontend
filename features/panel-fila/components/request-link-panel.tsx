@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useRef, type JSX } from "react";
 
-import { FormAlert } from "@/components/panel/form-alert";
-import { useToast } from "@/components/panel/toast";
-import { Button } from "@/components/ui/button";
+import { CopyLinkButton } from "@/components/panel/copy-link-button";
 import { useFila } from "@/features/panel-fila/components/fila-provider";
 import { SectionHeading } from "@/features/panel-fila/components/section-heading";
 import { filaCopy } from "@/features/panel-fila/copy";
-import { globalCopy } from "@/features/panel-shell/copy/global";
 
 type Props = {
   caseId: string;
@@ -32,10 +29,7 @@ export function RequestLinkPanel({
   decided,
 }: Props): JSX.Element | null {
   const { flash } = useFila();
-  const { show } = useToast();
   const panel = useRef<HTMLElement>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const [failed, setFailed] = useState(false);
   const requested = flash[caseId]?.kind === "requested" ? flash[caseId] : null;
   const shown = link ?? requested?.link;
   const fresh = requested !== null && shown !== undefined;
@@ -61,20 +55,6 @@ export function RequestLinkPanel({
 
   if (shown === undefined || decided) return null;
 
-  async function copyLink(value: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      // A rejection, or no clipboard API at all: copy by hand.
-      setFailed(true);
-      input.current?.focus();
-      input.current?.select();
-      return;
-    }
-    setFailed(false);
-    show(globalCopy["toast.link_copied"]);
-  }
-
   return (
     // Named by the copy, not by the heading: two heading elements render
     // (one is display: none), and aria-labelledby would read both.
@@ -84,28 +64,12 @@ export function RequestLinkPanel({
       className="flex flex-col gap-2 rounded-lg border border-field-line p-4"
     >
       <SectionHeading focusable>{filaCopy["doc.link.h"]}</SectionHeading>
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={input}
-          type="text"
-          readOnly
-          value={shown}
-          aria-label={filaCopy["doc.link.h"]}
-          autoComplete="off"
-          spellCheck={false}
-          autoCorrect="off"
-          className="min-w-0 flex-1 rounded-lg border border-field-line bg-field px-4 py-2 text-secondary text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          size="panel"
-          onClick={() => void copyLink(shown)}
-        >
-          {filaCopy["doc.link.copy"]}
-        </Button>
-      </div>
-      <FormAlert>{failed && globalCopy["copy.error"]}</FormAlert>
+      <CopyLinkButton
+        value={shown}
+        label={filaCopy["doc.link.copy"]}
+        inputLabel={filaCopy["doc.link.h"]}
+        inputVisible="always"
+      />
     </section>
   );
 }

@@ -9,14 +9,13 @@ import {
   type PanelCookieNames,
 } from "@/lib/panel-cookie-names";
 import { isLoopbackHostname } from "@/lib/safe-url";
+import { MAX_SESSION_SECONDS, SESSION_TOKEN } from "@/lib/session-limits";
 
 // The panel's cookies (ADR-0009 rules 3 and 10; P02, P19). Written only by
 // Server Actions, only from values the API returned. Host-only (no Domain),
 // and __Host- prefixed so a sibling subdomain can't toss its own copy.
 
-const MAX_SESSION_SECONDS = 7 * 24 * 60 * 60; // U-P6: 7 days absolute
 const SIGNUP_SECONDS = 30 * 60;
-const TOKEN = /^[\x21-\x7e]{16,512}$/;
 
 /**
  * Local and E2E only: WebKit refuses a Secure cookie on http loopback, so on
@@ -48,10 +47,14 @@ function options(secure: boolean, maxAge: number) {
 export async function readSessionToken(): Promise<string | undefined> {
   const { session } = await names();
   const value = (await cookies()).get(session)?.value;
-  return value !== undefined && TOKEN.test(value) ? value : undefined;
+  return value !== undefined && SESSION_TOKEN.test(value) ? value : undefined;
 }
 
-/** Sets the session from the API's { id, expira_em } (Max-Age ≤ 7 days). */
+/**
+ * Sets the session from the API's { id, expira_em }, already parsed by
+ * sessionGrantSchema: Max-Age = expira_em − now, clamped to 1..604800
+ * (O-F3). The only writer of the session cookie (a source test holds it).
+ */
 export async function setSessionCookie(sessao: {
   id: string;
   expira_em: string;
@@ -61,8 +64,8 @@ export async function setSessionCookie(sessao: {
     (Date.parse(sessao.expira_em) - Date.now()) / 1000,
   );
   const maxAge = Math.max(
-    0,
-    Math.min(Number.isFinite(seconds) ? seconds : 0, MAX_SESSION_SECONDS),
+    1,
+    Math.min(Number.isFinite(seconds) ? seconds : 1, MAX_SESSION_SECONDS),
   );
   (await cookies()).set(session, sessao.id, options(secure, maxAge));
 }
@@ -73,7 +76,7 @@ export async function deleteSessionCookie(): Promise<void> {
 }
 
 const pendingSignupSchema = z.object({
-  ticket: z.string().regex(TOKEN),
+  ticket: z.string().regex(SESSION_TOKEN),
   nome: z.string().max(120),
   workspace: z.string().max(80),
   email: z.string().max(254),

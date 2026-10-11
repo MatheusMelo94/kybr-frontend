@@ -159,6 +159,45 @@ describe("PanelNav: the Monitoramento count (S5, T122)", () => {
   });
 });
 
+describe("PanelNav: the Vendedores count (M8, T140)", () => {
+  const ITEMS = [
+    { key: "vendedores", href: "/vendedores", label: "Vendedores" },
+  ] as const;
+
+  function renderSellers(vendedores: number): void {
+    render(
+      <ShellStatusProvider
+        initial={{
+          contagens: { ...counts(0, 0), vendedores },
+          plano: undefined,
+        }}
+      >
+        <PanelNav items={ITEMS} />
+      </ShellStatusProvider>,
+    );
+  }
+
+  it("shows contagens.vendedores, named by ws.sellers.*", () => {
+    pathname.value = "/fila";
+    renderSellers(1234);
+    expect(
+      screen.getByRole("link", { name: "Vendedores 1.234 vendedores" }),
+    ).toHaveAttribute("href", "/vendedores");
+    expect(screen.getByTestId("nav-count-vendedores")).toHaveTextContent(
+      "1.234",
+    );
+  });
+
+  it("zero is hidden", () => {
+    pathname.value = "/fila";
+    renderSellers(0);
+    expect(
+      screen.getByRole("link", { name: "Vendedores" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-count-vendedores")).toBeNull();
+  });
+});
+
 describe("PanelNav: the tab row's hidden count text (AC 74)", () => {
   it("each link (both variants share the class) is a positioning box, so a count's sr-only text can't widen the page", () => {
     pathname.value = "/fila";

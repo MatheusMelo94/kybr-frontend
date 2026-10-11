@@ -23,6 +23,7 @@ import {
   setSessionCookie,
   setSignupCookie,
 } from "@/lib/api/panel/cookies";
+import { sessionGrantSchema } from "@/lib/api/schemas/panel/account";
 import { assertPanelHost } from "@/lib/api/panel/host";
 import { apiPaths } from "@/lib/api/path";
 import { isNewPassword } from "@/features/panel-auth/validation";
@@ -33,10 +34,6 @@ import { safeReturnPath } from "@/lib/safe-return-path";
 // The panel's auth actions (plan § 3.4; ADR-0009). Public POST endpoints:
 // assertPanelHost() first (P03.2), then zod, then the API. Cookies are set
 // only from values the API returned. Arguments are never logged.
-
-const sessaoSchema = z.object({
-  sessao: z.object({ id: z.string().min(16).max(512), expira_em: z.string() }),
-});
 
 /** Codes every auth form maps to copy; anything else reads as NETWORK. */
 type CommonFailure =
@@ -90,7 +87,7 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
     method: "POST",
     body: { email, senha, ...(turnstile !== undefined && { turnstile }) },
     headers: await presentedSession(),
-    schema: sessaoSchema,
+    schema: sessionGrantSchema,
     forwardClientIp: true,
   });
   if (result.ok) {
@@ -240,7 +237,7 @@ export async function confirmEmailAction(
     method: "POST",
     body: { signup_ticket: pending.ticket, codigo: parsed.data.codigo },
     headers: await presentedSession(),
-    schema: sessaoSchema,
+    schema: sessionGrantSchema,
     forwardClientIp: true,
   });
   if (result.ok) {

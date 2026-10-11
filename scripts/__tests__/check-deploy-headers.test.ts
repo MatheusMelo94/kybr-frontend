@@ -41,9 +41,16 @@ const TO_LOGIN: Route = {
   status: 307,
   headers: { location: `/entrar?volta=%2Ffila%2F${PROBE}` },
 };
+// T147: M8's exports and the seller's proof.
+const M8_PATHS = [
+  "/vendedores/exportar.csv",
+  "/vendedores/auditoria.csv",
+  `/vendedores/${PROBE}/comprovante`,
+] as const;
 const FILA_ROUTES: Record<string, Route> = {
   [PROOF_PATH]: TO_LOGIN,
   [DOCUMENT_PATH]: TO_LOGIN,
+  ...Object.fromEntries(M8_PATHS.map((path) => [path, TO_LOGIN])),
 };
 
 let server: Server | undefined;
@@ -246,7 +253,11 @@ describe("check-deploy-headers.sh: the Fila's route handlers (T116)", () => {
     // The server's port is known only once it listens: fill the Location in then.
     const absolute: Route = { status: 307 };
     const base = await serve(
-      routes({ [PROOF_PATH]: absolute, [DOCUMENT_PATH]: absolute }),
+      routes({
+        [PROOF_PATH]: absolute,
+        [DOCUMENT_PATH]: absolute,
+        ...Object.fromEntries(M8_PATHS.map((path) => [path, absolute])),
+      }),
     );
     absolute.headers = { location: `${base}/entrar?volta=%2Ffila` };
     const { status } = await run(base, { PANEL_URL: base });
@@ -278,6 +289,21 @@ describe("check-deploy-headers.sh: the Fila's route handlers (T116)", () => {
     const { status, output } = await run(base, { PANEL_URL: base });
     expect(output).toMatch(/FAIL: panel: .*\/documentos\//);
     expect(status).toBe(1);
+  });
+
+  it("T147: checks M8's exports and the seller's proof the same way", async () => {
+    const ok = await serve(routes(FILA_ROUTES));
+    const passed = await run(ok, { PANEL_URL: ok });
+    for (const path of M8_PATHS) expect(passed.output).toContain(path);
+    expect(passed.status).toBe(0);
+    for (const path of M8_PATHS) {
+      const base = await serve(
+        routes({ ...FILA_ROUTES, [path]: { status: 200 } }),
+      );
+      const { status, output } = await run(base, { PANEL_URL: base });
+      expect(output).toContain(`FAIL: panel: an anonymous GET of ${path}`);
+      expect(status).toBe(1);
+    }
   });
 
   it("checks the proof route the same way", async () => {

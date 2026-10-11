@@ -147,6 +147,7 @@ test.describe("Fila decisions: Bloquear (T107) @feature-ops-panel @panel-fila", 
     const [first, second] = await openCases(request, email);
     await caseSeed(request, email, "decide-falha", { n: 1 });
     await logIn(page, email);
+    await page.goto("/fila"); // M8 D1: login lands on Início
     // QA-M6-006: at lg, let /fila's auto-select land before navigating
     // (as QA-M6-002); below lg there is no auto-select.
     if ((page.viewportSize()?.width ?? 0) >= 1024)

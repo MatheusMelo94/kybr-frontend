@@ -104,6 +104,10 @@ mock_post() {
     --data "$2" "${mock_url}/__mock/panel$1"
 }
 mock_post /accounts "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"renata\",\"senha\":\"${LHCI_PANEL_SENHA}\"}" > /dev/null
+# M8 (T147): Início's dashboard and PS1's 120 sellers for /vendedores,
+# before the cases (the populado preset reseeds the account's queue).
+mock_post /dashboard/seed "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"populado\"}" > /dev/null
+mock_post /sellers/seed "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"ps1\"}" > /dev/null
 case_id=$(mock_post /cases/seed "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"vinte-e-cinco\"}" |
   node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].id)')
 
@@ -124,7 +128,12 @@ mock_post /alerts/seed "{\"email\":\"${LHCI_PANEL_EMAIL}\",\"preset\":\"sessenta
   --collect.url="${panel_url}/fila/${case_id}" \
   --collect.url="${panel_url}/monitoramento"
 
-# Desktop preset (lighthouserc.fila-desktop.json): the queue, LCP <= 2.5 s
+# Desktop preset (lighthouserc.fila-desktop.json): the queue and M8's four
+# screens (T147: Início, Vendedores, Regras, Configurações), LCP <= 2.5 s
 # blocking (ADR-0010).
 "$lhci" autorun --config=lighthouserc.fila-desktop.json --collect.chromePath="$chrome" \
-  --collect.url="${panel_url}/fila"
+  --collect.url="${panel_url}/fila" \
+  --collect.url="${panel_url}/" \
+  --collect.url="${panel_url}/vendedores" \
+  --collect.url="${panel_url}/regras" \
+  --collect.url="${panel_url}/configuracoes"

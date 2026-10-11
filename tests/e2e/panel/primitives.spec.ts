@@ -238,6 +238,7 @@ test.describe("panel primitives at 1280, fine pointer @feature-ops-panel @panel-
     const email = uniqueEmail("cores", testInfo);
     await createAccount(request, email, "renata");
     await logIn(page, email);
+    await page.goto("/fila"); // M8 D1: login lands on Início
     const badge = page.locator("aside").getByTestId("nav-count");
     // The Fila is the active item here: its count has no pill (the
     // Aplicações board); the dot and the glyph still mark the late state.

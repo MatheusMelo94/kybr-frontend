@@ -63,6 +63,7 @@ test.describe("Fila decisions: Aprovar (T105) @feature-ops-panel @panel-fila", (
     await seedCases(request, email, "dois");
     const [first, second] = await openCases(request, email);
     await logIn(page, email);
+    await page.goto("/fila"); // M8 D1: login lands on Início
     // QA-M6-002: logIn lands on /fila, whose auto-select (and its prefetch)
     // is still in flight; a goto now aborts it and Next's browser-navigation
     // fallback aborts the goto (NS_BINDING_ABORTED in Firefox). Let it land.
@@ -229,7 +230,8 @@ test.describe("Fila decisions: the last case (T105, F7) @feature-ops-panel @pane
     await logIn(page, email);
     await page.goto(`/fila/${only?.id}`);
     await page.getByRole("button", { name: "Aprovar" }).click();
-    await expect(page).toHaveURL(/\/fila$/);
+    // QA-M8-001: D13 navigates only after the action returns; give it SETTLE.
+    await expect(page).toHaveURL(/\/fila$/, SETTLE);
     const wide = (page.viewportSize()?.width ?? 0) >= 1024;
     if (wide)
       await expect(

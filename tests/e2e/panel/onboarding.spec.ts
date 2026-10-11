@@ -171,7 +171,7 @@ test.describe("onboarding step 2 and the template @feature-ops-panel @panel-lote
     ).toBeVisible();
     await expectNoAxeViolations(page);
     await main.getByRole("link", { name: "Fazer depois" }).click();
-    await expect(page).toHaveURL(/\/fila$/);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/$/);
 
     await page.goto("/lote");
     await expect(page.locator("main").getByText("Passo 2 de 2")).toHaveCount(0);

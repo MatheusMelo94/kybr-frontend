@@ -115,7 +115,12 @@ export function CaseActions({
             offline={off}
           />
         </div>
-        {proof && <ProofDownload caseId={caseId} className="max-lg:hidden" />}
+        {proof && (
+          <ProofDownload
+            href={`/fila/${encodeURIComponent(caseId)}/comprovante`}
+            className="max-lg:hidden"
+          />
+        )}
       </div>
     </>
   );

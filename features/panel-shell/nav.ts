@@ -10,7 +10,7 @@ export type NavItem = { key: string; href: string; label: string };
 type Entry = NavItem & { shipped: boolean };
 
 export const NAV_ITEMS: readonly Entry[] = [
-  { key: "inicio", href: "/", label: shellCopy["nav.inicio"], shipped: false },
+  { key: "inicio", href: "/", label: shellCopy["nav.inicio"], shipped: true },
   { key: "fila", href: "/fila", label: shellCopy["nav.fila"], shipped: true },
   {
     key: "monitor",
@@ -23,13 +23,13 @@ export const NAV_ITEMS: readonly Entry[] = [
     key: "vendedores",
     href: "/vendedores",
     label: shellCopy["nav.vendedores"],
-    shipped: false,
+    shipped: true,
   },
   {
     key: "regras",
     href: "/regras",
     label: shellCopy["nav.regras"],
-    shipped: false,
+    shipped: true,
   },
   {
     key: "relatorio",
@@ -51,7 +51,7 @@ export const NAV_ITEMS: readonly Entry[] = [
   },
 ];
 
-/** The items whose screens this build has (M4: the Fila; M5: Lote; M7: Monitoramento). */
+/** The items whose screens this build has (M4: the Fila; M5: Lote; M7: Monitoramento; M8: Início, Vendedores, Regras). */
 export function navItemsInBuild(): NavItem[] {
   return NAV_ITEMS.filter((item) => item.shipped).map(
     ({ key, href, label }) => ({ key, href, label }),

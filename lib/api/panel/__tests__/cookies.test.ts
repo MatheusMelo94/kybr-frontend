@@ -80,6 +80,15 @@ describe("the session cookie (ADR-0009 rule 3, P02)", () => {
     expect(setCookieHeader()).toContain(`Max-Age=${SEVEN_DAYS}`);
   });
 
+  it("O-F3: clamps Max-Age to at least 1 (never 0, which would delete it)", async () => {
+    await setSessionCookie({
+      id: "sessao-sintetica-0123456789",
+      expira_em: new Date(NOW + 200).toISOString(),
+    });
+
+    expect(setCookieHeader()).toContain("Max-Age=1");
+  });
+
   it("uses kybr_session without Secure on loopback http, behind the local-only flag", async () => {
     vi.stubEnv("API_ALLOW_LOOPBACK_HTTP", "true");
     vi.resetModules();

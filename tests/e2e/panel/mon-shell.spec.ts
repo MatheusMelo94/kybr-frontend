@@ -74,9 +74,12 @@ test.describe("Monitoramento route and shell (T122) @feature-ops-panel @panel-al
     const nav = page.getByRole("navigation", { name: "Navegação do painel" });
     const names = await nav.getByRole("link").allInnerTexts();
     expect(names.map((name) => name.split("\n")[0])).toEqual([
+      "Início",
       "Fila de revisão",
       "Monitoramento",
       "Verificar em lote",
+      "Vendedores",
+      "Regras",
     ]);
     await nav
       .getByRole("link", {

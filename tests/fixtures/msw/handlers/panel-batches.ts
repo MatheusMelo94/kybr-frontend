@@ -10,6 +10,7 @@ import {
   type BatchLinha,
   type BatchRowStatus,
 } from "../../factories/panel.ts";
+import { CSV_CAP_BYTES, csvOfBytes } from "../../factories/panel-sellers.ts";
 import { isValidCnpj } from "../../factories/seller-link.ts";
 import {
   addCase,
@@ -218,12 +219,12 @@ function decodeCursor(cursor: string): number | undefined {
 
 // D-B4 / CR-P8: every field quoted, quotes doubled, a formula-like cell
 // prefixed with ' (unless the csv-sem-escape seed, PB8, turns that off).
-function csvCell(value: string, escape: boolean): string {
+export function csvCell(value: string, escape: boolean): string {
   const safe = escape && /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
-function csvBody(lines: string[][], escape: boolean): string {
+export function csvBody(lines: string[][], escape: boolean): string {
   return `﻿${lines
     .map((cells) => cells.map((cell) => csvCell(cell, escape)).join(";"))
     .join("\r\n")}\r\n`;
@@ -318,7 +319,11 @@ function csvFault(fault: BatchFault | undefined): Response | undefined {
     });
   switch (fault?.kind) {
     case "csv-grande":
-      return reply("x".repeat(5 * 1024 * 1024 + 1));
+      // One byte over the shared 4 MiB cap (O-F5), under M5's old 5 MB.
+      return reply("x".repeat(4 * 1024 * 1024 + 1));
+    // QA G3: a well-formed file of exactly the cap (it downloads in full).
+    case "csv-exato":
+      return reply(csvOfBytes(CSV_CAP_BYTES));
     case "csv-html":
       return reply("<html><body>erro</body></html>", "text/html");
     case "csv-aspas":
@@ -693,11 +698,19 @@ export const panelBatchControlHandlers: RequestHandler[] = [
   // PB4 / PB16 (QA G10 calls it /plan): sets an account's plan usage or limit.
   http.post("*/__mock/panel/plan*", async ({ request }) => {
     const { email, usadas, limite } = await controlBody(request);
-    const current =
-      typeof email === "string" ? plano(email.toLowerCase()) : undefined;
-    if (!current) return new HttpResponse(null, { status: 404 });
-    if (typeof usadas === "number") current.usadas = usadas;
-    if (typeof limite === "number") current.limite = limite;
+    const account =
+      typeof email === "string"
+        ? panelStore().accounts.get(email.toLowerCase())
+        : undefined;
+    const current = account?.workspace.plano;
+    if (!account || !current) return new HttpResponse(null, { status: 404 });
+    // T141: on a copy. Presets share their plan objects, so an in-place
+    // write leaked into every other account of the preset (parallel tests).
+    account.workspace.plano = {
+      ...current,
+      ...(typeof usadas === "number" && { usadas }),
+      ...(typeof limite === "number" && { limite }),
+    };
     return new HttpResponse(null, { status: 204 });
   }),
 ];
