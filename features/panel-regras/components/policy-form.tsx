@@ -125,7 +125,11 @@ export function PolicyForm({ policy, categoria }: Props): JSX.Element {
   }
 
   return (
-    <form noValidate onSubmit={submit} className="flex min-w-0 flex-col gap-6">
+    <form
+      noValidate
+      onSubmit={submit}
+      className="flex min-w-0 flex-col gap-6 [overflow-wrap:anywhere]"
+    >
       <p className="text-lead font-lead break-words text-ink-muted">
         {fill(regrasCopy["regras.lead"], { categoria: categoria.nome })}
       </p>

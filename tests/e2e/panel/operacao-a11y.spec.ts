@@ -32,35 +32,37 @@ async function reflows(page: Page, label: string): Promise<void> {
         document.documentElement.clientWidth,
     );
     // On failure, name the elements that stick out (WebKit runs in CI only).
+    // On failure, find what widens the page by hiding elements one at a time
+    // (WebKit runs in CI only; a text overflow has no box past the edge).
     const culprits =
       overflow > 0
         ? await page.evaluate(() => {
-            const limit = document.documentElement.clientWidth;
-            // Skip anything inside a horizontal scroll box (the tab row):
-            // it scrolls there and can't widen the page.
-            const scrolls = (el: Element): boolean => {
-              for (let p = el.parentElement; p; p = p.parentElement) {
-                const o = getComputedStyle(p).overflowX;
-                if (o === "auto" || o === "scroll" || o === "hidden")
-                  return true;
+            const doc = document.documentElement;
+            const over = () => doc.scrollWidth - doc.clientWidth;
+            const describe = (el: Element) =>
+              `<${el.tagName.toLowerCase()} class="${(el.getAttribute("class") ?? "").slice(0, 90)}"> "${(el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 50)}"`;
+            const found: string[] = [];
+            // Walk down from body: keep descending into the child whose
+            // removal fixes the overflow, so the deepest such element wins.
+            let parent: Element = document.body;
+            for (let depth = 0; depth < 30; depth++) {
+              let next: Element | undefined;
+              for (const child of [...parent.children]) {
+                const el = child as HTMLElement;
+                const before = el.style.display;
+                el.style.display = "none";
+                const fixed = over() <= 0;
+                el.style.display = before;
+                if (fixed) {
+                  next = child;
+                  break;
+                }
               }
-              return false;
-            };
-            return [...document.querySelectorAll("body *")]
-              .filter((el) => el.getBoundingClientRect().right > limit + 0.5)
-              .filter((el) => !scrolls(el))
-              .filter(
-                (el) =>
-                  ![...el.children].some(
-                    (child) =>
-                      child.getBoundingClientRect().right > limit + 0.5,
-                  ),
-              )
-              .slice(0, 8)
-              .map((el) => {
-                const r = el.getBoundingClientRect();
-                return `<${el.tagName.toLowerCase()} class="${(el.getAttribute("class") ?? "").slice(0, 80)}"> w=${Math.round(r.width)} right=${Math.round(r.right)} "${(el.textContent ?? "").trim().slice(0, 40)}"`;
-              });
+              if (!next) break;
+              found.push(describe(next));
+              parent = next;
+            }
+            return found.slice(-4);
           })
         : [];
     expect(
