@@ -230,7 +230,8 @@ test.describe("Fila decisions: the last case (T105, F7) @feature-ops-panel @pane
     await logIn(page, email);
     await page.goto(`/fila/${only?.id}`);
     await page.getByRole("button", { name: "Aprovar" }).click();
-    await expect(page).toHaveURL(/\/fila$/);
+    // QA-M8-001: D13 navigates only after the action returns; give it SETTLE.
+    await expect(page).toHaveURL(/\/fila$/, SETTLE);
     const wide = (page.viewportSize()?.width ?? 0) >= 1024;
     if (wide)
       await expect(
