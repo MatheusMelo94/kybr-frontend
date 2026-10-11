@@ -166,34 +166,42 @@ test.describe("Trocar senha @feature-ops-panel @panel-operacao", () => {
       baseURL: PANEL_URL,
       storageState: state,
     });
-    await noJs.route("**/_next/static/chunks/**", (route) => route.abort());
-    const plain = await noJs.newPage();
-    const requests: { method: string; url: string }[] = [];
-    plain.on("request", (req) =>
-      requests.push({ method: req.method(), url: req.url() }),
-    );
-    await plain.goto("/configuracoes");
-    await expect(
-      plain.locator("form").filter({ has: plain.getByLabel("Senha atual") }),
-    ).toHaveAttribute("method", /post/i);
-    await plain.getByLabel("Senha atual").fill(ATUAL);
-    await plain.getByLabel("Senha nova").fill(NOVA);
-    await Promise.all([
-      plain.waitForLoadState("load"),
-      plain.getByRole("button", { name: "Trocar senha" }).click(),
-    ]);
-    await plain.waitForLoadState("load");
+    try {
+      await noJs.route("**/_next/static/chunks/**", (route) => route.abort());
+      const plain = await noJs.newPage();
+      const requests: { method: string; url: string }[] = [];
+      plain.on("request", (req) =>
+        requests.push({ method: req.method(), url: req.url() }),
+      );
+      await plain.goto("/configuracoes");
+      await expect(
+        plain.locator("form").filter({ has: plain.getByLabel("Senha atual") }),
+      ).toHaveAttribute("method", /post/i);
+      await plain.getByLabel("Senha atual").fill(ATUAL);
+      await plain.getByLabel("Senha nova").fill(NOVA);
+      // P8-011: wait for the POST itself, not a load event that may already
+      // have fired.
+      await Promise.all([
+        plain.waitForRequest(
+          (req) =>
+            req.method() === "POST" && req.url().includes("/configuracoes"),
+        ),
+        plain.getByRole("button", { name: "Trocar senha" }).click(),
+      ]);
+      await plain.waitForLoadState("load");
 
-    const posts = requests.filter(
-      (req) => req.method === "POST" && req.url.includes("/configuracoes"),
-    );
-    expect(posts.length).toBeGreaterThan(0);
-    for (const req of requests) {
-      expect(req.url).not.toMatch(/senha/i);
-      expect(req.url).not.toContain(NOVA);
+      const posts = requests.filter(
+        (req) => req.method === "POST" && req.url.includes("/configuracoes"),
+      );
+      expect(posts.length).toBeGreaterThan(0);
+      for (const req of requests) {
+        expect(req.url).not.toMatch(/senha/i);
+        expect(req.url).not.toContain(NOVA);
+      }
+      expect(plain.url()).not.toMatch(/senha/i);
+    } finally {
+      await noJs.close();
     }
-    expect(plain.url()).not.toMatch(/senha/i);
-    await noJs.close();
   });
 
   test("ADR-0008 Addendum 2: changePasswordAction is owned by /configuracoes' page", async () => {

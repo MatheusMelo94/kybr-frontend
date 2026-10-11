@@ -188,6 +188,16 @@ describe("savePolicyAction (D-R1 PUT)", () => {
     expect(policyCalls()).toEqual([]);
   });
 
+  it("P8-011: a workspace with no category yet → UNAVAILABLE, 0 policy calls", async () => {
+    createAccount({ email, preset: "nova" });
+    state.token = openSession(email).id;
+    expect(await savePolicyAction(DRAFT())).toEqual({
+      ok: false,
+      code: "UNAVAILABLE",
+    });
+    expect(policyCalls()).toEqual([]);
+  });
+
   it("409 → POLITICA_DESATUALIZADA, never retried or merged", async () => {
     policyOf(email).versao = 5;
     expect(await savePolicyAction(DRAFT())).toEqual({

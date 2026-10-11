@@ -199,6 +199,15 @@ describe("changePasswordAction (T136)", () => {
       },
     ],
     [
+      "an id that isn't a session token",
+      {
+        sessao: {
+          id: "not a token!",
+          expira_em: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+      },
+    ],
+    [
       "an expiry 8 days ahead",
       {
         sessao: {
