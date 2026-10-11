@@ -248,6 +248,37 @@ test.describe("Regras: saving and leaving @feature-ops-panel @panel-operacao @pa
     await expect(page).toHaveURL(/\/fila(\/[\w-]+)?$/, SETTLE);
   });
 
+  test("P8-005 (D8): dirty + the account menu's Sair asks first; Sair sem salvar signs out", async ({
+    page,
+    request,
+  }, testInfo) => {
+    const email = uniqueEmail("regras-logout", testInfo);
+    await createAccount(request, email);
+    await openRegras(page, email);
+    await changeMei(page);
+    const posts: string[] = [];
+    page.on("request", (sent) => {
+      if (sent.method() === "POST" && sent.headers()["next-action"])
+        posts.push(sent.url());
+    });
+    const signOut = async () => {
+      await page.getByRole("button", { name: "Conta" }).click();
+      await page.getByRole("menuitem", { name: "Sair" }).click();
+    };
+    await signOut();
+    const dialog = page.getByRole("dialog", { name: "Sair sem salvar?" });
+    await expect(dialog).toBeVisible();
+    expect(posts).toEqual([]);
+    await dialog.getByRole("button", { name: "Continuar editando" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/\/regras$/);
+    expect(posts).toEqual([]);
+
+    await signOut();
+    await dialog.getByRole("button", { name: "Sair sem salvar" }).click();
+    await expect(page).toHaveURL(/\/entrar\?motivo=saiu/, SETTLE);
+  });
+
   test("a clean draft: the nav link goes with no dialog", async ({
     page,
     request,

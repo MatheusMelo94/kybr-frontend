@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDialogDraft } from "@/features/panel-shell/components/session-expiry-provider";
+import { setLeaveHolder } from "@/lib/navigation/leave-hold";
 import { useSoftNavigate } from "@/lib/navigation/soft-navigate";
 
 /**
@@ -47,19 +48,25 @@ export function guardedHref(
  * - a capture-phase click guard on same-origin links (the nav, the account
  *   menu, in-page links) holds the href for the regras.leave.* dialog:
  *   `stay` drops it, `leave` disarms and navigates there softly;
+ * - a leave holder (lib/navigation/leave-hold) does the same for the
+ *   account menu's Sair (P8-005): its server redirect is a soft navigation
+ *   beforeunload never sees; `leave` runs the held sign-out;
  * - beforeunload asks the browser's own prompt on reload or close;
  * - useDialogDraft: a session expiry says the draft was lost (perdido=1).
  * The browser's Back button is NOT intercepted (Q3): the App Router can't
  * block a popstate cleanly, and a sentinel history entry is fragile.
  */
+/** What the dialog holds back: a link's href, or an action to run (Sair). */
+type Held = string | (() => void);
+
 export function useLeaveGuard(dirty: boolean): {
-  pending: string | null;
+  pending: Held | null;
   stay: () => void;
   leave: () => void;
   /** Lets the next navigation or reload through (a reload link, a save). */
   disarm: () => void;
 } {
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<Held | null>(null);
   const armed = useRef(dirty);
   const navigate = useSoftNavigate();
 
@@ -88,9 +95,16 @@ export function useLeaveGuard(dirty: boolean): {
       event.returnValue = "";
     };
     document.addEventListener("click", onClick, true);
+    // A function in state needs the updater form.
+    setLeaveHolder((proceed) => {
+      if (!armed.current) return false;
+      setPending(() => proceed);
+      return true;
+    });
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       document.removeEventListener("click", onClick, true);
+      setLeaveHolder(null);
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, [dirty]);
@@ -103,7 +117,9 @@ export function useLeaveGuard(dirty: boolean): {
     if (pending === null) return;
     armed.current = false;
     setPending(null);
-    navigate(pending, { push: true, scroll: true });
+    if (typeof pending === "string")
+      navigate(pending, { push: true, scroll: true });
+    else pending();
   }, [navigate, pending]);
 
   return { pending, stay, leave, disarm };

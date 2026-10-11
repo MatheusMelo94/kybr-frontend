@@ -5,6 +5,7 @@ const logoutAction = vi.hoisted(() => vi.fn());
 vi.mock("@/features/panel-auth/actions", () => ({ logoutAction }));
 
 import { LogoutItem } from "@/features/panel-shell/components/logout-item";
+import { setLeaveHolder } from "@/lib/navigation/leave-hold";
 
 const assign = vi.fn();
 
@@ -24,6 +25,26 @@ describe("LogoutItem (AC 8, P15)", () => {
     expect(item.tagName).toBe("BUTTON");
     expect(item).toHaveAttribute("type", "submit");
     expect(item.closest("form")).not.toBeNull();
+  });
+
+  it("P8-005: a dirty page's holder keeps Sair from posting until it proceeds", async () => {
+    logoutAction.mockResolvedValue(undefined);
+    let proceed: (() => void) | undefined;
+    setLeaveHolder((next) => {
+      proceed = next;
+      return true;
+    });
+    try {
+      render(<LogoutItem />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("menuitem", { name: "Sair" }));
+      });
+      expect(logoutAction).not.toHaveBeenCalled();
+      await act(async () => proceed?.());
+      expect(logoutAction).toHaveBeenCalledOnce();
+    } finally {
+      setLeaveHolder(null);
+    }
   });
 
   it("posts straight to logoutAction, which owns the redirect: no client navigation races it", async () => {

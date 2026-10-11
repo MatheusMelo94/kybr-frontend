@@ -72,7 +72,13 @@ function Harness({ dirty }: { dirty: boolean }) {
       <a href="/fila" target="_blank">
         Nova aba
       </a>
-      <span data-testid="pending">{guard.pending ?? ""}</span>
+      <span data-testid="pending">
+        {typeof guard.pending === "string"
+          ? guard.pending
+          : guard.pending === null
+            ? ""
+            : "action"}
+      </span>
       <button type="button" onClick={guard.stay}>
         stay
       </button>

@@ -13,6 +13,7 @@ import { ToastProvider } from "@/components/panel/toast";
 import type { SavePolicyResult } from "@/features/panel-regras/actions";
 import { PolicyForm } from "@/features/panel-regras/components/policy-form";
 import { REGRAS_H1_ID } from "@/features/panel-regras/ids";
+import { holdLeave } from "@/lib/navigation/leave-hold";
 import type { Policy } from "@/lib/api/schemas/panel/policies";
 
 // T144 (AC 59 first half, plan-m8 D8): the rules in the spec's order with
@@ -357,6 +358,35 @@ describe("PolicyForm: save, conflict and leaving (T145)", () => {
       screen.getByRole("button", { name: "Sair sem salvar", hidden: true }),
     );
     expect(nav.soft).toHaveBeenCalledWith("/fila", expect.anything());
+  });
+
+  it("P8-005 (D8): dirty, the account menu's Sair is held for regras.leave.*; it goes only on Sair sem salvar", () => {
+    const signOut = vi.fn();
+    renderForm();
+    expect(holdLeave(signOut)).toBe(false);
+    editMei();
+
+    let held = false;
+    act(() => {
+      held = holdLeave(signOut);
+    });
+    expect(held).toBe(true);
+    expect(
+      screen.getByRole("heading", { name: "Sair sem salvar?", hidden: true }),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continuar editando", hidden: true }),
+    );
+    expect(signOut).not.toHaveBeenCalled();
+
+    act(() => {
+      holdLeave(signOut);
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sair sem salvar", hidden: true }),
+    );
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(nav.soft).not.toHaveBeenCalled();
   });
 
   it("a clean draft: links pass with no dialog", () => {
