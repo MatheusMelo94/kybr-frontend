@@ -44,6 +44,7 @@ export function SellersEmpty({
             label={homeCopy["home.cta.copy"]}
             inputLabel={settingsCopy["settings.link.h"]}
             inputVisible="on-error"
+            variant="primary"
           />
           <Link href="/lote" className={PANEL_LINK}>
             {homeCopy["home.cta.lote"]}

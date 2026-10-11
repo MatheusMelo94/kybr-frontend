@@ -24,9 +24,10 @@ describe("SellersEmpty", () => {
         "Coloque o link no seu cadastro de vendedores ou verifique sua base em lote.",
       ),
     ).toBeInTheDocument();
+    // P8-009: spec S10 marks it primary.
     expect(
       screen.getByRole("button", { name: "Copiar link de cadastro" }),
-    ).toBeInTheDocument();
+    ).toHaveClass("bg-accent");
     expect(
       screen.getByRole("link", { name: "Verificar em lote" }),
     ).toHaveAttribute("href", "/lote");

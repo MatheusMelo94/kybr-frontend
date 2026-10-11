@@ -81,11 +81,28 @@ export function PasswordForm({ email }: Props): JSX.Element {
     [],
   );
 
-  /** The draft is only whether there's input, never the input (O-F2). */
-  function noteInput(): void {
+  /**
+   * The draft is only whether there's input, never the input (O-F2).
+   * Typing in a field clears its error (P8-009, as SettingsForm does).
+   */
+  function noteInput(event: FormEvent<HTMLFormElement>): void {
     setHasInput(
       [atual, nova].some((field) => (field.current?.value ?? "") !== ""),
     );
+    const typed = event.target;
+    const field =
+      typed === atual.current
+        ? "atual"
+        : typed === nova.current
+          ? "nova"
+          : null;
+    if (field !== null)
+      setErrors((previous) => {
+        if (previous[field] === undefined) return previous;
+        const next = { ...previous };
+        delete next[field];
+        return next;
+      });
   }
 
   function lockFor(seconds: number): void {

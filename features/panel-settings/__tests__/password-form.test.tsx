@@ -94,6 +94,11 @@ describe("PasswordForm (T136)", () => {
       expect.stringContaining("A senha precisa ter pelo menos 12 caracteres."),
     );
     expect(next()).toHaveFocus();
+    // P8-009: typing in the field clears its error, as SettingsForm does.
+    await userEvent.type(next(), "x");
+    expect(next()).not.toHaveAccessibleDescription(
+      expect.stringContaining("A senha precisa ter pelo menos 12 caracteres."),
+    );
   });
 
   it("O-F1: SENHA_ATUAL_INCORRETA → pwd.error.current on the current field, no expiry", async () => {

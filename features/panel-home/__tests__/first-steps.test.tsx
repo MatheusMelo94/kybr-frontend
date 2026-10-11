@@ -68,6 +68,11 @@ describe("FirstSteps (T133, AC 53)", () => {
     );
   });
 
+  it("P8-009: the alert region is mounted, empty, before any failure", () => {
+    render(<FirstSteps steps={STEPS} />);
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+  });
+
   it("a failure shows error.network inline and the card stays", async () => {
     hide.mockResolvedValue({ ok: false, code: "NETWORK" });
     render(<FirstSteps steps={STEPS} />);

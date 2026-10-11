@@ -2,6 +2,7 @@
 
 import { useId, useState, type JSX } from "react";
 
+import { FormAlert } from "@/components/panel/form-alert";
 import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
 import { sellersCopy } from "@/features/panel-sellers/copy";
@@ -71,11 +72,8 @@ export function ExportButtons({
                 n: formatNumber(total),
               })}
         </p>
-        {sellers.failed && (
-          <p role="alert" className="text-secondary text-danger-ink">
-            {globalCopy["export.error"]}
-          </p>
-        )}
+        {/* P8-009: mounted empty, so the message is announced (P6-004). */}
+        <FormAlert>{sellers.failed && globalCopy["export.error"]}</FormAlert>
       </div>
       <div className="flex min-w-0 flex-wrap items-end gap-3">
         <TextField
@@ -105,11 +103,10 @@ export function ExportButtons({
         >
           {sellersCopy["sellers.audit"]}
         </Button>
-        {audit.failed && (
-          <p role="alert" className="basis-full text-secondary text-danger-ink">
-            {globalCopy["export.error"]} {sellersCopy["export.too_large"]}
-          </p>
-        )}
+        <FormAlert className="basis-full">
+          {audit.failed &&
+            `${globalCopy["export.error"]} ${sellersCopy["export.too_large"]}`}
+        </FormAlert>
       </div>
     </div>
   );

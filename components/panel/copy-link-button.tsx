@@ -16,6 +16,8 @@ type Props = {
   inputLabel: string;
   /** "always": the input shows from the start; "on-error": only after a failed copy. */
   inputVisible: "always" | "on-error";
+  /** Secondary by default; an empty state's lead action is primary (S10, P8-009). */
+  variant?: "primary" | "secondary";
 };
 
 /**
@@ -30,6 +32,7 @@ export function CopyLinkButton({
   label,
   inputLabel,
   inputVisible,
+  variant = "secondary",
 }: Props): JSX.Element {
   const { show } = useToast();
   const input = useRef<HTMLInputElement>(null);
@@ -75,7 +78,7 @@ export function CopyLinkButton({
         )}
         <Button
           type="button"
-          variant="secondary"
+          variant={variant}
           size="panel"
           onClick={() => void copy()}
         >

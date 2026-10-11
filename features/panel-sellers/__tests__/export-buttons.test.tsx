@@ -87,13 +87,20 @@ describe("ExportButtons", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalled();
   });
 
+  it("P8-009: both alert regions are mounted, empty, before any failure", () => {
+    renderButtons();
+    const alerts = screen.getAllByRole("alert");
+    expect(alerts).toHaveLength(2);
+    for (const alert of alerts) expect(alert).toBeEmptyDOMElement();
+  });
+
   it("a failed export: export.error inline, without the period hint", async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 502 }));
     renderButtons();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
     });
-    expect(screen.getByRole("alert")).toHaveTextContent(EXPORT_ERROR);
+    expect(screen.getAllByRole("alert")[0]).toHaveTextContent(EXPORT_ERROR);
     expect(screen.queryByText(TOO_LARGE)).toBeNull();
   });
 
@@ -124,7 +131,7 @@ describe("ExportButtons", () => {
         screen.getByRole("button", { name: "Exportar trilha de auditoria" }),
       );
     });
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    expect(screen.getAllByRole("alert")[1]).toHaveTextContent(
       `${EXPORT_ERROR} ${TOO_LARGE}`,
     );
   });

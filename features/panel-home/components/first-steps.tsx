@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type JSX } from "react";
 
+import { FormAlert } from "@/components/panel/form-alert";
 import { Button } from "@/components/ui/button";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import {
@@ -105,11 +106,8 @@ export function FirstSteps({ steps }: Props): JSX.Element | null {
         >
           {homeCopy["home.steps.hide"]}
         </Button>
-        {failed && (
-          <p role="alert" className="text-secondary text-danger-ink">
-            {globalCopy["error.network"]}
-          </p>
-        )}
+        {/* P8-009: mounted empty, so the message is announced (P6-004). */}
+        <FormAlert>{failed && globalCopy["error.network"]}</FormAlert>
       </div>
     </HomeCard>
   );

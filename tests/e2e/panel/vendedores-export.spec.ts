@@ -94,7 +94,10 @@ test.describe("Vendedores: exports @feature-ops-panel @panel-operacao @panel-ven
 
     await sellersFault(request, email, "sellers-csv", "500", { times: 1 });
     await content.getByRole("button", { name: "Exportar CSV" }).click();
-    await expect(content.getByRole("alert")).toHaveText(EXPORT_ERROR, SETTLE);
+    // P8-009: both regions are always mounted; the CSV's is the first.
+    const alerts = content.getByRole("alert");
+    await expect(alerts).toHaveCount(2);
+    await expect(alerts.first()).toHaveText(EXPORT_ERROR, SETTLE);
 
     await sellersFault(request, email, "audit-csv", "csv-grande", {
       times: 1,
