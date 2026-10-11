@@ -40,8 +40,8 @@ export function Select({
     .join(" ");
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <label htmlFor={id} className="text-label font-strong text-ink">
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      <label htmlFor={id} className="break-words text-label font-strong text-ink">
         {label}
       </label>
       <select
@@ -54,7 +54,9 @@ export function Select({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy || undefined}
         className={cn(
-          "min-h-10 w-full rounded-lg border border-field-line bg-field px-3 text-body text-ink",
+          // WebKit sizes a <select> to its longest option: min-w-0 + max-w-full
+          // let it shrink inside a flex column at 360 px / 200 % (AC 74).
+          "min-h-10 w-full min-w-0 max-w-full rounded-lg border border-field-line bg-field px-3 text-body text-ink",
           "hover:border-ink-muted",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           "aria-invalid:border-danger-ink",

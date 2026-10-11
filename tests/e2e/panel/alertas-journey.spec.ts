@@ -97,6 +97,11 @@ test.describe("AC 47: alert e-mail → case → Bloquear → decided (T126) @fea
       page.getByRole("status").filter({ hasText: /Bloqueado: / }),
     ).toBeVisible(SETTLE);
 
+    // D13: the app navigates on after the decision; let that navigation land
+    // before ours, or WebKit interrupts the goto (CI panel-webkit-360).
+    await expect(page).not.toHaveURL(new RegExp(`/fila/${caseId}$`), SETTLE);
+    await page.waitForLoadState("networkidle");
+
     // The Monitoramento: the alert reads decided, no Decidir; the count dropped.
     await page.goto("/monitoramento");
     const row = page

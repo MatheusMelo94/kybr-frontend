@@ -201,6 +201,9 @@ test.describe("Monitoramento offline, phone and accessibility (T125) @feature-op
     await expect(banner(page)).toHaveCount(0);
 
     await alertScenario(request, email, "monitoramento-falha");
+    // The reconnect's re-read may still be navigating; let it settle first,
+    // or WebKit interrupts the goto (CI panel-webkit-360).
+    await page.waitForLoadState("networkidle");
     await page.goto("/monitoramento");
     await expect(main(page).getByRole("article")).toHaveCount(7);
     await crossCutting(page, "partial (pill hidden)");
