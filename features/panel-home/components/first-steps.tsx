@@ -15,6 +15,7 @@ import type { FirstStepsState } from "@/features/panel-home/home-state";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import { globalCopy } from "@/features/panel-shell/copy/global";
 import { useSessionExpiry } from "@/features/panel-shell/use-session-expiry";
+import { cn } from "@/lib/utils";
 
 type Props = { steps: FirstStepsState };
 
@@ -86,7 +87,7 @@ export function FirstSteps({ steps }: Props): JSX.Element | null {
                 />
               </svg>
             )}
-            <Link href={item.href} className={`${PANEL_LINK} break-words`}>
+            <Link href={item.href} className={cn(PANEL_LINK, "break-words")}>
               {item.label}
             </Link>
             {steps[item.key] && (

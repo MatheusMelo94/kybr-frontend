@@ -9,6 +9,7 @@ import {
 import { homeCopy } from "@/features/panel-home/copy";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import type { Dashboard } from "@/lib/api/schemas/panel/home";
+import { cn } from "@/lib/utils";
 
 const QUEUE_ID = "home-queue";
 
@@ -38,7 +39,7 @@ export function QueueCard({ fila }: Props): JSX.Element {
             <li key={item.id} className="min-w-0">
               <Link
                 href={`/fila/${item.id}`}
-                className={`${PANEL_LINK} break-words`}
+                className={cn(PANEL_LINK, "break-words")}
               >
                 {item.razao_social ?? item.cnpj}
               </Link>

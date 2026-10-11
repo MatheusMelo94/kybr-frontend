@@ -26,6 +26,8 @@ export function SaveBar({
       aria-label={regrasCopy["regras.save"]}
       className="sticky bottom-0 z-10 flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-raised p-4"
     >
+      {/* The note takes the row and wraps the buttons under it below 16rem
+          (about 256 px: a phone at 200 % text). */}
       <p className="min-w-0 flex-[1_1_16rem] text-secondary text-ink">
         {regrasCopy["regras.save.note"]}
       </p>

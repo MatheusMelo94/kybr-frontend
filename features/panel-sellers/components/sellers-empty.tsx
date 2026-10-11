@@ -11,6 +11,7 @@ import {
 import { settingsCopy } from "@/features/panel-settings/copy";
 import { PANEL_LINK } from "@/features/panel-shell/components/panel-not-found";
 import { fill } from "@/features/panel-shell/format";
+import { cn } from "@/lib/utils";
 
 /**
  * Vendedores' empty states (AC 55). Nobody yet: sellers.empty.* + "Copiar
@@ -59,7 +60,7 @@ export function SellersEmpty({
         </p>
         <Link
           href={sellersHref({ pagina: 1 })}
-          className={`${PANEL_LINK} self-start`}
+          className={cn(PANEL_LINK, "self-start")}
         >
           {sellersCopy["sellers.empty.filter.cta"]}
         </Link>
@@ -74,7 +75,10 @@ export function SellersEmpty({
       <p className="text-body break-words text-ink">
         {fill(sellersCopy["sellers.empty.search"], { busca: search.q })}
       </p>
-      <Link href={sellersHref(cleared)} className={`${PANEL_LINK} self-start`}>
+      <Link
+        href={sellersHref(cleared)}
+        className={cn(PANEL_LINK, "self-start")}
+      >
         {sellersCopy["sellers.empty.search.cta"]}
       </Link>
     </div>
