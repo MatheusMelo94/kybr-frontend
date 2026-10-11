@@ -40,37 +40,59 @@ export function Select({
     .join(" ");
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <label htmlFor={id} className="text-label font-strong text-ink">
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      <label
+        htmlFor={id}
+        className="text-label font-strong break-words text-ink"
+      >
         {label}
       </label>
-      <select
-        ref={ref}
-        id={id}
-        name={name}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy || undefined}
-        className={cn(
-          "min-h-10 w-full rounded-lg border border-field-line bg-field px-3 text-body text-ink",
-          "hover:border-ink-muted",
-          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
-          "aria-invalid:border-danger-ink",
-          "disabled:cursor-not-allowed",
-          "pointer-coarse:min-h-11",
-        )}
-      >
-        {children}
-      </select>
+      {/* relative: holds the drawn chevron. WebKit's native menulist won't
+          shrink below its longest option (AC 74 at 360 px / 200 %), so the
+          control is appearance-none with its own chevron. */}
+      <div className="relative min-w-0">
+        <select
+          ref={ref}
+          id={id}
+          name={name}
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy || undefined}
+          className={cn(
+            "min-h-10 w-full max-w-full min-w-0 appearance-none truncate rounded-lg border border-field-line bg-field py-2 pr-10 pl-3 text-body text-ink",
+            "hover:border-ink-muted",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
+            "aria-invalid:border-danger-ink",
+            "disabled:cursor-not-allowed",
+            "pointer-coarse:min-h-11",
+          )}
+        >
+          {children}
+        </select>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-ink-muted"
+        >
+          <path
+            d="M4 6l4 4 4-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
       {hint && (
-        <p id={hintId} className="text-secondary text-ink-muted">
+        <p id={hintId} className="text-secondary break-words text-ink-muted">
           {hint}
         </p>
       )}
       {error && (
-        <p id={errorId} className="text-secondary text-danger-ink">
+        <p id={errorId} className="text-secondary break-words text-danger-ink">
           {error}
         </p>
       )}

@@ -31,9 +31,43 @@ async function reflows(page: Page, label: string): Promise<void> {
         document.documentElement.scrollWidth -
         document.documentElement.clientWidth,
     );
+    // On failure, name the elements that stick out (WebKit runs in CI only).
+    // On failure, find what widens the page by hiding elements one at a time
+    // (WebKit runs in CI only; a text overflow has no box past the edge).
+    const culprits =
+      overflow > 0
+        ? await page.evaluate(() => {
+            const doc = document.documentElement;
+            const over = () => doc.scrollWidth - doc.clientWidth;
+            const describe = (el: Element) =>
+              `<${el.tagName.toLowerCase()} class="${(el.getAttribute("class") ?? "").slice(0, 90)}"> "${(el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 50)}"`;
+            const found: string[] = [];
+            // Walk down from body: keep descending into the child whose
+            // removal fixes the overflow, so the deepest such element wins.
+            let parent: Element = document.body;
+            for (let depth = 0; depth < 30; depth++) {
+              let next: Element | undefined;
+              for (const child of [...parent.children]) {
+                const el = child as HTMLElement;
+                const before = el.style.display;
+                el.style.display = "none";
+                const fixed = over() <= 0;
+                el.style.display = before;
+                if (fixed) {
+                  next = child;
+                  break;
+                }
+              }
+              if (!next) break;
+              found.push(describe(next));
+              parent = next;
+            }
+            return found.slice(-4);
+          })
+        : [];
     expect(
       overflow,
-      `${label}: AC 74 at ${width}px, ${scale}`,
+      `${label}: AC 74 at ${width}px, ${scale}\n${culprits.join("\n")}`,
     ).toBeLessThanOrEqual(0);
   }
   await page.evaluate(() => {

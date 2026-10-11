@@ -6,6 +6,7 @@ import {
   setAlertClock,
 } from "../fixtures/alerts-mock.ts";
 import { expectNoAxeViolations } from "../fixtures/axe.ts";
+import { SETTLE } from "../fixtures/fila-timing.ts";
 import {
   callsFor,
   createAccount,
@@ -201,7 +202,11 @@ test.describe("Monitoramento offline, phone and accessibility (T125) @feature-op
     await expect(banner(page)).toHaveCount(0);
 
     await alertScenario(request, email, "monitoramento-falha");
-    await page.goto("/monitoramento");
+    // The reconnect's re-read may still be navigating (WebKit: even a full
+    // load of /monitoramento itself); retry the goto until one lands.
+    await expect(async () => {
+      await page.goto("/monitoramento");
+    }).toPass(SETTLE);
     await expect(main(page).getByRole("article")).toHaveCount(7);
     await crossCutting(page, "partial (pill hidden)");
     await alertScenario(request, email, "monitoramento-falha", false);

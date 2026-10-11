@@ -21,7 +21,10 @@ export function DocToggles({ enabled, onToggle, error }: Props): JSX.Element {
       aria-labelledby="regras-docs-h"
       className="flex min-w-0 flex-col gap-3 rounded-lg border border-line p-4"
     >
-      <h2 id="regras-docs-h" className="text-h2 font-title text-ink">
+      <h2
+        id="regras-docs-h"
+        className="text-h2 font-title break-words text-ink"
+      >
         {regrasCopy["regras.docs.h"]}
       </h2>
       <p className="text-secondary text-ink-muted">
