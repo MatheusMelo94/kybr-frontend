@@ -36,8 +36,19 @@ async function reflows(page: Page, label: string): Promise<void> {
       overflow > 0
         ? await page.evaluate(() => {
             const limit = document.documentElement.clientWidth;
+            // Skip anything inside a horizontal scroll box (the tab row):
+            // it scrolls there and can't widen the page.
+            const scrolls = (el: Element): boolean => {
+              for (let p = el.parentElement; p; p = p.parentElement) {
+                const o = getComputedStyle(p).overflowX;
+                if (o === "auto" || o === "scroll" || o === "hidden")
+                  return true;
+              }
+              return false;
+            };
             return [...document.querySelectorAll("body *")]
               .filter((el) => el.getBoundingClientRect().right > limit + 0.5)
+              .filter((el) => !scrolls(el))
               .filter(
                 (el) =>
                   ![...el.children].some(
@@ -45,7 +56,7 @@ async function reflows(page: Page, label: string): Promise<void> {
                       child.getBoundingClientRect().right > limit + 0.5,
                   ),
               )
-              .slice(0, 5)
+              .slice(0, 8)
               .map((el) => {
                 const r = el.getBoundingClientRect();
                 return `<${el.tagName.toLowerCase()} class="${(el.getAttribute("class") ?? "").slice(0, 80)}"> w=${Math.round(r.width)} right=${Math.round(r.right)} "${(el.textContent ?? "").trim().slice(0, 40)}"`;
