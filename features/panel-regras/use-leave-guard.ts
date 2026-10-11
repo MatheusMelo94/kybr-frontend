@@ -96,7 +96,7 @@ export function useLeaveGuard(dirty: boolean): {
     };
     document.addEventListener("click", onClick, true);
     // A function in state needs the updater form.
-    setLeaveHolder((proceed) => {
+    const unregister = setLeaveHolder((proceed) => {
       if (!armed.current) return false;
       setPending(() => proceed);
       return true;
@@ -104,7 +104,7 @@ export function useLeaveGuard(dirty: boolean): {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       document.removeEventListener("click", onClick, true);
-      setLeaveHolder(null);
+      unregister();
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, [dirty]);

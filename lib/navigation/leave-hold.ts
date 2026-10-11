@@ -9,9 +9,17 @@ type Holder = (proceed: () => void) => boolean;
 
 let holder: Holder | null = null;
 
-/** Registers (or, with null, clears) the page's holder. */
-export function setLeaveHolder(next: Holder | null): void {
+/**
+ * Registers (or, with null, clears) the page's holder. Returns an
+ * unregister that clears it only while it's still this holder (P8-013): an
+ * older cleanup running after a newer register (React commit order across
+ * a navigation, the R1 lesson) must not disable the newer hold.
+ */
+export function setLeaveHolder(next: Holder | null): () => void {
   holder = next;
+  return () => {
+    if (holder === next) holder = null;
+  };
 }
 
 /** True when a holder kept `proceed` for its own confirmation; then don't go. */
