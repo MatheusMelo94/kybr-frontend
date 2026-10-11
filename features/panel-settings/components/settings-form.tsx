@@ -23,6 +23,7 @@ import {
   type SaveSettingsResult,
 } from "@/features/panel-settings/actions";
 import { settingsCopy } from "@/features/panel-settings/copy";
+import { SETTINGS_H1_ID } from "@/features/panel-settings/ids";
 import {
   OWN_NAME_MAX_LENGTH,
   PLATFORM_NAME_MAX_LENGTH,
@@ -133,6 +134,9 @@ export function SettingsForm({ initial, link }: Props): JSX.Element {
       setSaved(sent);
       setValues(sent);
       toast.show(settingsCopy["toast.settings_saved"]);
+      // P8-002: clean again, "Salvar alterações" is disabled under focus;
+      // the h1 takes it (the toast announces the save), as on Regras.
+      document.getElementById(SETTINGS_H1_ID)?.focus();
       return null;
     }
     switch (result.code) {

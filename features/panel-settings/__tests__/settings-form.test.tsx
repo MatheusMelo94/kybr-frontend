@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ToastProvider } from "@/components/panel/toast";
 import { SettingsForm } from "@/features/panel-settings/components/settings-form";
+import { SETTINGS_H1_ID } from "@/features/panel-settings/ids";
 
 // T135 (AC 60 save half): the Configurações form, enabled only when dirty,
 // busy while saving, toast on success, error.network inline with the values
@@ -33,6 +34,9 @@ const INITIAL = {
 function view(): JSX.Element {
   return (
     <ToastProvider closeLabel="Fechar">
+      <h1 id={SETTINGS_H1_ID} tabIndex={-1}>
+        Configurações
+      </h1>
       <SettingsForm initial={INITIAL} link={<p>link slot</p>} />
     </ToastProvider>
   );
@@ -114,6 +118,10 @@ describe("SettingsForm (T135, AC 60)", () => {
     );
     expect(saveButton()).toBeDisabled();
     expect(draft).toHaveBeenLastCalledWith(false);
+    // P8-002: the focused button is now disabled; focus never falls to <body>.
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 1 }),
+    );
   });
 
   it("a failure shows error.network inline and keeps the values", async () => {

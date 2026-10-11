@@ -5,6 +5,7 @@ import { CopyLinkButton } from "@/components/panel/copy-link-button";
 import { PasswordForm } from "@/features/panel-settings/components/password-form";
 import { SettingsForm } from "@/features/panel-settings/components/settings-form";
 import { settingsCopy } from "@/features/panel-settings/copy";
+import { SETTINGS_H1_ID } from "@/features/panel-settings/ids";
 import { requireSession } from "@/lib/api/panel/session";
 
 export const metadata: Metadata = { title: settingsCopy["settings.h1"] };
@@ -15,7 +16,11 @@ export default async function ConfiguracoesPage(): Promise<JSX.Element> {
   const me = await requireSession();
   return (
     <div className="flex max-w-prose min-w-0 flex-col gap-8">
-      <h1 className="text-title font-title text-ink">
+      <h1
+        id={SETTINGS_H1_ID}
+        tabIndex={-1}
+        className="text-title font-title text-ink focus:outline-none"
+      >
         {settingsCopy["settings.h1"]}
       </h1>
       <SettingsForm
